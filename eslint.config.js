@@ -9,9 +9,10 @@ import tsconfig from "./tsconfig.json" with { type: "json" };
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
+    { ignores: ["mobile/**"] },
     { files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"] },
     { languageOptions: { globals: globals.browser } },
-    pluginJs.configs.recommended,
+pluginJs.configs.recommended,
     ...tseslint.configs.recommended,
     pluginReact.configs.flat.recommended,
     {
