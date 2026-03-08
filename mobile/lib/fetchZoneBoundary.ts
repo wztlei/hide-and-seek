@@ -10,6 +10,9 @@ const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
 // every time an additional location is added/removed in the same session.
 const geoJSONCache = new Map<number, FeatureCollection>();
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+
 async function fetchGeoJSONForZone(
   osmId: number,
   osmType: 'W' | 'R' | 'N',
@@ -18,19 +21,34 @@ async function fetchGeoJSONForZone(
   if (cached) return cached;
 
   const typeMap = { W: 'way', R: 'relation', N: 'node' } as const;
-  const query = `[out:json];${typeMap[osmType]}(${osmId});out geom;`;
-  const res = await fetch(`${OVERPASS_API}?data=${encodeURIComponent(query)}`);
-  if (!res.ok) {
-    throw new Error(`Overpass API error ${res.status} for osm_id ${osmId}`);
+  // [timeout:60] tells Overpass to allow up to 60 s of server-side processing
+  // before giving up (default is 25 s, which is too short for large relations).
+  const query = `[out:json][timeout:60];${typeMap[osmType]}(${osmId});out geom;`;
+  const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+    const res = await fetch(url);
+    if (res.status === 429 || res.status >= 500) {
+      lastError = new Error(`Overpass API error ${res.status} for osm_id ${osmId}`);
+      continue; // retry
+    }
+    if (!res.ok) {
+      throw new Error(`Overpass API error ${res.status} for osm_id ${osmId}`);
+    }
+    const data = await res.json();
+    const geo = osmtogeojson(data);
+    const result: FeatureCollection = {
+      ...geo,
+      features: geo.features.filter((f: any) => f.geometry.type !== 'Point'),
+    };
+    geoJSONCache.set(osmId, result);
+    return result;
   }
-  const data = await res.json();
-  const geo = osmtogeojson(data);
-  const result: FeatureCollection = {
-    ...geo,
-    features: geo.features.filter((f: any) => f.geometry.type !== 'Point'),
-  };
-  geoJSONCache.set(osmId, result);
-  return result;
+  throw lastError ?? new Error(`Overpass API failed for osm_id ${osmId}`);
 }
 
 // Inline safeUnion — operators.ts is not RN-safe due to @arcgis/core import
