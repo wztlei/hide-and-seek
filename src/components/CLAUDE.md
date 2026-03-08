@@ -104,3 +104,52 @@ The mobile component also has no `onSelectLocation` prop — it writes to stores
 | GPS | `navigator.geolocation.watchPosition` | `expo-location` (`Location.watchPositionAsync`) |
 | Context menu | `leaflet-contextmenu` plugin | `<MapContextMenu>` component (long-press) |
 | Duplicate layer guard | Polling interval | N/A — declarative rendering prevents duplicates |
+
+---
+
+# PolygonDraw.tsx — Component Logic Summary
+
+## Overview
+
+`PolygonDraw.tsx` (`src/components/PolygonDraw.tsx`) is a Leaflet-Draw integration component that enables interactive polygon/marker/polyline drawing on the web map. It is entirely web-only due to its Leaflet-Draw and react-leaflet-draw dependencies.
+
+## What It Renders
+
+- A Leaflet `FeatureGroup` with an `EditControl` (react-leaflet-draw) that surfaces polygon, marker, and polyline drawing tools in the map's bottom-left.
+- `TentacleMarker` — clickable markers for `tentacles`-type questions with `locationType: "custom"`. Click opens a dialog to edit the POI name and coordinates inline.
+- `MatchingPointMarker` — clickable markers for `matching`-type questions with `type: "custom-points"`. Click opens a lat/lng editor dialog.
+- `MeasuringPointMarker` — clickable markers for `measuring`-type questions with `type: "custom-measure"`. Click opens a lat/lng editor dialog.
+- Red `<Polygon>` and `<Polyline>` overlays for existing custom-zone/custom-measure geometry.
+
+## Nanostores It Reads / Writes
+
+| Atom | Access | Purpose |
+|------|--------|---------|
+| `drawingQuestionKey` | read | `-1` = drawing hiding zone; any other value = drawing for that question key |
+| `questions` | read/write | Finds the current question; writes updated `places`/`geo` back |
+| `mapGeoJSON` | write | Set to drawn FeatureCollection when drawing the hiding zone |
+| `polyGeoJSON` | write | Same FeatureCollection written alongside `mapGeoJSON` for zone override |
+| `questionModified` | call | Triggers sidebar refresh after per-question drawing changes |
+| `autoSave` | read | Conditionally shows a manual Save button in marker dialogs |
+
+## `onChange()` Handler
+
+Called on `EditControl` `onCreated`, `onEdited`, `onDeleted` events:
+
+1. **Hiding zone (`drawingQuestionKey === -1`)**: collects all `FeatureGroup` layers → `layer.toGeoJSON()` → `turf.featureCollection()` → writes to both `mapGeoJSON` and `polyGeoJSON`; clears `questions` and zone cache.
+2. **Tentacles custom**: collects point layers → deduplicates by coordinates → writes to `question.data.places`; removes unlabelled markers from the group.
+3. **Matching custom-zone**: combines all polygons via `turf.combine()` → writes to `question.data.geo`; removes non-special layers.
+4. **Matching custom-points**: collects point layers → deduplicates → writes to `question.data.geo`.
+5. **Measuring custom-measure**: collects all layers → deduplicates → writes to `question.data.geo` as a FeatureCollection.
+
+After any per-question write, calls `questionModified()` to refresh the sidebar.
+
+## `swapCoordinates()` Helper
+
+A JSON parse/stringify reviver that flips every `[lat, lng]` pair to `[lng, lat]` (or vice versa). Used when rendering existing custom-zone and custom-measure polygons as Leaflet `<Polygon>` / `<Polyline>` (which expect `[lat, lng]` position arrays), because the store holds standard GeoJSON `[lng, lat]` order.
+
+## Not Portable to React Native
+
+- `leaflet-draw`, `EditControl`, `react-leaflet-draw`, `FeatureGroup`, `Marker`, `Polygon`, `Polyline` — all Leaflet/web-only.
+- The coordinate-swap logic, GeoJSON collection, turf.js calls, and nanostore writes are all portable.
+- Mobile drawing (if needed) would require a different gesture-based approach (e.g., `@maplibre/maplibre-react-native` `ShapeSource` + touch handlers).

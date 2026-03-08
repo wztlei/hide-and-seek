@@ -1,20 +1,27 @@
 import {
   Camera,
   type CameraRef,
+  FillLayer,
+  LineLayer,
   MapView as MLMapView,
   MarkerView,
   setAccessToken,
+  ShapeSource,
   UserLocation,
 } from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '@nanostores/react';
+import * as turf from '@turf/turf';
 import * as Location from 'expo-location';
+import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../lib/colors';
-import { mapGeoLocation, thunderforestApiKey } from '../lib/context';
+import { additionalMapGeoLocations, mapGeoJSON, mapGeoLocation, thunderforestApiKey } from '../lib/context';
+import { fetchAllZoneBoundaries } from '../lib/fetchZoneBoundary';
+import { toast } from '../lib/notifications';
 import { PlacePicker } from './PlacePicker';
 
 // MapLibre doesn't need a Mapbox token when using OSM tiles
@@ -91,6 +98,38 @@ function UserLocationDot() {
 
 export function AppMapView() {
   const $mapGeoLocation = useStore(mapGeoLocation);
+  const $additionalMapGeoLocations = useStore(additionalMapGeoLocations);
+  const $mapGeoJSON = useStore(mapGeoJSON);
+  const [eliminationMask, setEliminationMask] = useState<Feature<Polygon | MultiPolygon> | null>(null);
+
+  // Compute elimination mask: world polygon minus the zone, matching the web's holedMask().
+  // The zone itself is left clear; everything outside gets the overlay.
+  useEffect(() => {
+    if (!$mapGeoJSON) {
+      setEliminationMask(null);
+      return;
+    }
+    try {
+      const features = $mapGeoJSON.features as Feature<Polygon | MultiPolygon>[];
+      // turf.union requires ≥2 features; use the single feature directly to avoid the error
+      const zone = features.length === 1
+        ? features[0]
+        : turf.union(turf.featureCollection(features));
+      if (!zone) return;
+      const world: Feature<Polygon> = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]],
+        },
+      };
+      setEliminationMask(turf.difference(turf.featureCollection([world, zone])));
+    } catch (e) {
+      console.error('Failed to compute zone mask:', e);
+      toast.error('Could not render zone boundary');
+    }
+  }, [$mapGeoJSON]);
   const $thunderforestApiKey = useStore(thunderforestApiKey);
   const cameraRef = useRef<CameraRef>(null);
   const insets = useSafeAreaInsets();
@@ -159,6 +198,20 @@ export function AppMapView() {
     };
   }, []);
 
+  // Re-fetch zone boundary whenever the selected location(s) change
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllZoneBoundaries()
+      .then((boundary) => { if (!cancelled) mapGeoJSON.set(boundary); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [
+    $mapGeoLocation.properties.osm_id,
+    $additionalMapGeoLocations.length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    $additionalMapGeoLocations.map((x) => `${x.location.properties.osm_id}:${x.added}`).join(','),
+  ]);
+
   return (
     <View className="flex-1">
       <MLMapView
@@ -186,6 +239,19 @@ export function AppMapView() {
           <MarkerView coordinate={userCoord}>
             <UserLocationDot />
           </MarkerView>
+        )}
+
+        {eliminationMask && (
+          <ShapeSource id="zone-mask" shape={eliminationMask}>
+            <FillLayer
+              id="zone-mask-fill"
+              style={{ fillColor: '#3388ff', fillOpacity: 0.2 }}
+            />
+            <LineLayer
+              id="zone-mask-line"
+              style={{ lineColor: '#3388ff', lineWidth: 3, lineOpacity: 1 }}
+            />
+          </ShapeSource>
         )}
       </MLMapView>
 
