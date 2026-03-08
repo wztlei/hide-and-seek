@@ -21,6 +21,10 @@ jest.mock('@maplibre/maplibre-react-native', () => ({
   FillLayer: 'FillLayer',
   LineLayer: 'LineLayer',
   SymbolLayer: 'SymbolLayer',
+  CircleLayer: 'CircleLayer',
+  RasterSource: 'RasterSource',
+  RasterLayer: 'RasterLayer',
+  PointAnnotation: 'PointAnnotation',
   MarkerView: 'MarkerView',
   setAccessToken: jest.fn(),
 }));

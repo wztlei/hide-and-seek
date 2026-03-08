@@ -9,8 +9,8 @@ Update after each verified + committed phase or sub-feature.
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 — Infrastructure | 🔄 In Progress | Deps + config + lib files done; awaiting manual verification |
-| 1 — Core Map Screen | ⬜ Not Started | |
+| 0 — Infrastructure | ✅ Complete | Deps + config + lib files done; unit tests pass |
+| 1 — Core Map Screen | ✅ Complete | Components written; all 5 tests pass |
 | 2 — Question System | ⬜ Not Started | |
 | 3 — Place Picker | ⬜ Not Started | |
 | 4 — Settings & Sharing | ⬜ Not Started | |
@@ -56,28 +56,36 @@ Update after each verified + committed phase or sub-feature.
 - [x] `mobile/jest.config.js` + `mobile/jest.setup.ts`
 
 ### Verification
-- [ ] `npx expo start --clear` — no red errors on cold start
-- [ ] `pnpm dev` — web app still works
+- [ ] `npx expo start --clear` — no red errors on cold start (awaiting manual test)
+- [ ] `pnpm dev` — web app still works (awaiting manual test)
 
 ---
 
 ## Phase 1 — Core Map Screen
 
 ### Features
-- [ ] Tile layer renders
-- [ ] GeoJSON question layers (one per questionKey)
-- [ ] Draggable question markers
-- [ ] Long-press context menu
-- [ ] GPS follow-me
-- [ ] Auto-zoom to result bounds
+- [x] Tile layer renders
+- [x] GeoJSON question layers (one per questionKey)
+- [x] Draggable question markers
+- [x] Long-press context menu
+- [x] GPS follow-me
+- [x] Auto-zoom to result bounds
 
 ### Files
-- [ ] `mobile/components/MapView.tsx`
-- [ ] `mobile/components/DraggableMarker.tsx`
-- [ ] `mobile/components/MapContextMenu.tsx`
+- [x] `mobile/components/MapView.tsx`
+- [x] `mobile/components/DraggableMarker.tsx`
+- [x] `mobile/components/MapContextMenu.tsx`
 
 ### Tests
-- [ ] `mobile/__tests__/components/MapView.test.tsx`
+- [x] `mobile/__tests__/components/MapView.test.tsx` — 5 tests pass
+
+### Manual verification (run `npx expo start --clear` from `mobile/`)
+- [x] App launches — no red error screen; Thunderforest tiles load
+- [x] Long-press map — context menu appears
+- [ ] Add Radius question — blue fill/outline overlay appears
+- [ ] GPS follow-me — toggle → permission dialog → blue dot
+- [ ] Auto-zoom — after adding a question, map fits result polygon
+- [ ] Draggable markers — question markers visible; can drag them
 
 ---
 
@@ -135,6 +143,7 @@ Update after each verified + committed phase or sub-feature.
 
 ### Features
 - [ ] Settings sheet (all toggles + API keys)
+  - [x] Thunderforest API key input (gear button → bottom sheet in `mobile/components/SettingsModal.tsx`)
 - [ ] Share state → URL/Pastebin
 - [ ] Import state from JSON/URL
 - [ ] Hider mode location editor

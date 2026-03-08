@@ -5,7 +5,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setPersistentEngine } from '@nanostores/persistent';
 
+// AsyncStorage does not support cross-tab storage events — use no-op event engine
 setPersistentEngine(AsyncStorage, {
-  // AsyncStorage does not support cross-tab storage events
-  listen: false,
+  addEventListener() {},
+  removeEventListener() {},
 });

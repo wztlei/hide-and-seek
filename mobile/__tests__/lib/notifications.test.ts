@@ -1,3 +1,4 @@
+/// <reference path="../../../node_modules/@types/jest/index.d.ts" />
 import Toast from 'react-native-toast-message';
 
 import { toast } from '../../lib/notifications';
