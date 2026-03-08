@@ -287,29 +287,26 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         {selectedLocations.map((item, rowIndex) => (
           <View
             key={`${item.location.properties.osm_id}-${rowIndex}`}
-            style={[styles.locationRow, rowIndex % 2 === 1 && styles.altRow]}
+            style={[
+              styles.locationRow,
+              !item.base && !item.added ? styles.excludedRow : rowIndex % 2 === 1 && styles.altRow,
+            ]}
           >
-            <Text className="flex-1 text-lg text-gray-800 mr-2" numberOfLines={1}>
+            <Text className="flex-1 text-lg mr-2" style={{ color: !item.base && !item.added ? '#9ca3af' : '#1f2937' }} numberOfLines={1}>
               {determineName(item.location)}
             </Text>
             <View style={styles.locationActions}>
               {!item.base && (
                 <TouchableOpacity hitSlop={8} activeOpacity={0.6} onPress={() => handleToggleAdded(rowIndex)}>
                   <View
-                    className="flex-row items-center gap-1 px-2 py-1 rounded-full"
-                    style={{ backgroundColor: item.added ? '#dcfce7' : '#f3f4f6' }}
+                    className="items-center justify-center w-8 h-8 rounded-full"
+                    style={{ backgroundColor: item.added ? '#dcfce7' : '#e5e7eb' }}
                   >
                     <Ionicons
                       name={item.added ? 'checkmark-outline' : 'ban-outline'}
-                      size={14}
+                      size={16}
                       color={item.added ? '#15803d' : '#6b7280'}
                     />
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{ color: item.added ? '#15803d' : '#6b7280' }}
-                    >
-                      {item.added ? 'Included' : 'Excluded'}
-                    </Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -433,6 +430,9 @@ const styles = StyleSheet.create({
   },
   altRow: {
     backgroundColor: '#f9fafb',
+  },
+  excludedRow: {
+    backgroundColor: '#f3f4f6',
   },
   locationActions: {
     flexDirection: 'row',
