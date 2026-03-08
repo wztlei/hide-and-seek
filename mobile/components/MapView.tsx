@@ -106,7 +106,7 @@ export function AppMapView() {
   // The zone itself is left clear; everything outside gets the overlay.
   useEffect(() => {
     if (!$mapGeoJSON) {
-      setEliminationMask(null);
+      // Keep the previous mask visible while a new boundary is loading.
       return;
     }
     try {
