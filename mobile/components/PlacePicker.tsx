@@ -15,6 +15,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -142,6 +143,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         ]).start();
       });
     } else if (mounted) {
+      Keyboard.dismiss();
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: SLIDE_DISTANCE,
@@ -310,10 +312,10 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         <View className="h-px bg-gray-200 mx-4 my-2" />
 
         {/* Search bar */}
-        <View className="mx-4 mb-3 flex-row items-center bg-gray-100 rounded-xl px-3 h-11">
+        <View className="mx-4 mb-3 flex flex-row items-center bg-gray-100 rounded-xl px-3 h-11">
           <Ionicons name="search" size={18} color="#888" />
           <TextInput
-            className="flex-1 ml-2 text-base text-gray-800 mb-1"
+            className="flex-1 ml-2 text-gray-800 h-full"
             placeholder="Search for a location…"
             placeholderTextColor="#aaa"
             value={query}
@@ -363,7 +365,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
           ItemSeparatorComponent={() => <View className="h-px bg-gray-100 ml-14" />}
           ListEmptyComponent={
             query.length > 0 && !loading ? (
-              <Text className="text-center text-gray-400 mt-8">No results found</Text>
+              <Text className="text-center text-gray-400 my-8">No results found</Text>
             ) : null
           }
         />
