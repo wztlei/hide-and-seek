@@ -3,7 +3,9 @@ import '../lib/storage';
 
 import { Stack } from 'expo-router';
 import { LogBox } from 'react-native';
-import { Toaster } from 'sonner-native';
+import Toast from 'react-native-toast-message';
+
+import { toastConfig } from '../components/ToastConfig';
 
 // Suppress deprecation warning emitted by expo-router's own internal code
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
@@ -16,7 +18,7 @@ export default function RootLayout() {
   return (
     <>
       <Stack />
-      <Toaster />
+      <Toast config={toastConfig} position="bottom" bottomOffset={100} />
     </>
   );
 }
