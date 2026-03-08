@@ -289,25 +289,20 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             key={`${item.location.properties.osm_id}-${rowIndex}`}
             style={[
               styles.locationRow,
-              !item.base && !item.added ? styles.excludedRow : rowIndex % 2 === 1 && styles.altRow,
+              !item.base && !item.added ? styles.excludedRow : ""
             ]}
           >
-            <Text className="flex-1 text-lg mr-2" style={{ color: !item.base && !item.added ? '#9ca3af' : '#1f2937' }} numberOfLines={1}>
+            <Text className="flex-1 text-lg mr-2" style={{ color: item.added ? '#1f2937' : '#888888'}} numberOfLines={1}>
               {determineName(item.location)}
             </Text>
             <View style={styles.locationActions}>
               {!item.base && (
                 <TouchableOpacity hitSlop={8} activeOpacity={0.6} onPress={() => handleToggleAdded(rowIndex)}>
-                  <View
-                    className="items-center justify-center w-8 h-8 rounded-full"
-                    style={{ backgroundColor: item.added ? '#dcfce7' : '#e5e7eb' }}
-                  >
-                    <Ionicons
-                      name={item.added ? 'checkmark-outline' : 'ban-outline'}
-                      size={16}
-                      color={item.added ? '#15803d' : '#6b7280'}
-                    />
-                  </View>
+                  <Ionicons
+                    name={item.added ? 'checkmark-outline' : 'ban-outline'}
+                    size={24}
+                    color="#6b7280"
+                  />
                 </TouchableOpacity>
               )}
               <TouchableOpacity hitSlop={8} activeOpacity={0.6} onPress={() => handleRemove(rowIndex, item.base)}>
@@ -432,7 +427,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   excludedRow: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#e3e4e6',
   },
   locationActions: {
     flexDirection: 'row',
