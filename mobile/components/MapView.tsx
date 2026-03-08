@@ -265,24 +265,17 @@ export function AppMapView() {
         )}
       </MLMapView>
 
-      {/* Zone loading indicator */}
-      {isLoadingZone && (
-        <View
-          style={{ bottom: insets.bottom + 159 }}
-          className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow"
-        >
-          <ActivityIndicator size="small" color={colors.PRIMARY} />
-        </View>
-      )}
-
-      {/* Zone selector button */}
+      {/* Zone selector button — shows spinner while boundary is loading */}
       <Pressable
         onPress={() => setZoneModalVisible(true)}
         style={{ bottom: insets.bottom + 87 }}
         className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
         hitSlop={8}
       >
-        <Ionicons name="map-outline" size={24} color={colors.PRIMARY} />
+        {isLoadingZone
+          ? <ActivityIndicator size="small" color={colors.PRIMARY} />
+          : <Ionicons name="map-outline" size={24} color={colors.PRIMARY} />
+        }
       </Pressable>
 
       {/* Locate button */}
