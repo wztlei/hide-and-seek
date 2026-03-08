@@ -22,3 +22,8 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Expo / React Native
+mobile/.expo/
+mobile/android/
+mobile/ios/
