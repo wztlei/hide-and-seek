@@ -15,7 +15,7 @@ import * as turf from '@turf/turf';
 import * as Location from 'expo-location';
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../lib/colors';
@@ -136,6 +136,7 @@ export function AppMapView() {
   const [userCoord, setUserCoord] = useState<[number, number] | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [zoneModalVisible, setZoneModalVisible] = useState(false);
+  const [isLoadingZone, setIsLoadingZone] = useState(false);
 
   // mapGeoLocation stores coordinates as [latitude, longitude] (non-standard GeoJSON).
   // MapLibre Camera expects [longitude, latitude].
@@ -201,12 +202,18 @@ export function AppMapView() {
   // Re-fetch zone boundary whenever the selected location(s) change
   useEffect(() => {
     let cancelled = false;
+    setIsLoadingZone(true);
     fetchAllZoneBoundaries()
-      .then((boundary) => { if (!cancelled) mapGeoJSON.set(boundary); })
+      .then((boundary) => {
+        if (cancelled) return;
+        mapGeoJSON.set(boundary);
+        toast.success('Zone boundary loaded');
+      })
       .catch((e) => {
         console.error('fetchAllZoneBoundaries failed:', e);
         toast.error('Could not load zone boundary');
-      });
+      })
+      .finally(() => { if (!cancelled) setIsLoadingZone(false); });
     return () => { cancelled = true; };
   }, [
     $mapGeoLocation.properties.osm_id,
@@ -257,6 +264,16 @@ export function AppMapView() {
           </ShapeSource>
         )}
       </MLMapView>
+
+      {/* Zone loading indicator */}
+      {isLoadingZone && (
+        <View
+          style={{ bottom: insets.bottom + 159 }}
+          className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow"
+        >
+          <ActivityIndicator size="small" color={colors.PRIMARY} />
+        </View>
+      )}
 
       {/* Zone selector button */}
       <Pressable
