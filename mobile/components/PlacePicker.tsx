@@ -288,21 +288,22 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             key={`${item.location.properties.osm_id}-${rowIndex}`}
             style={[styles.locationRow, rowIndex % 2 === 1 && styles.altRow]}
           >
-            <Text className="flex-1 text-sm text-gray-800 mr-2" numberOfLines={1}>
+            <Text className="flex-1 text-base text-gray-800 mr-2" numberOfLines={1}>
               {determineName(item.location)}
             </Text>
             <View style={styles.locationActions}>
               {!item.base && (
                 <Pressable hitSlop={8} onPress={() => handleToggleAdded(rowIndex)}>
-                  <Ionicons
-                    name={item.added ? 'add-circle-outline' : 'remove-circle-outline'}
-                    size={22}
-                    color={item.added ? '#15803d' : '#b91c1c'}
-                  />
+                  <Text
+                    className="text-sm font-semibold px-2 py-0.5 rounded-full overflow-hidden"
+                    style={{ color: item.added ? '#15803d' : '#b91c1c', backgroundColor: item.added ? '#dcfce7' : '#fee2e2' }}
+                  >
+                    {item.added ? 'Included' : 'Excluded'}
+                  </Text>
                 </Pressable>
               )}
               <Pressable hitSlop={8} onPress={() => handleRemove(rowIndex, item.base)}>
-                <Ionicons name="close-outline" size={22} color="#6b7280" />
+                <Ionicons name="trash-outline" size={20} color="#6b7280" />
               </Pressable>
             </View>
           </View>
