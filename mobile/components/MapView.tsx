@@ -13,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { colors } from '../lib/colors';
 import { mapGeoLocation, thunderforestApiKey } from '../lib/context';
+import { PlacePicker } from './PlacePicker';
 
 // MapLibre doesn't need a Mapbox token when using OSM tiles
 setAccessToken(null);
@@ -94,6 +96,7 @@ export function AppMapView() {
   const insets = useSafeAreaInsets();
   const [userCoord, setUserCoord] = useState<[number, number] | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [zoneModalVisible, setZoneModalVisible] = useState(false);
 
   // mapGeoLocation stores coordinates as [latitude, longitude] (non-standard GeoJSON).
   // MapLibre Camera expects [longitude, latitude].
@@ -186,14 +189,34 @@ export function AppMapView() {
         )}
       </MLMapView>
 
+      {/* Zone selector button */}
+      <Pressable
+        onPress={() => setZoneModalVisible(true)}
+        style={{ bottom: insets.bottom + 87 }}
+        className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
+        hitSlop={8}
+      >
+        <Ionicons name="map-outline" size={24} color={colors.PRIMARY} />
+      </Pressable>
+
+      {/* Locate button */}
       <Pressable
         onPress={zoomToUserLocation}
         style={{ bottom: insets.bottom + 15 }}
         className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
         hitSlop={8}
       >
-        <Ionicons name="locate" size={24} color="#2A81CB" />
+        <Ionicons name="locate-outline" size={24} color={colors.PRIMARY} />
       </Pressable>
+
+      <PlacePicker
+        visible={zoneModalVisible}
+        onClose={() => setZoneModalVisible(false)}
+        onCustomLocation={() => {
+          setZoneModalVisible(false);
+          // TODO: open custom location flow
+        }}
+      />
     </View>
   );
 }
@@ -214,7 +237,7 @@ const styles = StyleSheet.create({
     width: RING_SIZE,
     height: RING_SIZE,
     borderRadius: RING_SIZE / 2,
-    backgroundColor: '#2A81CB',
+    backgroundColor: colors.PRIMARY,
   },
   dotBorder: {
     width: DOT_SIZE,
@@ -233,6 +256,6 @@ const styles = StyleSheet.create({
     width: DOT_SIZE - 4,
     height: DOT_SIZE - 4,
     borderRadius: (DOT_SIZE - 4) / 2,
-    backgroundColor: '#2A81CB',
+    backgroundColor: colors.PRIMARY,
   },
 });
