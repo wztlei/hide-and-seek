@@ -6,16 +6,31 @@ import { mapGeoLocation, additionalMapGeoLocations } from './context';
 
 const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
 
+// Module-level cache: avoids re-fetching the same zone (e.g. the base location)
+// every time an additional location is added/removed in the same session.
+const geoJSONCache = new Map<number, FeatureCollection>();
+
 async function fetchGeoJSONForZone(
   osmId: number,
   osmType: 'W' | 'R' | 'N',
 ): Promise<FeatureCollection> {
+  const cached = geoJSONCache.get(osmId);
+  if (cached) return cached;
+
   const typeMap = { W: 'way', R: 'relation', N: 'node' } as const;
   const query = `[out:json];${typeMap[osmType]}(${osmId});out geom;`;
   const res = await fetch(`${OVERPASS_API}?data=${encodeURIComponent(query)}`);
+  if (!res.ok) {
+    throw new Error(`Overpass API error ${res.status} for osm_id ${osmId}`);
+  }
   const data = await res.json();
   const geo = osmtogeojson(data);
-  return { ...geo, features: geo.features.filter((f: any) => f.geometry.type !== 'Point') };
+  const result: FeatureCollection = {
+    ...geo,
+    features: geo.features.filter((f: any) => f.geometry.type !== 'Point'),
+  };
+  geoJSONCache.set(osmId, result);
+  return result;
 }
 
 // Inline safeUnion — operators.ts is not RN-safe due to @arcgis/core import

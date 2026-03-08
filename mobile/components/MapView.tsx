@@ -203,7 +203,10 @@ export function AppMapView() {
     let cancelled = false;
     fetchAllZoneBoundaries()
       .then((boundary) => { if (!cancelled) mapGeoJSON.set(boundary); })
-      .catch(console.error);
+      .catch((e) => {
+        console.error('fetchAllZoneBoundaries failed:', e);
+        toast.error('Could not load zone boundary');
+      });
     return () => { cancelled = true; };
   }, [
     $mapGeoLocation.properties.osm_id,
