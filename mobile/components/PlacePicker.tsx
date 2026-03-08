@@ -21,6 +21,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -230,7 +231,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
     mapGeoJSON.set(null);
     polyGeoJSON.set(null);
     questions.set([...questions.get()]);
-    onClose();
+    setQuery('');
   }
 
   function handleClearZone() {
@@ -276,7 +277,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
       >
         {/* Header */}
         <View className="flex-row items-center px-4 mb-3">
-          <Text className="flex-1 text-lg font-semibold text-gray-800">Select zone</Text>
+          <Text className="flex-1 text-xl font-semibold text-gray-800">Select zone</Text>
           <Pressable onPress={onClose} hitSlop={8} className="active:opacity-60">
             <Ionicons name="close" size={24} color="#555" />
           </Pressable>
@@ -288,23 +289,33 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             key={`${item.location.properties.osm_id}-${rowIndex}`}
             style={[styles.locationRow, rowIndex % 2 === 1 && styles.altRow]}
           >
-            <Text className="flex-1 text-base text-gray-800 mr-2" numberOfLines={1}>
+            <Text className="flex-1 text-lg text-gray-800 mr-2" numberOfLines={1}>
               {determineName(item.location)}
             </Text>
             <View style={styles.locationActions}>
               {!item.base && (
-                <Pressable hitSlop={8} onPress={() => handleToggleAdded(rowIndex)}>
-                  <Text
-                    className="text-sm font-semibold px-2 py-0.5 rounded-full overflow-hidden"
-                    style={{ color: item.added ? '#15803d' : '#b91c1c', backgroundColor: item.added ? '#dcfce7' : '#fee2e2' }}
+                <TouchableOpacity hitSlop={8} activeOpacity={0.6} onPress={() => handleToggleAdded(rowIndex)}>
+                  <View
+                    className="flex-row items-center gap-1 px-2 py-1 rounded-full"
+                    style={{ backgroundColor: item.added ? '#dcfce7' : '#f3f4f6' }}
                   >
-                    {item.added ? 'Included' : 'Excluded'}
-                  </Text>
-                </Pressable>
+                    <Ionicons
+                      name={item.added ? 'checkmark-outline' : 'ban-outline'}
+                      size={14}
+                      color={item.added ? '#15803d' : '#6b7280'}
+                    />
+                    <Text
+                      className="text-xs font-semibold"
+                      style={{ color: item.added ? '#15803d' : '#6b7280' }}
+                    >
+                      {item.added ? 'Included' : 'Excluded'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               )}
-              <Pressable hitSlop={8} onPress={() => handleRemove(rowIndex, item.base)}>
-                <Ionicons name="trash-outline" size={20} color="#6b7280" />
-              </Pressable>
+              <TouchableOpacity hitSlop={8} activeOpacity={0.6} onPress={() => handleRemove(rowIndex, item.base)}>
+                <Ionicons name="trash-outline" size={24} color="#6b7280" />
+              </TouchableOpacity>
             </View>
           </View>
         ))}
