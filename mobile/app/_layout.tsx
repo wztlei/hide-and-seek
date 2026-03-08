@@ -18,7 +18,7 @@ export default function RootLayout() {
   return (
     <>
       <Stack />
-      <Toast config={toastConfig} position="bottom" bottomOffset={100} />
+      <Toast config={toastConfig} position="top" topOffset={60} />
     </>
   );
 }
