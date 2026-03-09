@@ -47,3 +47,13 @@ setPersistentEngine(storageProxy, {
   addEventListener() {},
   removeEventListener() {},
 });
+
+/** Synchronous read from the in-memory mirror (populated by storageReady). */
+export function getCached(key: string): string | undefined {
+  return memStore[key];
+}
+
+/** Write to the in-memory mirror and persist to AsyncStorage. */
+export function setCached(key: string, value: string): void {
+  storageProxy[key] = value;
+}

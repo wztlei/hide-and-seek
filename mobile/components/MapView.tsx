@@ -22,7 +22,10 @@ import { colors } from '../lib/colors';
 import { additionalMapGeoLocations, mapGeoJSON, mapGeoLocation, thunderforestApiKey } from '../lib/context';
 import { fetchAllZoneBoundaries } from '../lib/fetchZoneBoundary';
 import { toast } from '../lib/notifications';
+import { getCached, setCached } from '../lib/storage';
 import { PlacePicker } from './PlacePicker';
+
+const BOUNDARY_CACHE_KEY = 'cachedMapGeoJSON';
 
 // MapLibre doesn't need a Mapbox token when using OSM tiles
 setAccessToken(null);
@@ -199,6 +202,20 @@ export function AppMapView() {
     };
   }, []);
 
+  // Seed mapGeoJSON from the last saved boundary so the map renders immediately
+  // before the Overpass API call completes. storageReady has already resolved
+  // by the time MapView mounts, so getCached is a synchronous memStore lookup.
+  useEffect(() => {
+    const cached = getCached(BOUNDARY_CACHE_KEY);
+    if (cached) {
+      try {
+        mapGeoJSON.set(JSON.parse(cached));
+      } catch (e) {
+        console.error('Failed to parse cached boundary:', e);
+      }
+    }
+  }, []);
+
   // Re-fetch zone boundary whenever the selected location(s) change
   useEffect(() => {
     let cancelled = false;
@@ -207,6 +224,7 @@ export function AppMapView() {
       .then((boundary) => {
         if (cancelled) return;
         mapGeoJSON.set(boundary);
+        setCached(BOUNDARY_CACHE_KEY, JSON.stringify(boundary));
         toast.success('Zone boundary loaded');
       })
       .catch((e) => {
