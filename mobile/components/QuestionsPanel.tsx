@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Location from "expo-location";
 import { useStore } from "@nanostores/react";
+import * as turf from "@turf/turf";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
@@ -85,6 +86,29 @@ function labelForType(type: Question["id"]): string {
     return QUESTION_TYPES.find((q) => q.id === type)?.label ?? type;
 }
 
+function colorForType(type: Question["id"]): string {
+    switch (type) {
+        case "radius":      return colors.RADIUS;
+        case "thermometer": return colors.THERMOMETER;
+        case "tentacles":   return colors.TENTACLES;
+        case "matching":    return colors.MATCHING;
+        case "measuring":   return colors.MEASURING;
+        default:            return colors.PRIMARY;
+    }
+}
+
+/** Light background tint for the question-type icon chip (Screen 2). */
+function bgColorForType(type: Question["id"]): string {
+    switch (type) {
+        case "radius":      return "#fee2e2"; // red-100
+        case "thermometer": return "#f3e8ff"; // purple-100
+        case "tentacles":   return "#dcfce7"; // green-100
+        case "matching":    return "#fef3c7"; // amber-100
+        case "measuring":   return "#cffafe"; // cyan-100
+        default:            return "#e0e7ff"; // indigo-100
+    }
+}
+
 function subtitleForQuestion(q: Question): string | null {
     if (q.id === "radius") {
         const { radius, unit, lat, lng, within } = q.data;
@@ -92,6 +116,10 @@ function subtitleForQuestion(q: Question): string | null {
             unit === "miles" ? "mi" : unit === "kilometers" ? "km" : "m";
         const coord = formatCoord(lat, lng);
         return `${within === false ? "Outside" : "Inside"} ${radius} ${unitLabel} · ${coord}`;
+    }
+    if (q.id === "thermometer") {
+        const { latA, lngA, warmer } = q.data;
+        return `${warmer ? "Warmer" : "Colder"} · A: ${formatCoord(latA, lngA)}`;
     }
     return null;
 }
@@ -110,11 +138,14 @@ function defaultPayloadForType(
                 id: "radius" as const,
                 data: { lat, lng, radius: 1, unit: "miles" as const },
             };
-        case "thermometer":
+        case "thermometer": {
+            const dest = turf.destination([lng, lat], 1, Math.random() * 360, { units: "miles" });
+            const [lngB, latB] = dest.geometry.coordinates;
             return {
                 id: "thermometer" as const,
-                data: { latA: lat, lngA: lng, latB: lat, lngB: lng + 0.1 },
+                data: { latA: lat, lngA: lng, latB, lngB, warmer: true },
             };
+        }
         case "tentacles":
             return { id: "tentacles" as const, data: { lat, lng } };
         case "matching":
@@ -188,7 +219,7 @@ interface Props {
     getMapCenter: () => Promise<[number, number] | null>;
     userCoord?: [number, number] | null;
     initialEditKey?: number | null;
-    onPickLocationOnMap?: (key: number) => void;
+    onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
 export function QuestionsPanel({
@@ -207,6 +238,13 @@ export function QuestionsPanel({
 
     const [editingKey, setEditingKey] = useState<number | null>(null);
     const [radiusText, setRadiusText] = useState("1");
+    // Key of a question that has been added to the store but not yet confirmed by
+    // the user. While draftKey is set the Screen 3 heading reads "Add Question"
+    // and a confirm button is shown. Going back or closing discards the draft.
+    const [draftKey, setDraftKey] = useState<number | null>(null);
+    // True when the BottomSheet is being closed programmatically (e.g. for
+    // pick-mode). Prevents the onChange handler from discarding the draft.
+    const isProgrammaticCloseRef = useRef(false);
 
     const editData = useMemo(
         () =>
@@ -216,9 +254,12 @@ export function QuestionsPanel({
         [editingKey, $questions],
     );
 
+    const isAddMode = draftKey !== null && draftKey === editingKey;
+
     // Sync panel open/close; restore edit screen when returning from map-pick mode
     useEffect(() => {
         if (visible) {
+            isProgrammaticCloseRef.current = false;
             sheetRef.current?.expand();
             if (initialEditKey != null) {
                 setEditingKey(initialEditKey);
@@ -227,6 +268,9 @@ export function QuestionsPanel({
                 slideX.setValue(0);
             }
         } else {
+            // Mark as programmatic so handleSheetChange won't discard the draft
+            // (pick-mode closes the panel temporarily and will reopen it).
+            isProgrammaticCloseRef.current = true;
             sheetRef.current?.close();
             setEditingKey(null);
         }
@@ -249,9 +293,21 @@ export function QuestionsPanel({
 
     const handleSheetChange = useCallback(
         (index: number) => {
-            if (index === -1) onClose();
+            if (index === -1) {
+                // User swiped the sheet closed (not a programmatic close for pick-mode).
+                // Discard any in-progress draft.
+                if (!isProgrammaticCloseRef.current && draftKey !== null) {
+                    questions.set(
+                        (questions.get() as Questions).filter(
+                            (q) => q.key !== draftKey,
+                        ),
+                    );
+                    setDraftKey(null);
+                }
+                onClose();
+            }
         },
-        [onClose],
+        [onClose, draftKey],
     );
 
     const renderBackdrop = useCallback(
@@ -264,6 +320,17 @@ export function QuestionsPanel({
         ),
         [],
     );
+
+    function discardDraft() {
+        if (draftKey !== null) {
+            questions.set(
+                (questions.get() as Questions).filter(
+                    (q) => q.key !== draftKey,
+                ),
+            );
+            setDraftKey(null);
+        }
+    }
 
     function goToAddQuestion() {
         Animated.spring(slideX, {
@@ -290,13 +357,14 @@ export function QuestionsPanel({
 
     async function handleAddQuestion(id: QuestionId) {
         const center =
-            id === "radius"
+            id === "radius" || id === "thermometer"
                 ? (userCoord ?? (await getMapCenter()))
                 : await getMapCenter();
         addQuestion(defaultPayloadForType(id, center));
-        if (id === "radius") {
+        if (id === "radius" || id === "thermometer") {
             const allQ = questions.get();
             const newKey = allQ[allQ.length - 1].key;
+            setDraftKey(newKey);
             goToEdit(newKey);
         } else {
             goBack();
@@ -359,7 +427,7 @@ export function QuestionsPanel({
                                     <Ionicons
                                         name={iconForType(q.id)}
                                         size={22}
-                                        color={colors.PRIMARY}
+                                        color={colorForType(q.id)}
                                     />
                                     <View className="flex-1 gap-0.5">
                                         <Text className="text-lg font-medium text-gray-800">
@@ -475,11 +543,14 @@ export function QuestionsPanel({
                                 onPress={() => handleAddQuestion(id)}
                                 className="flex-row items-center px-4 py-3.5 gap-3.5 border-b border-gray-100 active:bg-gray-50"
                             >
-                                <View className="w-11 h-11 rounded-xl bg-blue-50 items-center justify-center">
+                                <View
+                                    className="w-11 h-11 rounded-xl items-center justify-center"
+                                    style={{ backgroundColor: bgColorForType(id) }}
+                                >
                                     <Ionicons
                                         name={icon}
                                         size={24}
-                                        color={colors.PRIMARY}
+                                        color={colorForType(id)}
                                     />
                                 </View>
                                 <View className="flex-1 gap-0.5">
@@ -500,11 +571,19 @@ export function QuestionsPanel({
                     </BottomSheetScrollView>
                 </View>
 
-                {/* ── Screen 3: Edit Question ─────────────────────────────────────── */}
+                {/* ── Screen 3: Add / Edit Question ──────────────────────────────── */}
                 <View style={styles.screen}>
                     <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
                         <Pressable
-                            onPress={goBackToList}
+                            onPress={() => {
+                                if (isAddMode) {
+                                    // Discard the draft and return to the type picker
+                                    discardDraft();
+                                    goBack();
+                                } else {
+                                    goBackToList();
+                                }
+                            }}
                             hitSlop={8}
                             className="p-1 mr-2 active:opacity-60"
                         >
@@ -515,10 +594,13 @@ export function QuestionsPanel({
                             />
                         </Pressable>
                         <Text className="flex-1 text-xl font-semibold text-gray-800">
-                            Edit Question
+                            {isAddMode ? "Add Question" : "Edit Question"}
                         </Text>
                         <Pressable
-                            onPress={onClose}
+                            onPress={() => {
+                                discardDraft();
+                                onClose();
+                            }}
                             hitSlop={8}
                             className="p-1 active:opacity-60"
                         >
@@ -582,8 +664,7 @@ export function QuestionsPanel({
                                                         }}
                                                         style={[
                                                             styles.segmentItem,
-                                                            selected &&
-                                                                styles.segmentItemSelected,
+                                                            selected && { backgroundColor: colors.RADIUS },
                                                         ]}
                                                     >
                                                         <Text
@@ -622,8 +703,7 @@ export function QuestionsPanel({
                                                     style={[
                                                         styles.segmentItem,
                                                         styles.segmentItemWide,
-                                                        selected &&
-                                                            styles.segmentItemSelected,
+                                                        selected && { backgroundColor: colors.RADIUS },
                                                     ]}
                                                 >
                                                     <Text
@@ -664,7 +744,7 @@ export function QuestionsPanel({
                                             <Ionicons
                                                 name="map-outline"
                                                 size={20}
-                                                color={colors.PRIMARY}
+                                                color={colors.RADIUS}
                                             />
                                             <Text className="text-xs mt-1 text-gray-500">
                                                 Select on Map
@@ -705,7 +785,7 @@ export function QuestionsPanel({
                                             <Ionicons
                                                 name="locate-outline"
                                                 size={20}
-                                                color={colors.PRIMARY}
+                                                color={colors.RADIUS}
                                             />
                                             <Text className="text-xs mt-1 text-gray-500">
                                               Set to Current
@@ -741,7 +821,7 @@ export function QuestionsPanel({
                                             <Ionicons
                                                 name="clipboard-outline"
                                                 size={20}
-                                                color={colors.PRIMARY}
+                                                color={colors.RADIUS}
                                             />
                                             <Text className="text-xs mt-1 text-gray-500">
                                                 Paste
@@ -763,7 +843,7 @@ export function QuestionsPanel({
                                             <Ionicons
                                                 name="copy-outline"
                                                 size={20}
-                                                color={colors.PRIMARY}
+                                                color={colors.RADIUS}
                                             />
                                             <Text className="text-xs mt-1 text-gray-500">
                                                 Copy
@@ -778,6 +858,203 @@ export function QuestionsPanel({
                                     </Text>
                                 </View>
                             </View>
+                        ) : editData?.id === "thermometer" ? (
+                            <View className="gap-4 px-4">
+                                {/* Point A */}
+                                <View className="gap-2">
+                                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                        Start (Point A)
+                                    </Text>
+                                    <View className="flex-row gap-2">
+                                        <Pressable
+                                            onPress={() => {
+                                                if (editingKey !== null) requestAnimationFrame(() => onPickLocationOnMap?.(editingKey, "A"));
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="map-outline" size={20} color={colors.THERMOMETER_A} />
+                                            <Text className="text-xs mt-1 text-gray-500">Select on Map</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                const { status } = await Location.requestForegroundPermissionsAsync();
+                                                if (status !== "granted") {
+                                                    Alert.alert("Permission denied", "Location permission is required.");
+                                                    return;
+                                                }
+                                                const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                                                if (editData?.id === "thermometer") {
+                                                    editData.data.latA = pos.coords.latitude;
+                                                    editData.data.lngA = pos.coords.longitude;
+                                                    questionModified();
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="locate-outline" size={20} color={colors.THERMOMETER_A} />
+                                            <Text className="text-xs mt-1 text-gray-500">Set to Current</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                const text = await Clipboard.getStringAsync();
+                                                const { lat, lng } = parseCoordinatesFromText(text);
+                                                if (lat !== null && lng !== null && editData?.id === "thermometer") {
+                                                    editData.data.latA = lat;
+                                                    editData.data.lngA = lng;
+                                                    questionModified();
+                                                } else {
+                                                    Alert.alert("No coordinates found", "Copy a coordinate pair to your clipboard first.");
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="clipboard-outline" size={20} color={colors.THERMOMETER_A} />
+                                            <Text className="text-xs mt-1 text-gray-500">Paste</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                if (editData?.id === "thermometer") {
+                                                    const text = `${Math.abs(editData.data.latA)}°${editData.data.latA >= 0 ? "N" : "S"}, ${Math.abs(editData.data.lngA)}°${editData.data.lngA >= 0 ? "E" : "W"}`;
+                                                    await Clipboard.setStringAsync(text);
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="copy-outline" size={20} color={colors.THERMOMETER_A} />
+                                            <Text className="text-xs mt-1 text-gray-500">Copy</Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-center text-sm text-gray-500">
+                                        {formatCoord(editData.data.latA, editData.data.lngA)}
+                                    </Text>
+                                </View>
+
+                                {/* Point B */}
+                                <View className="gap-2">
+                                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                        End (Point B)
+                                    </Text>
+                                    <View className="flex-row gap-2">
+                                        <Pressable
+                                            onPress={() => {
+                                                if (editingKey !== null) requestAnimationFrame(() => onPickLocationOnMap?.(editingKey, "B"));
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="map-outline" size={20} color={colors.THERMOMETER_B} />
+                                            <Text className="text-xs mt-1 text-gray-500">Select on Map</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                const { status } = await Location.requestForegroundPermissionsAsync();
+                                                if (status !== "granted") {
+                                                    Alert.alert("Permission denied", "Location permission is required.");
+                                                    return;
+                                                }
+                                                const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                                                if (editData?.id === "thermometer") {
+                                                    editData.data.latB = pos.coords.latitude;
+                                                    editData.data.lngB = pos.coords.longitude;
+                                                    questionModified();
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="locate-outline" size={20} color={colors.THERMOMETER_B} />
+                                            <Text className="text-xs mt-1 text-gray-500">Set to Current</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                const text = await Clipboard.getStringAsync();
+                                                const { lat, lng } = parseCoordinatesFromText(text);
+                                                if (lat !== null && lng !== null && editData?.id === "thermometer") {
+                                                    editData.data.latB = lat;
+                                                    editData.data.lngB = lng;
+                                                    questionModified();
+                                                } else {
+                                                    Alert.alert("No coordinates found", "Copy a coordinate pair to your clipboard first.");
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="clipboard-outline" size={20} color={colors.THERMOMETER_B} />
+                                            <Text className="text-xs mt-1 text-gray-500">Paste</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                if (editData?.id === "thermometer") {
+                                                    const text = `${Math.abs(editData.data.latB)}°${editData.data.latB >= 0 ? "N" : "S"}, ${Math.abs(editData.data.lngB)}°${editData.data.lngB >= 0 ? "E" : "W"}`;
+                                                    await Clipboard.setStringAsync(text);
+                                                }
+                                            }}
+                                            style={styles.locationBtn}
+                                            className="active:opacity-70"
+                                        >
+                                            <Ionicons name="copy-outline" size={20} color={colors.THERMOMETER_B} />
+                                            <Text className="text-xs mt-1 text-gray-500">Copy</Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-center text-sm text-gray-500">
+                                        {formatCoord(editData.data.latB, editData.data.lngB)}
+                                    </Text>
+                                </View>
+
+                                {/* Distance */}
+                                <View className="gap-2">
+                                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                        Distance
+                                    </Text>
+                                    <Text className="text-base text-gray-700">
+                                        {turf.distance(
+                                            [editData.data.lngA, editData.data.latA],
+                                            [editData.data.lngB, editData.data.latB],
+                                            { units: "miles" },
+                                        ).toFixed(2)} miles
+                                    </Text>
+                                </View>
+
+                                {/* Result */}
+                                <View className="gap-2">
+                                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                        Result
+                                    </Text>
+                                    <View style={styles.segmentRow}>
+                                        {([true, false] as const).map((val) => {
+                                            const selected = editData.data.warmer === val;
+                                            return (
+                                                <Pressable
+                                                    key={String(val)}
+                                                    onPress={() => {
+                                                        editData.data.warmer = val;
+                                                        questionModified();
+                                                    }}
+                                                    style={[
+                                                        styles.segmentItem,
+                                                        styles.segmentItemWide,
+                                                        selected && { backgroundColor: colors.THERMOMETER },
+                                                    ]}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.segmentText,
+                                                            selected && styles.segmentTextSelected,
+                                                        ]}
+                                                    >
+                                                        {val ? "Warmer (closer to B)" : "Colder (closer to A)"}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            </View>
                         ) : editData != null ? (
                             <Text className="text-center text-gray-400 mt-10">
                                 Editing {labelForType(editData.id)} questions is
@@ -785,6 +1062,31 @@ export function QuestionsPanel({
                             </Text>
                         ) : null}
                     </BottomSheetScrollView>
+
+                    {isAddMode && (
+                        <View
+                            className="p-4 border-t border-gray-100"
+                            style={{ paddingBottom: insets.bottom + 16 }}
+                        >
+                            <Pressable
+                                onPress={() => {
+                                    setDraftKey(null);
+                                    goBackToList();
+                                }}
+                                className="flex-row items-center justify-center h-12 rounded-xl gap-2 active:opacity-80"
+                                style={{ backgroundColor: editData ? colorForType(editData.id) : colors.PRIMARY }}
+                            >
+                                <Ionicons
+                                    name="checkmark-circle-outline"
+                                    size={20}
+                                    color="#fff"
+                                />
+                                <Text className="text-white text-base font-semibold">
+                                    Submit
+                                </Text>
+                            </Pressable>
+                        </View>
+                    )}
                 </View>
             </Animated.View>
         </BottomSheet>
