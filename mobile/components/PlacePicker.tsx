@@ -235,9 +235,23 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
   }
 
   function handleClearZone() {
-    mapGeoJSON.set(null);
-    polyGeoJSON.set(null);
-    questions.set([]);
+    Alert.alert(
+      'Reset everything?',
+      'This will clear any added zone boundaries and questions.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            mapGeoJSON.set(null);
+            polyGeoJSON.set(null);
+            questions.set([]);
+            additionalMapGeoLocations.set([]);
+          },
+        },
+      ],
+    );
   }
 
   // ── Render ───────────────────────────────────────────────────────────────

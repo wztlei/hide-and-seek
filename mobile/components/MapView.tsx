@@ -223,9 +223,14 @@ export function AppMapView() {
     fetchAllZoneBoundaries()
       .then((boundary) => {
         if (cancelled) return;
-        mapGeoJSON.set(boundary);
-        setCached(BOUNDARY_CACHE_KEY, JSON.stringify(boundary));
         toast.success('Zone boundary loaded');
+        // Defer the heavy nanostore update so the toast text gets a paint cycle
+        // before the map re-render saturates the JS thread.
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          mapGeoJSON.set(boundary);
+          setCached(BOUNDARY_CACHE_KEY, JSON.stringify(boundary));
+        });
       })
       .catch((e) => {
         console.error('fetchAllZoneBoundaries failed:', e);
