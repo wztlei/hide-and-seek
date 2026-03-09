@@ -6,12 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo is a **pnpm workspace** monorepo with two packages:
 
-| Package | Path | Description |
-|---------|------|-------------|
-| Web app | `.` (root) | Astro + React PWA |
-| Mobile app | `mobile/` | Expo React Native app |
+| Package    | Path       | Description           |
+| ---------- | ---------- | --------------------- |
+| Web app    | `.` (root) | Astro + React PWA     |
+| Mobile app | `mobile/`  | Expo React Native app |
 
 **Web app commands** (run from root):
+
 ```bash
 pnpm install       # Install all workspace dependencies
 pnpm dev           # Start Astro dev server
@@ -22,6 +23,7 @@ pnpm test          # Run tests with vitest
 ```
 
 **Mobile app commands** (run from `mobile/`):
+
 ```bash
 cd mobile
 npx expo start     # Start Expo dev tools (scan QR with Expo Go)
@@ -34,6 +36,7 @@ npx expo start --android  # Open in Android emulator
 Shared code lives in the root `src/maps/` and `src/lib/` directories. Metro is configured in `mobile/metro.config.js` to watch the monorepo root, enabling future cross-package imports. When the shared surface grows, it can be extracted into a `packages/shared/` workspace package.
 
 Files that are already portable to React Native (no changes needed):
+
 - `src/maps/schema.ts` — Zod schemas
 - `src/maps/index.ts` — core data pipeline
 - `src/maps/api/types.ts`, `constants.ts`, `geo.ts`, `geocode.ts`, `importers.ts`
@@ -41,6 +44,7 @@ Files that are already portable to React Native (no changes needed):
 - `src/maps/questions/` — all question-processing logic
 
 Files that need platform abstraction before sharing:
+
 - `src/lib/context.ts` — uses localStorage via `@nanostores/persistent`
 - `src/maps/api/cache.ts` — uses browser Cache API
 - `src/maps/api/overpass.ts` — reads nanostores atoms directly
@@ -54,6 +58,7 @@ This is an **Astro + React** PWA (single page at `src/pages/index.astro`) that g
 ### State Management
 
 All persistent state lives in **nanostores** (`src/lib/context.ts`) using `persistentAtom` (localStorage-backed). Key atoms:
+
 - `mapGeoLocation` — the selected geographic region (OSM feature, default: Japan)
 - `additionalMapGeoLocations` — extra regions to add/subtract from the map
 - `questions` — the list of active game questions (validated against `questionsSchema`)
@@ -71,6 +76,7 @@ All persistent state lives in **nanostores** (`src/lib/context.ts`) using `persi
 ### Question Types & Schema
 
 Questions are defined in `src/maps/schema.ts` using **Zod**. The top-level union is `questionSchema` with 5 discriminated variants by `id`:
+
 - `radius` — circular radius from a point
 - `thermometer` — "warmer/colder" between two points
 - `tentacles` — radius from a specific POI type (zoo, museum, etc.)
@@ -78,6 +84,7 @@ Questions are defined in `src/maps/schema.ts` using **Zod**. The top-level union
 - `measuring` — distance comparison to a feature type (coastline, rail, etc.)
 
 Each question type has its own processing logic in `src/maps/questions/`:
+
 - `adjustPer*` — filters the base GeoJSON FeatureCollection to matching areas
 - `hiderify*` — transforms question data to be from the hider's perspective
 - `*PlanningPolygon` — returns the polygon for planning mode display

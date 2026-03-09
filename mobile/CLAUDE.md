@@ -4,16 +4,20 @@ This is the Expo React Native app (`mobile/`). It shares business logic with the
 
 ## Stack
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| Expo | ~54 | Managed workflow |
-| React Native | 0.81 | New Architecture supported |
-| NativeWind | ^4 | Tailwind for RN — use `className` on core RN components |
-| MapLibre RN | ^10 | See below |
+| Tool         | Version | Notes                                                   |
+| ------------ | ------- | ------------------------------------------------------- |
+| Expo         | ~54     | Managed workflow                                        |
+| React Native | 0.81    | New Architecture supported                              |
+| NativeWind   | ^4      | Tailwind for RN — use `className` on core RN components |
+| MapLibre RN  | ^10     | See below                                               |
 
 ## NativeWind
 
 Use `className` on core React Native components (`View`, `Text`, `Pressable`, etc.). Third-party components only accept `className` if they explicitly extend `ViewProps` with it — always check their `.d.ts` before using `className` on them. When in doubt, use `style`.
+
+## Design Guidelines
+
+- **Minimum text size is `text-base` (16 px).** Never use `text-xs` or `text-sm` for body or list content — reserve those only for truly secondary metadata (subtitles, captions). When bumping font sizes, go one step up: `text-sm` → `text-base`, `text-base` → `text-lg`, etc.
 
 ## MapLibre React Native
 
@@ -23,7 +27,7 @@ Package: `@maplibre/maplibre-react-native`
 ### Setup
 
 ```ts
-import { setAccessToken } from '@maplibre/maplibre-react-native';
+import { setAccessToken } from "@maplibre/maplibre-react-native";
 setAccessToken(null); // required module-level call when not using Mapbox
 ```
 
@@ -37,14 +41,14 @@ Only accepts `style` (not `className`) — it uses `ViewProps["style"]`.
 
 ```tsx
 <MapView
-  style={{ flex: 1 }}
-  mapStyle={styleJSON}        // string (URL) or object (Style JSON)
-  compassEnabled              // show compass
-  logoEnabled={false}
-  attributionEnabled={false}
-  onPress={handler}           // (feature: GeoJSON.Feature) => void
-  onLongPress={handler}
-  onDidFinishLoadingMap={cb}  // fires when style finishes loading
+    style={{ flex: 1 }}
+    mapStyle={styleJSON} // string (URL) or object (Style JSON)
+    compassEnabled // show compass
+    logoEnabled={false}
+    attributionEnabled={false}
+    onPress={handler} // (feature: GeoJSON.Feature) => void
+    onLongPress={handler}
+    onDidFinishLoadingMap={cb} // fires when style finishes loading
 />
 ```
 
@@ -54,14 +58,15 @@ Must be a child of `MapView`. Use `defaultSettings` for initial position — set
 
 ```tsx
 <Camera
-  ref={cameraRef}                           // CameraRef
-  defaultSettings={{ centerCoordinate: [lng, lat], zoomLevel: 5 }}
-  followUserLocation={false}
-  followZoomLevel={15}
+    ref={cameraRef} // CameraRef
+    defaultSettings={{ centerCoordinate: [lng, lat], zoomLevel: 5 }}
+    followUserLocation={false}
+    followZoomLevel={15}
 />
 ```
 
 **CameraRef methods** (imperative, via `ref`):
+
 - `setCamera(config: CameraStop)` — preferred for combined center+zoom moves
 - `flyTo(coordinates, animationDuration?)` — center only
 - `moveTo(coordinates, animationDuration?)` — center only, no arc
@@ -69,6 +74,7 @@ Must be a child of `MapView`. Use `defaultSettings` for initial position — set
 - `fitBounds(ne, sw, padding?, animationDuration?)`
 
 **CameraStop shape:**
+
 ```ts
 {
   centerCoordinate?: GeoJSON.Position   // [lng, lat]
@@ -89,11 +95,12 @@ Subscribes to device GPS. Must be inside `MapView`. Starts automatically when `v
 
 ```tsx
 <UserLocation
-  visible={false}           // hide the default dot if rendering a custom one
-  onUpdate={(loc) => {      // loc.coords.longitude / loc.coords.latitude
-    setCoord([loc.coords.longitude, loc.coords.latitude]);
-  }}
-  minDisplacement={5}       // metres before next update
+    visible={false} // hide the default dot if rendering a custom one
+    onUpdate={(loc) => {
+        // loc.coords.longitude / loc.coords.latitude
+        setCoord([loc.coords.longitude, loc.coords.latitude]);
+    }}
+    minDisplacement={5} // metres before next update
 />
 ```
 
@@ -105,11 +112,11 @@ Places an interactive React Native view anchored to a map coordinate. Always ren
 
 ```tsx
 <MarkerView
-  coordinate={[lng, lat]}          // required, [lng, lat]
-  anchor={{ x: 0.5, y: 0.5 }}      // default: center
-  allowOverlap={false}
+    coordinate={[lng, lat]} // required, [lng, lat]
+    anchor={{ x: 0.5, y: 0.5 }} // default: center
+    allowOverlap={false}
 >
-  <View>...</View>   {/* single ReactElement child */}
+    <View>...</View> {/* single ReactElement child */}
 </MarkerView>
 ```
 
@@ -119,7 +126,7 @@ Like `MarkerView` but children are rasterised to a bitmap on Android — better 
 
 ```tsx
 <PointAnnotation id="pin" coordinate={[lng, lat]}>
-  <View>...</View>
+    <View>...</View>
 </PointAnnotation>
 ```
 
@@ -134,17 +141,64 @@ The `mapGeoLocation` nanostore uses **`[latitude, longitude]`** (non-standard). 
 
 ```ts
 const center: [number, number] = [
-  $mapGeoLocation.geometry.coordinates[1], // longitude
-  $mapGeoLocation.geometry.coordinates[0], // latitude
+    $mapGeoLocation.geometry.coordinates[1], // longitude
+    $mapGeoLocation.geometry.coordinates[0], // latitude
 ];
 ```
 
 ### Annotation type comparison
 
-| | `CircleLayer` | `SymbolLayer` | `PointAnnotation` | `MarkerView` |
-|---|---|---|---|---|
-| RN children | No | Limited (static iOS) | Interactive iOS / bitmap Android | Interactive |
-| Clustering | Yes | Yes | No | No |
-| Style expressions | Yes | Yes | No | No |
-| Z-index control | Yes | Yes | Platform-limited | Always top |
-| Performance | Best | Best | Good | Worst |
+|                   | `CircleLayer` | `SymbolLayer`        | `PointAnnotation`                | `MarkerView` |
+| ----------------- | ------------- | -------------------- | -------------------------------- | ------------ |
+| RN children       | No            | Limited (static iOS) | Interactive iOS / bitmap Android | Interactive  |
+| Clustering        | Yes           | Yes                  | No                               | No           |
+| Style expressions | Yes           | Yes                  | No                               | No           |
+| Z-index control   | Yes           | Yes                  | Platform-limited                 | Always top   |
+| Performance       | Best          | Best                 | Good                             | Worst        |
+
+---
+
+## Bottom Sheet
+
+Docs: https://gorhom.dev/react-native-bottom-sheet/
+Package: `@gorhom/bottom-sheet`
+
+### Setup
+
+Wrap the app root with `<GestureHandlerRootView>` (react-native-gesture-handler) and `<BottomSheetModalProvider>` if using `BottomSheetModal`.
+
+### Key usage
+
+```tsx
+import BottomSheet, {
+  BottomSheetScrollView,
+  BottomSheetBackdrop,
+} from '@gorhom/bottom-sheet';
+
+<BottomSheet
+  ref={sheetRef}
+  snapPoints={['80%']}
+  enableDynamicSizing={false}   // REQUIRED when using snapPoints — see note below
+  enablePanDownToClose
+  backdropComponent={(props) => (
+    <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+  )}
+  onClose={handleClose}
+>
+  <BottomSheetScrollView>
+    {/* content */}
+  </BottomSheetScrollView>
+</BottomSheet>
+```
+
+### Critical: `enableDynamicSizing={false}`
+
+In v5, `enableDynamicSizing` defaults to `true`. When `snapPoints` are also provided, the sheet measures content height and can snap to an incorrect (near-zero) position when the user swipes down — leaving a sliver instead of closing. **Always set `enableDynamicSizing={false}` when using `snapPoints`.**
+
+### Imperative control
+
+```ts
+sheetRef.current?.expand();   // open to first snap point
+sheetRef.current?.close();    // animate closed
+sheetRef.current?.snapToIndex(0);
+```

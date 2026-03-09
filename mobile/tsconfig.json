@@ -1,14 +1,8 @@
 {
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
-  },
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx",
-    "nativewind-env.d.ts"
-  ]
+    "extends": "expo/tsconfig.base",
+    "compilerOptions": {
+        "strict": true,
+        "typeRoots": ["./node_modules/@types"]
+    },
+    "include": ["./**/*.ts", "./**/*.tsx", "nativewind-env.d.ts"]
 }

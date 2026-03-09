@@ -13,6 +13,7 @@
 ## Right-Click Context Menu (`leaflet-contextmenu`)
 
 Long-press/right-click on the map surfaces a context menu with actions:
+
 - **Add Radius / Thermometer / Tentacles / Matching / Measuring** — calls `addQuestion()` with the clicked coordinates pre-filled.
 - **Exclude Country** — shortcut for a `matching` question with `same: false` and `adminLevel: 2`.
 - **Copy Coordinates** — writes `lat°N/S, lng°E/W` to the clipboard.
@@ -34,12 +35,12 @@ Called whenever questions or hider mode change. Steps:
 
 ## Effects
 
-| Effect | Trigger | Behavior |
-|--------|---------|----------|
-| Question refresh | `$questions`, `map`, `$hiderMode` | Calls `refreshQuestions(true)` |
-| Duplicate layer guard | 1-second interval | If more than one `eliminationGeoJSON` layer exists, calls `refreshQuestions(false)` |
-| Fullscreen CSS class | `fullscreenchange` DOM event | Adds/removes `fullscreen` class on `<main>` |
-| Follow-me GPS | `$followMe`, `map` | Watches `navigator.geolocation`, places/moves a blue circle marker; clears watch on cleanup |
+| Effect                | Trigger                           | Behavior                                                                                    |
+| --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------- |
+| Question refresh      | `$questions`, `map`, `$hiderMode` | Calls `refreshQuestions(true)`                                                              |
+| Duplicate layer guard | 1-second interval                 | If more than one `eliminationGeoJSON` layer exists, calls `refreshQuestions(false)`         |
+| Fullscreen CSS class  | `fullscreenchange` DOM event      | Adds/removes `fullscreen` class on `<main>`                                                 |
+| Follow-me GPS         | `$followMe`, `map`                | Watches `navigator.geolocation`, places/moves a blue circle marker; clears watch on cleanup |
 
 ---
 
@@ -59,15 +60,16 @@ Called whenever questions or hider mode change. Steps:
 Renders `[{ location: $mapGeoLocation, added: true, base: true }, ...$additionalMapGeoLocations]`.
 
 Each row shows:
+
 - **Display name** via `determineName(feature)` — joins `name, state, country` for R-type features.
 - **Toggle +/−** (non-base rows only):
-  - Green `LucidePlusSquare` when `added: true` (zone unioned). Click → set `location.added = false`, re-set `additionalMapGeoLocations`, clear `mapGeoJSON` + `polyGeoJSON`, trigger `questions` refresh.
-  - Red `LucideMinusSquare` when `added: false` (zone subtracted). Click → set `location.added = true`, same side-effects.
-  - Disabled (muted, no-op) when `$isLoading` is true.
+    - Green `LucidePlusSquare` when `added: true` (zone unioned). Click → set `location.added = false`, re-set `additionalMapGeoLocations`, clear `mapGeoJSON` + `polyGeoJSON`, trigger `questions` refresh.
+    - Red `LucideMinusSquare` when `added: false` (zone subtracted). Click → set `location.added = true`, same side-effects.
+    - Disabled (muted, no-op) when `$isLoading` is true.
 - **X remove button**:
-  - **Base location**: promotes the first `added: true` additional to base (`addedLocations[0].base = true`, filter it out of `additionalMapGeoLocations`, `mapGeoLocation.set(addedLocations[0].location)`). Shows a toast error if no added additional locations exist.
-  - **Non-base location**: filters it out of `additionalMapGeoLocations` by `osm_id`.
-  - Always clears `mapGeoJSON`, `polyGeoJSON`, triggers `questions` refresh.
+    - **Base location**: promotes the first `added: true` additional to base (`addedLocations[0].base = true`, filter it out of `additionalMapGeoLocations`, `mapGeoLocation.set(addedLocations[0].location)`). Shows a toast error if no added additional locations exist.
+    - **Non-base location**: filters it out of `additionalMapGeoLocations` by `osm_id`.
+    - Always clears `mapGeoJSON`, `polyGeoJSON`, triggers `questions` refresh.
 
 ## Section 2 — Search
 
@@ -96,14 +98,14 @@ The mobile component also has no `onSelectLocation` prop — it writes to stores
 
 ## Key Differences vs. Mobile (`MapView.tsx`)
 
-| Concern | Web (`Map.tsx`) | Mobile (`MapView.tsx`) |
-|---------|----------------|----------------------|
-| Map library | react-leaflet / Leaflet | MapLibre (`@maplibre/maplibre-react-native`) |
-| Layer management | Imperative (`map.addLayer` / `map.removeLayer`) | Declarative React state → JSX `<ShapeSource>` |
-| Tile config | `<TileLayer>` prop swap | `buildStyleJSON()` returns a MapLibre style JSON string |
-| GPS | `navigator.geolocation.watchPosition` | `expo-location` (`Location.watchPositionAsync`) |
-| Context menu | `leaflet-contextmenu` plugin | `<MapContextMenu>` component (long-press) |
-| Duplicate layer guard | Polling interval | N/A — declarative rendering prevents duplicates |
+| Concern               | Web (`Map.tsx`)                                 | Mobile (`MapView.tsx`)                                  |
+| --------------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| Map library           | react-leaflet / Leaflet                         | MapLibre (`@maplibre/maplibre-react-native`)            |
+| Layer management      | Imperative (`map.addLayer` / `map.removeLayer`) | Declarative React state → JSX `<ShapeSource>`           |
+| Tile config           | `<TileLayer>` prop swap                         | `buildStyleJSON()` returns a MapLibre style JSON string |
+| GPS                   | `navigator.geolocation.watchPosition`           | `expo-location` (`Location.watchPositionAsync`)         |
+| Context menu          | `leaflet-contextmenu` plugin                    | `<MapContextMenu>` component (long-press)               |
+| Duplicate layer guard | Polling interval                                | N/A — declarative rendering prevents duplicates         |
 
 ---
 
@@ -123,14 +125,14 @@ The mobile component also has no `onSelectLocation` prop — it writes to stores
 
 ## Nanostores It Reads / Writes
 
-| Atom | Access | Purpose |
-|------|--------|---------|
-| `drawingQuestionKey` | read | `-1` = drawing hiding zone; any other value = drawing for that question key |
-| `questions` | read/write | Finds the current question; writes updated `places`/`geo` back |
-| `mapGeoJSON` | write | Set to drawn FeatureCollection when drawing the hiding zone |
-| `polyGeoJSON` | write | Same FeatureCollection written alongside `mapGeoJSON` for zone override |
-| `questionModified` | call | Triggers sidebar refresh after per-question drawing changes |
-| `autoSave` | read | Conditionally shows a manual Save button in marker dialogs |
+| Atom                 | Access     | Purpose                                                                     |
+| -------------------- | ---------- | --------------------------------------------------------------------------- |
+| `drawingQuestionKey` | read       | `-1` = drawing hiding zone; any other value = drawing for that question key |
+| `questions`          | read/write | Finds the current question; writes updated `places`/`geo` back              |
+| `mapGeoJSON`         | write      | Set to drawn FeatureCollection when drawing the hiding zone                 |
+| `polyGeoJSON`        | write      | Same FeatureCollection written alongside `mapGeoJSON` for zone override     |
+| `questionModified`   | call       | Triggers sidebar refresh after per-question drawing changes                 |
+| `autoSave`           | read       | Conditionally shows a manual Save button in marker dialogs                  |
 
 ## `onChange()` Handler
 

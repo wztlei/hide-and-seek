@@ -41,10 +41,10 @@ npx expo start
 
 1. Connect your iPhone via USB and tap **Trust** on the device prompt
 2. Run:
-   ```bash
-   cd mobile
-   npx expo run:ios --device
-   ```
+    ```bash
+    cd mobile
+    npx expo run:ios --device
+    ```
 3. Select your device from the list
 4. After the build installs, go to **Settings → General → VPN & Device Management → [your Apple ID] → Trust**
 
@@ -55,22 +55,23 @@ You'll need an Apple Developer team configured — set `ios.bundleIdentifier` in
 1. Enable **Developer Options** and **USB Debugging** on your device
 2. Connect via USB
 3. Run:
-   ```bash
-   cd mobile
-   npx expo run:android --device
-   ```
+    ```bash
+    cd mobile
+    npx expo run:android --device
+    ```
 
 ## Dev Loop
 
 Once the app is installed on a simulator or device, Metro handles JS changes via Fast Refresh — no rebuild needed unless you change native dependencies.
 
-| Key | Action |
-|-----|--------|
-| `r` | Force reload |
+| Key | Action           |
+| --- | ---------------- |
+| `r` | Force reload     |
 | `j` | Open JS debugger |
-| `m` | Toggle dev menu |
+| `m` | Toggle dev menu  |
 
 Rebuild native code (`expo run:*`) only when you:
+
 - Add or update a package with native code
 - Change native config fields in `app.json`
 
