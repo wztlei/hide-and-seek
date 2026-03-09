@@ -326,7 +326,8 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             onChangeText={setQuery}
             autoCorrect={false}
             autoCapitalize="none"
-            returnKeyType="search"
+            returnKeyType="done"
+            onSubmitEditing={() => onClose()}
           />
           {loading && <ActivityIndicator size="small" color={colors.PRIMARY} />}
           {!loading && query.length > 0 && (
@@ -383,7 +384,8 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             <Ionicons name="trash-outline" size={18} color="#ef4444" />
             <Text className="ml-2 text-base font-medium text-red-500">Clear zone</Text>
           </Pressable>
-          <Pressable
+          {/* TODO: Enable custom location ie. polygon selection */}
+          {/* <Pressable
             onPress={onCustomLocation}
             className="flex-row items-center justify-center bg-gray-100 rounded-xl h-12 active:opacity-70"
           >
@@ -391,7 +393,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             <Text className="ml-2 text-base font-medium" style={{ color: colors.PRIMARY }}>
               Custom location
             </Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       </Animated.View>
     </Modal>
