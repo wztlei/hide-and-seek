@@ -24,6 +24,7 @@ import { fetchAllZoneBoundaries } from '../lib/fetchZoneBoundary';
 import { toast } from '../lib/notifications';
 import { getCached, setCached } from '../lib/storage';
 import { PlacePicker } from './PlacePicker';
+import { QuestionsPanel } from './QuestionsPanel';
 
 const BOUNDARY_CACHE_KEY = 'cachedMapGeoJSON';
 
@@ -139,6 +140,7 @@ export function AppMapView() {
   const [userCoord, setUserCoord] = useState<[number, number] | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [zoneModalVisible, setZoneModalVisible] = useState(false);
+  const [questionsVisible, setQuestionsVisible] = useState(false);
   const [isLoadingZone, setIsLoadingZone] = useState(false);
 
   // mapGeoLocation stores coordinates as [latitude, longitude] (non-standard GeoJSON).
@@ -288,6 +290,16 @@ export function AppMapView() {
         )}
       </MLMapView>
 
+      {/* Questions button */}
+      <Pressable
+        onPress={() => setQuestionsVisible(true)}
+        style={{ bottom: insets.bottom + 159 }}
+        className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
+        hitSlop={8}
+      >
+        <Ionicons name="chatbox-ellipses-outline" size={24} color={colors.PRIMARY} />
+      </Pressable>
+
       {/* Zone selector button — shows spinner while boundary is loading */}
       <Pressable
         onPress={() => setZoneModalVisible(true)}
@@ -319,6 +331,7 @@ export function AppMapView() {
           // TODO: open custom location flow
         }}
       />
+      <QuestionsPanel visible={questionsVisible} onClose={() => setQuestionsVisible(false)} />
     </View>
   );
 }

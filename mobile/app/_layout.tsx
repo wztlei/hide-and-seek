@@ -3,6 +3,7 @@ import '../global.css';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
 
 import { toastConfig } from '../components/ToastConfig';
@@ -27,9 +28,9 @@ export default function RootLayout() {
   // (user code is transformed; node_modules is not), which injects CSS variable
   // strings as props onto react-native-screens' Fabric Stack → JSI TypeError.
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack />
       <Toast config={toastConfig} position="top" topOffset={60} />
-    </>
+    </GestureHandlerRootView>
   );
 }

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { BaseToastProps } from 'react-native-toast-message';
 
 type Variant = 'success' | 'error' | 'info';
@@ -13,11 +13,23 @@ const VARIANTS: Record<Variant, { icon: keyof typeof Ionicons.glyphMap; iconColo
 function ToastItem({ text1, variant }: BaseToastProps & { variant: Variant }) {
   const { icon, iconColor, badgeColor } = VARIANTS[variant];
   return (
-    <View style={styles.container}>
-      <View style={[styles.badge, { backgroundColor: badgeColor }]}>
+    <View
+      className="mx-4 flex-row items-center bg-zinc-900 rounded-2xl px-4 py-3.5 gap-3"
+      style={{
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 8,
+      }}
+    >
+      <View
+        className="w-9 h-9 rounded-full items-center justify-center"
+        style={{ backgroundColor: badgeColor }}
+      >
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
-      <Text style={styles.text} numberOfLines={2}>
+      <Text className="flex-1 text-zinc-100 text-[15px] font-medium leading-5" numberOfLines={2}>
         {text1}
       </Text>
     </View>
@@ -29,35 +41,3 @@ export const toastConfig = {
   error:   (props: BaseToastProps) => <ToastItem {...props} variant="error" />,
   info:    (props: BaseToastProps) => <ToastItem {...props} variant="info" />,
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181b',   // zinc-900
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  badge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    flex: 1,
-    color: '#f4f4f5',             // zinc-100
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-});
