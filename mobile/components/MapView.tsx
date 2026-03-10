@@ -170,6 +170,11 @@ export function AppMapView() {
         [],
     );
 
+    const handleQuestionsClose = useCallback(() => {
+        setQuestionsVisible(false);
+        setEditingQuestionKey(null);
+    }, []);
+
     /** Exits pick-mode and reopens the edit panel for the given question. */
     const finishPicking = useCallback((key: number) => {
         setPickingLocationForKey(null);
@@ -325,10 +330,7 @@ export function AppMapView() {
 
             <QuestionsPanel
                 visible={questionsVisible}
-                onClose={() => {
-                    setQuestionsVisible(false);
-                    setEditingQuestionKey(null);
-                }}
+                onClose={handleQuestionsClose}
                 getMapCenter={getMapCenter}
                 userCoord={userCoord}
                 initialEditKey={editingQuestionKey}

@@ -6,7 +6,7 @@ import BottomSheet, {
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     Animated,
@@ -280,7 +280,7 @@ interface Props {
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
-export function QuestionsPanel({
+export const QuestionsPanel = memo(function QuestionsPanel({
     visible,
     onClose,
     getMapCenter,
@@ -725,7 +725,7 @@ export function QuestionsPanel({
             </Animated.View>
         </BottomSheet>
     );
-}
+});
 
 const styles = StyleSheet.create({
     sheetBackground: {

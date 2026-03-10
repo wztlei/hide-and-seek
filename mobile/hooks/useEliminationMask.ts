@@ -1,7 +1,7 @@
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
 import type { Feature, MultiPolygon, Point, Polygon } from "geojson";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 
 import type { Question, Questions } from "../../src/maps/schema";
 import { mapGeoJSON, questions } from "../lib/context";
@@ -73,7 +73,18 @@ export type MeasuringRegion = {
  */
 export function useEliminationMask() {
     const $mapGeoJSON = useStore(mapGeoJSON);
-    const $questions = useStore(questions) as Questions;
+
+    // Subscribe to questions with low priority so urgent UI updates (e.g.
+    // QuestionsPanel showing a newly submitted question) are processed first.
+    // The map overlay catches up in the next transition render.
+    const [mapQuestions, setMapQuestions] = useState<Questions>(
+        () => questions.get() as Questions,
+    );
+    useEffect(() => {
+        return questions.subscribe((q) => {
+            startTransition(() => setMapQuestions(q as Questions));
+        });
+    }, []);
 
     const [eliminationMask, setEliminationMask] = useState<Feature<
         Polygon | MultiPolygon
@@ -141,18 +152,18 @@ export function useEliminationMask() {
                     turf.difference(turf.featureCollection([world, zoneOrNull])),
                 );
 
-                setRadiusRegions(computeRadiusRegions($questions, zoneOrNull));
-                setThermometerRegions(computeThermometerRegions($questions, zoneOrNull));
+                setRadiusRegions(computeRadiusRegions(mapQuestions, zoneOrNull));
+                setThermometerRegions(computeThermometerRegions(mapQuestions, zoneOrNull));
 
-                const tentacles = await computeTentaclesRegions($questions, zoneOrNull, isCancelled);
+                const tentacles = await computeTentaclesRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (tentacles === null) return;
                 setTentaclesRegions(tentacles);
 
-                const matching = await computeMatchingRegions($questions, zoneOrNull, isCancelled);
+                const matching = await computeMatchingRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (matching === null) return;
                 setMatchingRegions(matching);
 
-                const measuring = await computeMeasuringRegions($questions, zoneOrNull, isCancelled);
+                const measuring = await computeMeasuringRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (measuring === null) return;
                 setMeasuringRegions(measuring);
             } catch (e) {
@@ -164,7 +175,7 @@ export function useEliminationMask() {
         return () => {
             cancelled = true;
         };
-    }, [$mapGeoJSON, $questions]);
+    }, [$mapGeoJSON, mapQuestions]);
 
     return { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions };
 }
