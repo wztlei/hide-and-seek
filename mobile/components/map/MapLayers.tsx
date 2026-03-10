@@ -10,8 +10,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { radiusCircle, thermometerBisector } from "../../lib/mapGeometry";
-import type { RadiusRegion, ThermometerRegion } from "../../hooks/useEliminationMask";
+import { radiusCircle, tentaclesCircle, thermometerBisector } from "../../lib/mapGeometry";
+import type { MatchingRegion, MeasuringRegion, RadiusRegion, TentaclesRegion, ThermometerRegion } from "../../hooks/useEliminationMask";
 import { UserLocationDot } from "./UserLocationDot";
 
 interface Props {
@@ -22,6 +22,12 @@ interface Props {
     radiusRegions: RadiusRegion[];
     /** Valid Voronoi halves per thermometer question, clipped to game zone. */
     thermometerRegions: ThermometerRegion[];
+    /** Selected POI Voronoi cells per tentacles question, clipped to circle + zone. */
+    tentaclesRegions: TentaclesRegion[];
+    /** Eliminated regions per matching question (boundary fill). */
+    matchingRegions: MatchingRegion[];
+    /** Eliminated regions per measuring question (distance-buffer fill). */
+    measuringRegions: MeasuringRegion[];
     questions: Questions;
     userCoord: [number, number] | null;
     pendingCoord: [number, number] | null;
@@ -46,6 +52,9 @@ export function MapLayers({
     zoneBoundary,
     radiusRegions,
     thermometerRegions,
+    tentaclesRegions,
+    matchingRegions,
+    measuringRegions,
     questions,
     userCoord,
     pendingCoord,
@@ -58,6 +67,21 @@ export function MapLayers({
                     <UserLocationDot />
                 </MarkerView>
             )}
+
+            {/* Tentacles valid-region fills — rendered below the elimination mask
+                so the indigo mask on top correctly clips them to the game zone */}
+            {tentaclesRegions.map(({ key, region }) => (
+                <ShapeSource
+                    key={`tent-fill-${key}`}
+                    id={`tent-fill-src-${key}`}
+                    shape={region}
+                >
+                    <FillLayer
+                        id={`tent-fill-layer-${key}`}
+                        style={{ fillColor: colors.TENTACLES, fillOpacity: 0.2 }}
+                    />
+                </ShapeSource>
+            ))}
 
             {/* Thermometer valid-half fills — rendered below the elimination mask
                 so the indigo mask on top correctly clips them to the game zone */}
@@ -73,6 +97,36 @@ export function MapLayers({
                             fillColor: colors.THERMOMETER,
                             fillOpacity: 0.15,
                         }}
+                    />
+                </ShapeSource>
+            ))}
+
+            {/* Matching eliminated-region fills — rendered below the elimination mask
+                so the indigo mask on top correctly clips them to the game zone */}
+            {matchingRegions.map(({ key, region }) => (
+                <ShapeSource
+                    key={`match-fill-${key}`}
+                    id={`match-fill-src-${key}`}
+                    shape={region}
+                >
+                    <FillLayer
+                        id={`match-fill-layer-${key}`}
+                        style={{ fillColor: colors.MATCHING, fillOpacity: 0.2 }}
+                    />
+                </ShapeSource>
+            ))}
+
+            {/* Measuring eliminated-region fills — rendered below the elimination mask
+                so the indigo mask on top correctly clips them to the game zone */}
+            {measuringRegions.map(({ key, region }) => (
+                <ShapeSource
+                    key={`meas-fill-${key}`}
+                    id={`meas-fill-src-${key}`}
+                    shape={region}
+                >
+                    <FillLayer
+                        id={`meas-fill-layer-${key}`}
+                        style={{ fillColor: colors.MEASURING, fillOpacity: 0.2 }}
                     />
                 </ShapeSource>
             ))}
@@ -138,6 +192,26 @@ export function MapLayers({
                                 }}
                             />
                         </ShapeSource>
+                ))}
+
+            {/* Tentacles circle outlines */}
+            {questions
+                .filter((q) => q.id === "tentacles")
+                .map((q) => (
+                    <ShapeSource
+                        key={`tent-circle-${q.key}`}
+                        id={`tent-circle-src-${q.key}`}
+                        shape={tentaclesCircle(q as any)}
+                    >
+                        <LineLayer
+                            id={`tent-circle-line-${q.key}`}
+                            style={{
+                                lineColor: colors.TENTACLES,
+                                lineWidth: 2,
+                                lineOpacity: 0.8,
+                            }}
+                        />
+                    </ShapeSource>
                 ))}
 
             {/* Thermometer dividing lines — perpendicular bisector of A↔B.
@@ -227,6 +301,92 @@ export function MapLayers({
                     </MarkerView>,
                 ])}
 
+            {/* Tentacles anchor markers */}
+            {questions
+                .filter((q) => q.id === "tentacles")
+                .map((q) => (
+                    <MarkerView
+                        key={`tent-m-${q.key}`}
+                        coordinate={[q.data.lng, q.data.lat]}
+                    >
+                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                            <View style={styles.tentaclesMarker}>
+                                <Ionicons name="pie-chart-outline" size={18} color="white" />
+                            </View>
+                        </Pressable>
+                    </MarkerView>
+                ))}
+
+            {/* Tentacles POI dots — nearby POIs (capped to avoid OOM from too many MarkerViews) */}
+            {tentaclesRegions.flatMap(({ key, location, pois }) =>
+                pois
+                    .filter(
+                        (poi) =>
+                            (poi as any).properties?.name !==
+                            (location as any).properties?.name,
+                    )
+                    .slice(0, 30)
+                    .map((poi) => {
+                        const name = (poi as any).properties?.name as string;
+                        return (
+                            <MarkerView
+                                key={`tent-poi-${key}-${name}`}
+                                coordinate={
+                                    poi.geometry.coordinates as [number, number]
+                                }
+                            >
+                                <View style={styles.tentaclesPOIDot} />
+                            </MarkerView>
+                        );
+                    }),
+            )}
+
+            {/* Tentacles selected-location markers */}
+            {tentaclesRegions.map(({ key, location }) => (
+                <MarkerView
+                    key={`tent-loc-${key}`}
+                    coordinate={location.geometry.coordinates as [number, number]}
+                >
+                    <Pressable onPress={() => onMarkerPress(key)} hitSlop={8}>
+                        <View style={styles.tentaclesLocationMarker}>
+                            <Ionicons name="location" size={14} color="white" />
+                        </View>
+                    </Pressable>
+                </MarkerView>
+            ))}
+
+            {/* Matching seeker location markers */}
+            {questions
+                .filter((q) => q.id === "matching")
+                .map((q) => (
+                    <MarkerView
+                        key={`match-m-${q.key}`}
+                        coordinate={[q.data.lng, q.data.lat]}
+                    >
+                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                            <View style={styles.matchingMarker}>
+                                <Ionicons name="reorder-two-outline" size={18} color="white" />
+                            </View>
+                        </Pressable>
+                    </MarkerView>
+                ))}
+
+            {/* Measuring seeker location markers */}
+            {questions
+                .filter((q) => q.id === "measuring")
+                .map((q) => (
+                    <MarkerView
+                        key={`meas-m-${q.key}`}
+                        coordinate={[q.data.lng, q.data.lat]}
+                    >
+                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                            <View style={styles.measuringMarker}>
+                                <Ionicons name="resize-outline" size={18} color="white" />
+                            </View>
+                        </Pressable>
+                    </MarkerView>
+                ))}
+
             {/* Orange pending-coord pin shown during map-pick mode phase 2 */}
             {pendingCoord && (
                 <MarkerView coordinate={pendingCoord}>
@@ -269,6 +429,67 @@ const styles = StyleSheet.create({
         color: "white",
         fontSize: 14,
         fontWeight: "700",
+    },
+    tentaclesMarker: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: colors.TENTACLES,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    tentaclesLocationMarker: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: colors.TENTACLES,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    tentaclesPOIDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 14,
+        backgroundColor: colors.TENTACLES,
+        opacity: 0.8,
+        borderWidth: 1.5,
+        borderColor: "white",
+    },
+    matchingMarker: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: colors.MATCHING,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    measuringMarker: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: colors.MEASURING,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
     },
     pendingMarker: {
         width: 36,

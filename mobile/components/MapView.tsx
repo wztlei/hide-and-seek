@@ -89,7 +89,7 @@ export function AppMapView() {
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
-    const { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions } = useEliminationMask();
+    const { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions } = useEliminationMask();
     const { isLoadingZone } = useZoneBoundary();
     const {
         userCoord,
@@ -160,10 +160,10 @@ export function AppMapView() {
             setPendingCoord(null);
             setQuestionsVisible(false);
             setEditingQuestionKey(null);
-            // Allow map taps after the BottomSheet close animation (~300 ms).
+            // Allow map taps after the BottomSheet close animation (~300-400 ms).
             setTimeout(() => {
                 pickReadyRef.current = true;
-            }, 350);
+            }, 500);
         },
         [],
     );
@@ -184,6 +184,18 @@ export function AppMapView() {
             (x) => x.key === pickingLocationForKey,
         );
         if (q?.id === "radius") {
+            q.data.lng = pendingCoord[0];
+            q.data.lat = pendingCoord[1];
+            questionModified();
+        } else if (q?.id === "tentacles") {
+            q.data.lng = pendingCoord[0];
+            q.data.lat = pendingCoord[1];
+            questionModified();
+        } else if (q?.id === "matching") {
+            q.data.lng = pendingCoord[0];
+            q.data.lat = pendingCoord[1];
+            questionModified();
+        } else if (q?.id === "measuring") {
             q.data.lng = pendingCoord[0];
             q.data.lat = pendingCoord[1];
             questionModified();
@@ -250,6 +262,9 @@ export function AppMapView() {
                     zoneBoundary={zoneBoundary}
                     radiusRegions={radiusRegions}
                     thermometerRegions={thermometerRegions}
+                    tentaclesRegions={tentaclesRegions}
+                    matchingRegions={matchingRegions}
+                    measuringRegions={measuringRegions}
                     questions={$questions}
                     userCoord={userCoord}
                     pendingCoord={pendingCoord}

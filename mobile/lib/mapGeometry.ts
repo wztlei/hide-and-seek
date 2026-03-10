@@ -5,6 +5,7 @@ import type { Questions } from "../../src/maps/schema";
 
 type RadiusQuestion = Extract<Questions[number], { id: "radius" }>;
 type ThermometerQuestion = Extract<Questions[number], { id: "thermometer" }>;
+type TentaclesQuestion = Extract<Questions[number], { id: "tentacles" }>;
 
 /**
  * Returns the circle polygon for a radius question (used for the outline layer).
@@ -49,4 +50,15 @@ export function thermometerBisector(q: ThermometerQuestion): Feature<LineString>
     }
 
     return turf.lineString(coords);
+}
+
+/**
+ * Returns the circle polygon for a tentacles question (used for the outline layer).
+ * 64 steps gives a smooth circle at any zoom level.
+ */
+export function tentaclesCircle(q: TentaclesQuestion): Feature<Polygon> {
+    return turf.circle([q.data.lng, q.data.lat], q.data.radius, {
+        units: q.data.unit,
+        steps: 64,
+    });
 }
