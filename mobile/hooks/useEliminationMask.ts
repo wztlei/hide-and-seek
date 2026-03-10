@@ -38,7 +38,8 @@ export type ThermometerRegion = {
 export type TentaclesRegion = {
     key: number;
     region: Feature<Polygon | MultiPolygon>;
-    location: Feature<Point>;
+    /** null in outside mode (no specific location selected) */
+    location: Feature<Point> | null;
     pois: Feature<Point>[];
 };
 
@@ -96,6 +97,7 @@ export function useEliminationMask() {
             return;
         }
         let cancelled = false;
+        const isCancelled = () => cancelled;
 
         const run = async () => {
             try {
@@ -127,212 +129,24 @@ export function useEliminationMask() {
                 if (!zoneOrNull) return;
 
                 setZoneBoundary(zoneOrNull);
-
-                // Base elimination mask: world minus game zone (no questions applied).
                 setEliminationMask(
                     turf.difference(turf.featureCollection([world, zoneOrNull])),
                 );
 
-                // ── Radius: eliminated portion per question ───────────────────────
-                const newRadiusRegions: RadiusRegion[] = [];
-                for (const q of $questions) {
-                    if (q.id !== "radius") continue;
-                    const { lat, lng, radius, unit, within } = q.data;
-                    const circle = turf.circle([lng, lat], radius, {
-                        units: unit,
-                        steps: 64,
-                    });
-                    const eliminated = within
-                        // within=true: valid area is inside circle → eliminate the ring outside
-                        ? turf.difference(turf.featureCollection([zoneOrNull, circle]))
-                        // within=false: valid area is outside circle → eliminate the circle
-                        : turf.intersect(turf.featureCollection([zoneOrNull, circle]));
-                    if (eliminated) {
-                        newRadiusRegions.push({ key: q.key, region: eliminated });
-                    }
-                }
-                setRadiusRegions(newRadiusRegions);
+                setRadiusRegions(computeRadiusRegions($questions, zoneOrNull));
+                setThermometerRegions(computeThermometerRegions($questions, zoneOrNull));
 
-                // ── Thermometer: valid half per question ──────────────────────────
-                // Uses the same geodesic perpendicular-bisector construction as
-                // MapLayers so the fill exactly matches the rendered dividing line.
-                const newThermRegions: ThermometerRegion[] = [];
-                for (const q of $questions) {
-                    if (q.id !== "thermometer") continue;
-                    const { latA, lngA, latB, lngB, warmer } = q.data;
+                const tentacles = await computeTentaclesRegions($questions, zoneOrNull, isCancelled);
+                if (tentacles === null) return;
+                setTentaclesRegions(tentacles);
 
-                    const ptA = turf.point([lngA, latA]);
-                    const ptB = turf.point([lngB, latB]);
-                    const mid = turf.midpoint(ptA, ptB);
-                    const abBearing = turf.bearing(ptA, ptB);
+                const matching = await computeMatchingRegions($questions, zoneOrNull, isCancelled);
+                if (matching === null) return;
+                setMatchingRegions(matching);
 
-                    // Build the geodesic bisector edge with many intermediate points
-                    // (same algorithm as MapLayers) so the half-plane polygon is
-                    // accurate at any map scale.
-                    const step = 20;
-                    const reach = 5000;
-                    const bisectorCoords: [number, number][] = [];
-                    for (let d = reach; d >= step; d -= step) {
-                        bisectorCoords.push(
-                            turf.destination(mid, d, abBearing - 90, { units: "kilometers" })
-                                .geometry.coordinates as [number, number],
-                        );
-                    }
-                    bisectorCoords.push(mid.geometry.coordinates as [number, number]);
-                    for (let d = step; d <= reach; d += step) {
-                        bisectorCoords.push(
-                            turf.destination(mid, d, abBearing + 90, { units: "kilometers" })
-                                .geometry.coordinates as [number, number],
-                        );
-                    }
-
-                    // Close the half-plane on the valid side by adding two far
-                    // corners behind the valid point, then closing to the start.
-                    // warmer=true → valid side is B (abBearing direction from mid)
-                    // warmer=false → valid side is A (abBearing+180 direction)
-                    const validBearing = warmer ? abBearing : abBearing + 180;
-                    const farRight = turf.destination(
-                        turf.point(bisectorCoords[bisectorCoords.length - 1]),
-                        reach,
-                        validBearing,
-                        { units: "kilometers" },
-                    ).geometry.coordinates as [number, number];
-                    const farLeft = turf.destination(
-                        turf.point(bisectorCoords[0]),
-                        reach,
-                        validBearing,
-                        { units: "kilometers" },
-                    ).geometry.coordinates as [number, number];
-
-                    const halfPlane = turf.polygon([[
-                        ...bisectorCoords,
-                        farRight,
-                        farLeft,
-                        bisectorCoords[0],
-                    ]]);
-
-                    const clipped = turf.intersect(
-                        turf.featureCollection([zoneOrNull, halfPlane]),
-                    );
-                    if (clipped) {
-                        newThermRegions.push({ key: q.key, region: clipped });
-                    }
-                }
-                setThermometerRegions(newThermRegions);
-
-                // ── Tentacles: selected POI Voronoi cell clipped to circle + zone ─
-                const newTentaclesRegions: TentaclesRegion[] = [];
-                for (const q of $questions) {
-                    if (q.id !== "tentacles") continue;
-                    if (q.data.location === false) continue;
-                    if (q.data.locationType === "custom") continue;
-                    try {
-                        const pts = await fetchTentacleLocations(q.data as any);
-                        if (cancelled) return;
-                        if (pts.features.length === 0) continue;
-
-                        const circleBbox = turf.bbox(
-                            turf.circle(
-                                [q.data.lng, q.data.lat],
-                                q.data.radius * 3,
-                                { units: q.data.unit },
-                            ),
-                        ) as [number, number, number, number];
-                        const voronoi = turf.voronoi(pts, { bbox: circleBbox });
-                        if (!voronoi) continue;
-
-                        const selectedName = (q.data.location as any).properties.name;
-                        const selectedPt = pts.features.find(
-                            (f: any) => f.properties.name === selectedName,
-                        );
-                        if (!selectedPt) continue;
-
-                        const cell = voronoi.features.find(
-                            (f: any) => f && turf.booleanPointInPolygon(selectedPt, f),
-                        );
-                        if (!cell) continue;
-
-                        const circle = turf.circle(
-                            [q.data.lng, q.data.lat],
-                            q.data.radius,
-                            { units: q.data.unit, steps: 64 },
-                        );
-                        const circleClipped = turf.intersect(
-                            turf.featureCollection([cell, circle]),
-                        );
-                        if (!circleClipped) continue;
-                        const clipped = turf.intersect(
-                            turf.featureCollection([zoneOrNull, circleClipped]),
-                        );
-                        if (clipped) {
-                            newTentaclesRegions.push({
-                                key: q.key,
-                                region: clipped,
-                                location: q.data.location as unknown as Feature<Point>,
-                                pois: pts.features as Feature<Point>[],
-                            });
-                        }
-                    } catch {
-                        // Network error — skip silently
-                    }
-                }
-                if (!cancelled) setTentaclesRegions(newTentaclesRegions);
-
-                // ── Matching: boundary polygon per question ────────────────────────
-                const newMatchingRegions: MatchingRegion[] = [];
-                for (const q of $questions) {
-                    if (q.id !== "matching") continue;
-                    try {
-                        const boundary = await resolveMatchingBoundary(
-                            q as Extract<Question, { id: "matching" }>,
-                            zoneOrNull,
-                        );
-                        if (cancelled) return;
-                        if (!boundary) continue;
-
-                        // same=true: valid zone is the matching boundary → eliminate what's outside
-                        // same=false: valid zone excludes the matching boundary → eliminate what's inside
-                        const eliminated = q.data.same
-                            ? turf.difference(turf.featureCollection([zoneOrNull, boundary]))
-                            : turf.intersect(turf.featureCollection([zoneOrNull, boundary]));
-
-                        if (eliminated) {
-                            newMatchingRegions.push({ key: q.key, region: eliminated });
-                        }
-                    } catch {
-                        // Network error — skip silently
-                    }
-                }
-                if (!cancelled) setMatchingRegions(newMatchingRegions);
-
-                // ── Measuring: distance-buffer boundary per question ──────────────
-                const newMeasuringRegions: MeasuringRegion[] = [];
-                for (const q of $questions) {
-                    if (q.id !== "measuring") continue;
-                    try {
-                        const result = await resolveMeasuringBuffer(
-                            q as Extract<Question, { id: "measuring" }>,
-                            zoneOrNull,
-                        );
-                        if (cancelled) return;
-                        if (!result) continue;
-
-                        const { buffer } = result;
-
-                        // hiderCloser=true: valid zone is INSIDE buffer → eliminate outer ring
-                        // hiderCloser=false: valid zone is OUTSIDE buffer → eliminate inner circle
-                        const eliminated = q.data.hiderCloser
-                            ? turf.difference(turf.featureCollection([zoneOrNull, buffer]))
-                            : turf.intersect(turf.featureCollection([zoneOrNull, buffer]));
-
-                        if (eliminated) {
-                            newMeasuringRegions.push({ key: q.key, region: eliminated });
-                        }
-                    } catch {
-                        // Network error — skip silently
-                    }
-                }
-                if (!cancelled) setMeasuringRegions(newMeasuringRegions);
+                const measuring = await computeMeasuringRegions($questions, zoneOrNull, isCancelled);
+                if (measuring === null) return;
+                setMeasuringRegions(measuring);
             } catch (e) {
                 console.error("Failed to compute zone mask:", e);
             }
@@ -345,6 +159,257 @@ export function useEliminationMask() {
     }, [$mapGeoJSON, $questions]);
 
     return { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions };
+}
+
+// ── Per-question region computers ────────────────────────────────────────────
+//
+// Sync helpers return the regions array directly.
+// Async helpers return null if cancelled (caller must return early on null).
+
+function computeRadiusRegions(
+    $questions: Questions,
+    zone: Feature<Polygon | MultiPolygon>,
+): RadiusRegion[] {
+    const regions: RadiusRegion[] = [];
+    for (const q of $questions) {
+        if (q.id !== "radius") continue;
+        const { lat, lng, radius, unit, within } = q.data;
+        const circle = turf.circle([lng, lat], radius, { units: unit, steps: 64 });
+        const eliminated = within
+            // within=true: valid area is inside circle → eliminate the ring outside
+            ? turf.difference(turf.featureCollection([zone, circle]))
+            // within=false: valid area is outside circle → eliminate the circle
+            : turf.intersect(turf.featureCollection([zone, circle]));
+        if (eliminated) regions.push({ key: q.key, region: eliminated });
+    }
+    return regions;
+}
+
+function computeThermometerRegions(
+    $questions: Questions,
+    zone: Feature<Polygon | MultiPolygon>,
+): ThermometerRegion[] {
+    const regions: ThermometerRegion[] = [];
+    for (const q of $questions) {
+        if (q.id !== "thermometer") continue;
+        const { latA, lngA, latB, lngB, warmer } = q.data;
+
+        const ptA = turf.point([lngA, latA]);
+        const ptB = turf.point([lngB, latB]);
+        const mid = turf.midpoint(ptA, ptB);
+        const abBearing = turf.bearing(ptA, ptB);
+
+        // Build the geodesic bisector edge with many intermediate points
+        // (same algorithm as MapLayers) so the half-plane polygon is
+        // accurate at any map scale.
+        const step = 20;
+        const reach = 5000;
+        const bisectorCoords: [number, number][] = [];
+        for (let d = reach; d >= step; d -= step) {
+            bisectorCoords.push(
+                turf.destination(mid, d, abBearing - 90, { units: "kilometers" })
+                    .geometry.coordinates as [number, number],
+            );
+        }
+        bisectorCoords.push(mid.geometry.coordinates as [number, number]);
+        for (let d = step; d <= reach; d += step) {
+            bisectorCoords.push(
+                turf.destination(mid, d, abBearing + 90, { units: "kilometers" })
+                    .geometry.coordinates as [number, number],
+            );
+        }
+
+        // Close the half-plane on the valid side by adding two far
+        // corners behind the valid point, then closing to the start.
+        // warmer=true → valid side is B (abBearing direction from mid)
+        // warmer=false → valid side is A (abBearing+180 direction)
+        const validBearing = warmer ? abBearing : abBearing + 180;
+        const farRight = turf.destination(
+            turf.point(bisectorCoords[bisectorCoords.length - 1]),
+            reach,
+            validBearing,
+            { units: "kilometers" },
+        ).geometry.coordinates as [number, number];
+        const farLeft = turf.destination(
+            turf.point(bisectorCoords[0]),
+            reach,
+            validBearing,
+            { units: "kilometers" },
+        ).geometry.coordinates as [number, number];
+
+        const halfPlane = turf.polygon([[
+            ...bisectorCoords,
+            farRight,
+            farLeft,
+            bisectorCoords[0],
+        ]]);
+
+        const clipped = turf.intersect(turf.featureCollection([zone, halfPlane]));
+        if (clipped) regions.push({ key: q.key, region: clipped });
+    }
+    return regions;
+}
+
+/**
+ * Returns null if cancelled mid-fetch (caller should return early).
+ */
+async function computeTentaclesRegions(
+    $questions: Questions,
+    zone: Feature<Polygon | MultiPolygon>,
+    isCancelled: () => boolean,
+): Promise<TentaclesRegion[] | null> {
+    const regions: TentaclesRegion[] = [];
+
+    for (const q of $questions) {
+        if (q.id !== "tentacles") continue;
+        if (q.data.locationType === "custom") continue;
+
+        const circle = turf.circle(
+            [q.data.lng, q.data.lat],
+            q.data.radius,
+            { units: q.data.unit, steps: 64 },
+        );
+
+        // Always fetch POIs so dots are visible in all modes.
+        let poiFeatures: Feature<Point>[] = [];
+        try {
+            const pts = await fetchTentacleLocations(q.data as any);
+            if (isCancelled()) return null;
+            poiFeatures = pts.features as Feature<Point>[];
+        } catch {
+            // Network error — continue without POI dots
+            if (isCancelled()) return null;
+        }
+
+        if (!q.data.within) {
+            // Outside mode: hider is NOT in the circle → shade the circle.
+            const eliminated = turf.intersect(turf.featureCollection([zone, circle]));
+            if (eliminated) {
+                regions.push({ key: q.key, region: eliminated, location: null, pois: poiFeatures });
+            }
+            continue;
+        }
+
+        if (q.data.location === false) {
+            // Inside mode, no POI selected → shade outside the circle.
+            const eliminated = turf.difference(turf.featureCollection([zone, circle]));
+            if (eliminated) {
+                regions.push({ key: q.key, region: eliminated, location: null, pois: poiFeatures });
+            }
+            continue;
+        }
+
+        // Inside mode, POI selected → shade everything except the
+        // selected POI's Voronoi cell clipped to the circle.
+        if (poiFeatures.length === 0) continue;
+        try {
+            const circleBbox = turf.bbox(
+                turf.circle([q.data.lng, q.data.lat], q.data.radius * 3, { units: q.data.unit }),
+            ) as [number, number, number, number];
+            const voronoi = turf.voronoi(turf.featureCollection(poiFeatures), { bbox: circleBbox });
+            if (!voronoi) continue;
+
+            const selectedName = (q.data.location as any).properties.name;
+            const selectedPt = poiFeatures.find((f: any) => f.properties.name === selectedName);
+            if (!selectedPt) continue;
+
+            const cell = voronoi.features.find(
+                (f: any) => f && turf.booleanPointInPolygon(selectedPt, f),
+            );
+            if (!cell) continue;
+
+            // Valid area = selected Voronoi cell ∩ circle (clipped to zone).
+            const validArea = turf.intersect(turf.featureCollection([zone, cell, circle]));
+            if (!validArea) continue;
+
+            // Eliminated = zone minus valid area.
+            const eliminated = turf.difference(turf.featureCollection([zone, validArea]));
+            if (eliminated) {
+                regions.push({
+                    key: q.key,
+                    region: eliminated,
+                    location: q.data.location as unknown as Feature<Point>,
+                    pois: poiFeatures,
+                });
+            }
+        } catch {
+            // Voronoi error — skip silently
+        }
+    }
+
+    return regions;
+}
+
+/**
+ * Returns null if cancelled mid-fetch (caller should return early).
+ */
+async function computeMatchingRegions(
+    $questions: Questions,
+    zone: Feature<Polygon | MultiPolygon>,
+    isCancelled: () => boolean,
+): Promise<MatchingRegion[] | null> {
+    const regions: MatchingRegion[] = [];
+
+    for (const q of $questions) {
+        if (q.id !== "matching") continue;
+        try {
+            const boundary = await resolveMatchingBoundary(
+                q as Extract<Question, { id: "matching" }>,
+                zone,
+            );
+            if (isCancelled()) return null;
+            if (!boundary) continue;
+
+            // same=true: valid zone is the matching boundary → eliminate what's outside
+            // same=false: valid zone excludes the matching boundary → eliminate what's inside
+            const eliminated = q.data.same
+                ? turf.difference(turf.featureCollection([zone, boundary]))
+                : turf.intersect(turf.featureCollection([zone, boundary]));
+
+            if (eliminated) regions.push({ key: q.key, region: eliminated });
+        } catch {
+            // Network error — skip silently
+        }
+    }
+
+    return regions;
+}
+
+/**
+ * Returns null if cancelled mid-fetch (caller should return early).
+ */
+async function computeMeasuringRegions(
+    $questions: Questions,
+    zone: Feature<Polygon | MultiPolygon>,
+    isCancelled: () => boolean,
+): Promise<MeasuringRegion[] | null> {
+    const regions: MeasuringRegion[] = [];
+
+    for (const q of $questions) {
+        if (q.id !== "measuring") continue;
+        try {
+            const result = await resolveMeasuringBuffer(
+                q as Extract<Question, { id: "measuring" }>,
+                zone,
+            );
+            if (isCancelled()) return null;
+            if (!result) continue;
+
+            const { buffer } = result;
+
+            // hiderCloser=true: valid zone is INSIDE buffer → eliminate outer ring
+            // hiderCloser=false: valid zone is OUTSIDE buffer → eliminate inner circle
+            const eliminated = q.data.hiderCloser
+                ? turf.difference(turf.featureCollection([zone, buffer]))
+                : turf.intersect(turf.featureCollection([zone, buffer]));
+
+            if (eliminated) regions.push({ key: q.key, region: eliminated });
+        } catch {
+            // Network error — skip silently
+        }
+    }
+
+    return regions;
 }
 
 // ── resolveMatchingBoundary ───────────────────────────────────────────────

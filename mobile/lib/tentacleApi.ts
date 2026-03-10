@@ -76,7 +76,14 @@ export async function fetchTentacleLocations(
     // 3. Network
     const res = await fetch(url);
     const data = await res.json();
-    const fc = parseElements(data.elements);
+    const allPts = parseElements(data.elements);
+
+    // Keep only POIs that fall within the radius circle.
+    const radiusMeters = turf.convertLength(question.radius, question.unit, "meters");
+    const circle = turf.circle([question.lng, question.lat], radiusMeters, { units: "meters", steps: 64 });
+    const fc = turf.featureCollection(
+        allPts.features.filter((pt) => turf.booleanPointInPolygon(pt, circle)),
+    ) as FeatureCollection<Point>;
 
     memCache.set(url, fc);
     AsyncStorage.setItem(key, JSON.stringify(fc)).catch(() => {});

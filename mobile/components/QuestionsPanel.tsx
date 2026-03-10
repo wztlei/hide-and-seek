@@ -178,12 +178,13 @@ function subtitleForQuestion(q: Question): string | null {
         return `${warmer ? "Warmer" : "Colder"} · A: ${Math.abs(latA).toFixed(4)}° ${dir}, ${Math.abs(lngA).toFixed(4)}° ${lngDir}`;
     }
     if (q.id === "tentacles") {
+        if (!q.data.within) return "Outside";
         const label = LOCATION_TYPE_LABELS[q.data.locationType] ?? q.data.locationType;
         const loc =
             q.data.location !== false
                 ? (q.data.location as any).properties?.name ?? "Selected"
                 : "None selected";
-        return `${label} · ${loc}`;
+        return `Inside · ${label} · ${loc}`;
     }
     if (q.id === "matching") {
         const typeLabel = MATCHING_TYPE_LABELS[q.data.type] ?? q.data.type;
@@ -224,8 +225,9 @@ function defaultPayloadForType(
                 data: {
                     lat,
                     lng,
-                    radius: 15,
+                    radius: 1,
                     unit: "miles" as const,
+                    within: false,
                     locationType: "hospital" as const,
                     location: false as const,
                 },

@@ -323,7 +323,7 @@ export function MapLayers({
                     .filter(
                         (poi) =>
                             (poi as any).properties?.name !==
-                            (location as any).properties?.name,
+                            (location as any)?.properties?.name,
                     )
                     .slice(0, 30)
                     .map((poi) => {
@@ -341,19 +341,25 @@ export function MapLayers({
                     }),
             )}
 
-            {/* Tentacles selected-location markers */}
-            {tentaclesRegions.map(({ key, location }) => (
-                <MarkerView
-                    key={`tent-loc-${key}`}
-                    coordinate={location.geometry.coordinates as [number, number]}
-                >
-                    <Pressable onPress={() => onMarkerPress(key)} hitSlop={8}>
-                        <View style={styles.tentaclesLocationMarker}>
-                            <Ionicons name="location" size={14} color="white" />
-                        </View>
-                    </Pressable>
-                </MarkerView>
-            ))}
+            {/* Tentacles selected-location markers — only in inside mode */}
+            {tentaclesRegions.flatMap(({ key, location }) =>
+                location
+                    ? [
+                          <MarkerView
+                              key={`tent-loc-${key}`}
+                              coordinate={
+                                  location.geometry.coordinates as [number, number]
+                              }
+                          >
+                              <Pressable onPress={() => onMarkerPress(key)} hitSlop={8}>
+                                  <View style={styles.tentaclesLocationMarker}>
+                                      <Ionicons name="location" size={14} color="white" />
+                                  </View>
+                              </Pressable>
+                          </MarkerView>,
+                      ]
+                    : [],
+            )}
 
             {/* Matching seeker location markers */}
             {questions
