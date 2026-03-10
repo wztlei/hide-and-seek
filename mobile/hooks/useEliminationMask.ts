@@ -93,7 +93,15 @@ export function useEliminationMask() {
 
     useEffect(() => {
         if (!$mapGeoJSON) {
-            // Keep previous visuals while a new boundary is loading.
+            // Zone cleared or loading — wipe all overlays so stale question
+            // regions don't persist on the map.
+            setEliminationMask(null);
+            setZoneBoundary(null);
+            setRadiusRegions([]);
+            setThermometerRegions([]);
+            setTentaclesRegions([]);
+            setMatchingRegions([]);
+            setMeasuringRegions([]);
             return;
         }
         let cancelled = false;

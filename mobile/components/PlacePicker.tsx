@@ -253,10 +253,15 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                     text: "Reset",
                     style: "destructive",
                     onPress: () => {
-                        mapGeoJSON.set(null);
+                        const hadAdditional = additionalMapGeoLocations.get().length > 0;
                         polyGeoJSON.set(null);
                         questions.set([]);
                         additionalMapGeoLocations.set([]);
+                        // Only null out mapGeoJSON when additional zones existed —
+                        // if there were none, useZoneBoundary won't re-run (dependencies
+                        // unchanged) so mapGeoJSON would stay null and the base zone
+                        // boundary would never reload.
+                        if (hadAdditional) mapGeoJSON.set(null);
                     },
                 },
             ],

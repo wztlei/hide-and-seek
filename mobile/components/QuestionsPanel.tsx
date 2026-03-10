@@ -430,6 +430,31 @@ export function QuestionsPanel({
                         <Text className="flex-1 text-2xl font-semibold text-gray-800">
                             Questions
                         </Text>
+                        {$questions.length > 0 && (
+                            <Pressable
+                                onPress={() =>
+                                    Alert.alert(
+                                        "Clear All Questions",
+                                        "Remove all questions?",
+                                        [
+                                            { text: "Cancel", style: "cancel" },
+                                            {
+                                                text: "Clear All",
+                                                style: "destructive",
+                                                onPress: () => {
+                                                    questions.set([]);
+                                                    questionModified();
+                                                },
+                                            },
+                                        ],
+                                    )
+                                }
+                                hitSlop={8}
+                                className="px-2 py-1 active:opacity-60"
+                            >
+                                <Text className="text-base text-red-500">Clear all</Text>
+                            </Pressable>
+                        )}
                         <Pressable
                             onPress={onClose}
                             hitSlop={8}
