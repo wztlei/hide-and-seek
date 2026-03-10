@@ -243,13 +243,13 @@ function defaultPayloadForType(
                 data: {
                     lat,
                     lng,
-                    type: "" as any,
+                    type: "zone" as const,
                     same: true,
                     drag: false,
                     color: "blue" as const,
                     collapsed: false,
-                    cat: { adminLevel: 4 },
-                } as any,
+                    cat: { adminLevel: 4 as const },
+                },
             };
         case "measuring":
             return {
@@ -257,7 +257,7 @@ function defaultPayloadForType(
                 data: {
                     lat,
                     lng,
-                    type: "" as any,
+                    type: "coastline" as const,
                     hiderCloser: true,
                     drag: false,
                     color: "blue" as const,
@@ -672,6 +672,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             <TentaclesEditor
                                 data={editData.data}
                                 editingKey={editingKey!}
+                                isNew={isAddMode}
                                 onPickLocationOnMap={onPickLocationOnMap}
                             />
                         )}

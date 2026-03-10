@@ -12,13 +12,14 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
-import { mapGeoLocation, questionModified, questions, thunderforestApiKey } from "../lib/context";
+import { mapGeoJSON, mapGeoLocation, questionModified, questions, thunderforestApiKey } from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
 import { MapLayers } from "./map/MapLayers";
+import { MapLoadingOverlay } from "./map/MapLoadingOverlay";
 import { PickLocationBanner } from "./map/PickLocationBanner";
 import { PlacePicker } from "./PlacePicker";
 import { QuestionsPanel } from "./QuestionsPanel";
@@ -82,6 +83,7 @@ function buildStyleJSON(useThunderforest: boolean, apiKey: string): string {
  */
 export function AppMapView() {
     const $mapGeoLocation = useStore(mapGeoLocation);
+    const $mapGeoJSON = useStore(mapGeoJSON);
     const $questions = useStore(questions) as Questions;
     const $thunderforestApiKey = useStore(thunderforestApiKey);
 
@@ -336,6 +338,8 @@ export function AppMapView() {
                 initialEditKey={editingQuestionKey}
                 onPickLocationOnMap={handlePickLocationOnMap}
             />
+
+            {!$mapGeoJSON && <MapLoadingOverlay />}
         </View>
     );
 }

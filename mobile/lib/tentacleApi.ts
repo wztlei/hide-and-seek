@@ -76,14 +76,11 @@ export async function fetchTentacleLocations(
     // 3. Network
     const res = await fetch(url);
     const data = await res.json();
-    const allPts = parseElements(data.elements);
-
-    // Keep only POIs that fall within the radius circle.
-    const radiusMeters = turf.convertLength(question.radius, question.unit, "meters");
-    const circle = turf.circle([question.lng, question.lat], radiusMeters, { units: "meters", steps: 64 });
-    const fc = turf.featureCollection(
-        allPts.features.filter((pt) => turf.booleanPointInPolygon(pt, circle)),
-    ) as FeatureCollection<Point>;
+    // Don't post-filter by circle: Overpass `around:` already does radius filtering
+    // using the nearest boundary point of each feature. Large features (e.g. theme
+    // parks) may have their centroid outside the radius even though they overlap it,
+    // so a booleanPointInPolygon check on the center would drop valid results.
+    const fc = parseElements(data.elements);
 
     memCache.set(url, fc);
     AsyncStorage.setItem(key, JSON.stringify(fc)).catch(() => {});

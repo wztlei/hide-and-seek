@@ -118,6 +118,10 @@ export function useEliminationMask() {
         let cancelled = false;
         const isCancelled = () => cancelled;
 
+        // Yields the JS thread for one macrotask, allowing touch events (e.g.
+        // opening the location-type dropdown) to be processed between heavy steps.
+        const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
         const run = async () => {
             try {
                 const features = $mapGeoJSON.features as Feature<
@@ -152,7 +156,10 @@ export function useEliminationMask() {
                     turf.difference(turf.featureCollection([world, zoneOrNull])),
                 );
 
+                await tick(); if (isCancelled()) return;
                 setRadiusRegions(computeRadiusRegions(mapQuestions, zoneOrNull));
+
+                await tick(); if (isCancelled()) return;
                 setThermometerRegions(computeThermometerRegions(mapQuestions, zoneOrNull));
 
                 const tentacles = await computeTentaclesRegions(mapQuestions, zoneOrNull, isCancelled);
@@ -278,6 +285,7 @@ async function computeTentaclesRegions(
     isCancelled: () => boolean,
 ): Promise<TentaclesRegion[] | null> {
     const regions: TentaclesRegion[] = [];
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
     for (const q of $questions) {
         if (q.id !== "tentacles") continue;
@@ -299,6 +307,10 @@ async function computeTentaclesRegions(
             // Network error — continue without POI dots
             if (isCancelled()) return null;
         }
+
+        // Yield after the fetch so touch events can be processed before the
+        // synchronous Voronoi / turf work below runs.
+        await tick(); if (isCancelled()) return null;
 
         if (!q.data.within) {
             // Outside mode: hider is NOT in the circle → shade the circle.
@@ -368,6 +380,7 @@ async function computeMatchingRegions(
     isCancelled: () => boolean,
 ): Promise<MatchingRegion[] | null> {
     const regions: MatchingRegion[] = [];
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
     for (const q of $questions) {
         if (q.id !== "matching") continue;
@@ -378,6 +391,8 @@ async function computeMatchingRegions(
             );
             if (isCancelled()) return null;
             if (!boundary) continue;
+
+            await tick(); if (isCancelled()) return null;
 
             // same=true: valid zone is the matching boundary → eliminate what's outside
             // same=false: valid zone excludes the matching boundary → eliminate what's inside
@@ -403,6 +418,7 @@ async function computeMeasuringRegions(
     isCancelled: () => boolean,
 ): Promise<MeasuringRegion[] | null> {
     const regions: MeasuringRegion[] = [];
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
     for (const q of $questions) {
         if (q.id !== "measuring") continue;
@@ -413,6 +429,8 @@ async function computeMeasuringRegions(
             );
             if (isCancelled()) return null;
             if (!result) continue;
+
+            await tick(); if (isCancelled()) return null;
 
             const { buffer } = result;
 

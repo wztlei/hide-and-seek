@@ -8,6 +8,7 @@ import type { Feature, Point } from "geojson";
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
 import { questionModified, questions } from "../../lib/context";
+import { draftQuestion } from "../../lib/draftQuestion";
 import { fetchTentacleLocations } from "../../lib/tentacleApi";
 import { LocationButtons } from "./LocationButtons";
 import { editorStyles } from "./editorStyles";
@@ -31,27 +32,39 @@ const LOCATION_TYPE_OPTIONS = Object.entries(LOCATION_TYPE_LABELS).map(
 interface Props {
     data: TentaclesData;
     editingKey: number;
+    isNew?: boolean;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
-export function TentaclesEditor({ data, editingKey, onPickLocationOnMap }: Props) {
+export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }: Props) {
     const $questions = useStore(questions) as Questions;
+    const $draftQuestion = useStore(draftQuestion);
 
     const [radiusText, setRadiusText] = useState(String(data.radius));
     const [pois, setPois] = useState<Feature<Point>[]>([]);
     const [loading, setLoading] = useState(false);
     const [reloadCount, setReloadCount] = useState(0);
+    // Tracks whether the user has explicitly chosen a location type.
+    // New questions start unselected; existing questions start selected.
+    const [hasSelectedType, setHasSelectedType] = useState(!isNew);
     // Set to true before incrementing reloadCount so the effect can read it.
     const forceRef = useRef(false);
 
-    // Recompute whenever question data changes (questions atom gets new array ref on every questionModified())
+    // Recompute whenever question data changes. Checks both the store (existing
+    // questions) and the draft atom (new questions being added).
     const fetchKey = useMemo(() => {
-        const q = $questions.find((x) => x.key === editingKey);
-        if (q?.id !== "tentacles") return null;
+        const stored = $questions.find((x) => x.key === editingKey);
+        const q =
+            (stored?.id === "tentacles" ? stored : null) ??
+            ($draftQuestion?.key === editingKey && $draftQuestion.id === "tentacles"
+                ? $draftQuestion
+                : null);
+        if (!q) return null;
         if (!q.data.within) return null;
+        if (!hasSelectedType) return null;
         if (q.data.locationType === "custom") return null;
         return `${q.data.lat},${q.data.lng},${q.data.radius},${q.data.unit},${q.data.locationType}`;
-    }, [$questions, editingKey]);
+    }, [$questions, $draftQuestion, editingKey, hasSelectedType]);
 
     useEffect(() => {
         if (!fetchKey) return;
@@ -217,10 +230,11 @@ export function TentaclesEditor({ data, editingKey, onPickLocationOnMap }: Props
                     data={LOCATION_TYPE_OPTIONS}
                     labelField="label"
                     valueField="value"
-                    value={data.locationType}
+                    value={hasSelectedType ? data.locationType : null}
                     onChange={(item) => {
                         data.locationType = item.value as any;
                         data.location = false;
+                        setHasSelectedType(true);
                         questionModified();
                     }}
                     disable={!data.within}
