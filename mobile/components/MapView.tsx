@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
 import { mapGeoLocation, questionModified, questions, thunderforestApiKey } from "../lib/context";
+import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
@@ -140,15 +141,16 @@ export function AppMapView() {
 
     // ── Callbacks ───────────────────────────────────────────────────────────
 
-    const getMapCenter = useCallback(async (): Promise<
-        [number, number] | null
-    > => {
-        try {
-            const c = await mapRef.current?.getCenter(); // [lng, lat]
-            return (c as [number, number]) ?? null;
-        } catch {
-            return null;
-        }
+    // Cached map center — initialised to the zone centre so it's always
+    // synchronously available. Refreshed in the background whenever called
+    // so future calls return a more accurate position.
+    const mapCenterRef = useRef<[number, number]>(initialCenter);
+
+    const getMapCenter = useCallback((): [number, number] => {
+        mapRef.current?.getCenter()
+            .then((c) => { if (c) mapCenterRef.current = c as [number, number]; })
+            .catch(() => {});
+        return mapCenterRef.current;
     }, []);
 
     /** Opens pick-mode: closes the panel and waits for a map tap. */
@@ -180,6 +182,28 @@ export function AppMapView() {
     /** Writes the confirmed coord to the question data and exits pick-mode. */
     const handleConfirmPick = useCallback(() => {
         if (pendingCoord === null || pickingLocationForKey === null) return;
+
+        // Draft questions live outside the store — update the atom directly.
+        const draft = draftQuestion.get();
+        if (draft && draft.key === pickingLocationForKey) {
+            const updated = { ...draft, data: { ...draft.data } } as typeof draft;
+            if (draft.id === "thermometer") {
+                if (pickingLocationField === "A") {
+                    (updated.data as any).lngA = pendingCoord[0];
+                    (updated.data as any).latA = pendingCoord[1];
+                } else {
+                    (updated.data as any).lngB = pendingCoord[0];
+                    (updated.data as any).latB = pendingCoord[1];
+                }
+            } else {
+                (updated.data as any).lng = pendingCoord[0];
+                (updated.data as any).lat = pendingCoord[1];
+            }
+            draftQuestion.set(updated);
+            finishPicking(pickingLocationForKey);
+            return;
+        }
+
         const q = (questions.get() as Questions).find(
             (x) => x.key === pickingLocationForKey,
         );

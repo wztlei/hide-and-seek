@@ -146,6 +146,7 @@ export async function fetchAirports(): Promise<FeatureCollection<Point>> {
                 fc.features.push(turf.point(coord, { name, iata }));
             }
         }
+        fc.features = fc.features.slice(0, 100);
         return fc;
     })();
 
@@ -181,6 +182,7 @@ export async function fetchMajorCities(): Promise<FeatureCollection<Point>> {
                 fc.features.push(turf.point(coord, { name }));
             }
         }
+        fc.features = fc.features.slice(0, 100);
         return fc;
     })();
 
@@ -227,6 +229,7 @@ export async function fetchMatchingPOIs(
                       : null;
             if (coord) fc.features.push(turf.point(coord, { name }));
         }
+        fc.features = fc.features.slice(0, 100);
         return fc;
     })();
 

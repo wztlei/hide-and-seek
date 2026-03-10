@@ -20,7 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors } from "../lib/colors";
 import { addQuestion, questions, questionModified } from "../lib/context";
-import type { Question, Questions } from "../../src/maps/schema";
+import { draftQuestion } from "../lib/draftQuestion";
+import { questionSchema, type Question, type Questions } from "../../src/maps/schema";
 
 import { MatchingEditor } from "./questions/MatchingEditor";
 import { MeasuringEditor } from "./questions/MeasuringEditor";
@@ -187,11 +188,15 @@ function subtitleForQuestion(q: Question): string | null {
         return `Inside · ${label} · ${loc}`;
     }
     if (q.id === "matching") {
-        const typeLabel = MATCHING_TYPE_LABELS[q.data.type] ?? q.data.type;
+        const type = (q.data as any).type as string;
+        if (!type) return "Select a zone type";
+        const typeLabel = MATCHING_TYPE_LABELS[type] ?? type;
         return `${q.data.same ? "Same" : "Different"} · ${typeLabel}`;
     }
     if (q.id === "measuring") {
-        const typeLabel = MEASURING_TYPE_LABELS[q.data.type] ?? q.data.type;
+        const type = (q.data as any).type as string;
+        if (!type) return "Select a feature type";
+        const typeLabel = MEASURING_TYPE_LABELS[type] ?? type;
         return `${q.data.hiderCloser ? "Closer" : "Farther"} · ${typeLabel}`;
     }
     return null;
@@ -238,13 +243,13 @@ function defaultPayloadForType(
                 data: {
                     lat,
                     lng,
-                    type: "zone" as const,
+                    type: "" as any,
                     same: true,
                     drag: false,
                     color: "blue" as const,
                     collapsed: false,
-                    cat: { adminLevel: 4 as const },
-                },
+                    cat: { adminLevel: 4 },
+                } as any,
             };
         case "measuring":
             return {
@@ -252,7 +257,7 @@ function defaultPayloadForType(
                 data: {
                     lat,
                     lng,
-                    type: "coastline" as const,
+                    type: "" as any,
                     hiderCloser: true,
                     drag: false,
                     color: "blue" as const,
@@ -269,7 +274,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 interface Props {
     visible: boolean;
     onClose: () => void;
-    getMapCenter: () => Promise<[number, number] | null>;
+    getMapCenter: () => [number, number] | null;
     userCoord?: [number, number] | null;
     initialEditKey?: number | null;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
@@ -290,20 +295,18 @@ export function QuestionsPanel({
     const slideX = useRef(new Animated.Value(0)).current;
 
     const [editingKey, setEditingKey] = useState<number | null>(null);
-    // Key of a question that has been added to the store but not yet confirmed.
-    const [draftKey, setDraftKey] = useState<number | null>(null);
     // Prevents the onChange handler from discarding the draft on programmatic close.
     const isProgrammaticCloseRef = useRef(false);
 
-    const editData = useMemo(
-        () =>
-            editingKey !== null
-                ? ($questions.find((q) => q.key === editingKey) ?? null)
-                : null,
-        [editingKey, $questions],
-    );
+    const $draftQuestion = useStore(draftQuestion);
 
-    const isAddMode = draftKey !== null && draftKey === editingKey;
+    const editData = useMemo(() => {
+        if (editingKey === null) return null;
+        if ($draftQuestion?.key === editingKey) return $draftQuestion;
+        return $questions.find((q) => q.key === editingKey) ?? null;
+    }, [editingKey, $questions, $draftQuestion]);
+
+    const isAddMode = $draftQuestion !== null && $draftQuestion.key === editingKey;
 
     // Sync panel open/close; restore edit screen when returning from map-pick mode
     useEffect(() => {
@@ -334,18 +337,13 @@ export function QuestionsPanel({
     const handleSheetChange = useCallback(
         (index: number) => {
             if (index === -1) {
-                if (!isProgrammaticCloseRef.current && draftKey !== null) {
-                    questions.set(
-                        (questions.get() as Questions).filter(
-                            (q) => q.key !== draftKey,
-                        ),
-                    );
-                    setDraftKey(null);
+                if (!isProgrammaticCloseRef.current) {
+                    draftQuestion.set(null);
                 }
                 onClose();
             }
         },
-        [onClose, draftKey],
+        [onClose],
     );
 
     const renderBackdrop = useCallback(
@@ -360,14 +358,7 @@ export function QuestionsPanel({
     );
 
     function discardDraft() {
-        if (draftKey !== null) {
-            questions.set(
-                (questions.get() as Questions).filter(
-                    (q) => q.key !== draftKey,
-                ),
-            );
-            setDraftKey(null);
-        }
+        draftQuestion.set(null);
     }
 
     function goToAddQuestion() {
@@ -393,13 +384,11 @@ export function QuestionsPanel({
         Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
     }
 
-    async function handleAddQuestion(id: QuestionId) {
-        const center = userCoord ?? (await getMapCenter());
-        addQuestion(defaultPayloadForType(id, center));
-        const allQ = questions.get();
-        const newKey = (allQ as Questions)[allQ.length - 1].key;
-        setDraftKey(newKey);
-        goToEdit(newKey);
+    function handleAddQuestion(id: QuestionId) {
+        const center = userCoord ?? getMapCenter();
+        const parsed = questionSchema.parse(defaultPayloadForType(id, center));
+        draftQuestion.set(parsed);
+        goToEdit(parsed.key);
     }
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -709,7 +698,9 @@ export function QuestionsPanel({
                         >
                             <Pressable
                                 onPress={() => {
-                                    setDraftKey(null);
+                                    const draft = draftQuestion.get();
+                                    if (draft) addQuestion(draft);
+                                    draftQuestion.set(null);
                                     goBackToList();
                                 }}
                                 className="flex-row items-center justify-center h-12 rounded-xl gap-2 active:opacity-80"

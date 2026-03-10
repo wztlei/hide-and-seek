@@ -366,6 +366,7 @@ const tutorialSteps: TutorialStep[] = [
                                 unit: "miles",
                                 color: "red",
                                 locationType: "theme_park",
+                                within: false,
                                 location: false,
                             }}
                         />

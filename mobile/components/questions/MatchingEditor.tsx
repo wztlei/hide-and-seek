@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
+import { Dropdown } from "react-native-element-dropdown";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
@@ -9,61 +9,31 @@ import { editorStyles } from "./editorStyles";
 
 type MatchingData = Extract<Questions[number], { id: "matching" }>["data"];
 
-type MatchingBasicType = "zone" | "letter-zone" | "airport" | "major-city";
-type MatchingPOIType =
-    | "aquarium"
-    | "zoo"
-    | "theme_park"
-    | "peak"
-    | "museum"
-    | "hospital"
-    | "cinema"
-    | "library"
-    | "golf_course"
-    | "consulate"
-    | "park";
+type DropdownItem =
+    | { isHeader: true; label: string; value: string }
+    | { isHeader?: false; label: string; value: string };
 
-const MATCHING_TYPE_LABELS: Record<string, string> = {
-    zone: "Admin zone",
-    "letter-zone": "Letter zone",
-    airport: "Airport",
-    "major-city": "Major city",
-    aquarium: "Aquarium",
-    zoo: "Zoo",
-    theme_park: "Theme park",
-    peak: "Peak",
-    museum: "Museum",
-    hospital: "Hospital",
-    cinema: "Cinema",
-    library: "Library",
-    golf_course: "Golf course",
-    consulate: "Consulate",
-    park: "Park",
-    "same-first-letter-station": "Station (first letter)",
-    "same-length-station": "Station (name length)",
-    "same-train-line": "Train line",
-};
-
-const MATCHING_BASIC_TYPES: MatchingBasicType[] = [
-    "zone",
-    "letter-zone",
-    "airport",
-    "major-city",
+const DROPDOWN_DATA: DropdownItem[] = [
+    { isHeader: true, label: "Basic", value: "__header_basic" },
+    { label: "Admin zone", value: "zone" },
+    { label: "Letter zone", value: "letter-zone" },
+    { label: "Airport", value: "airport" },
+    { label: "Major city", value: "major-city" },
+    { isHeader: true, label: "Home Game", value: "__header_home" },
+    { label: "Aquarium", value: "aquarium" },
+    { label: "Zoo", value: "zoo" },
+    { label: "Theme park", value: "theme_park" },
+    { label: "Peak", value: "peak" },
+    { label: "Museum", value: "museum" },
+    { label: "Hospital", value: "hospital" },
+    { label: "Cinema", value: "cinema" },
+    { label: "Library", value: "library" },
+    { label: "Golf course", value: "golf_course" },
+    { label: "Consulate", value: "consulate" },
+    { label: "Park", value: "park" },
 ];
 
-const MATCHING_POI_TYPES: MatchingPOIType[] = [
-    "aquarium",
-    "zoo",
-    "theme_park",
-    "peak",
-    "museum",
-    "hospital",
-    "cinema",
-    "library",
-    "golf_course",
-    "consulate",
-    "park",
-];
+const SELECTABLE_DATA = DROPDOWN_DATA.filter((d) => !d.isHeader);
 
 interface Props {
     data: MatchingData;
@@ -71,133 +41,86 @@ interface Props {
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
-function TypeRow({
-    type,
-    selected,
-    onPress,
-}: {
-    type: string;
-    selected: boolean;
-    onPress: () => void;
-}) {
-    return (
-        <Pressable
-            onPress={onPress}
-            style={[
-                editorStyles.typeRow,
-                {
-                    borderColor: selected ? colors.MATCHING : "#e5e7eb",
-                    backgroundColor: selected ? "#fffbeb" : "#fff",
-                },
-            ]}
-        >
-            <Ionicons
-                name={selected ? "checkmark-circle" : "ellipse-outline"}
-                size={20}
-                color={selected ? colors.MATCHING : "#9ca3af"}
-            />
-            <Text
-                style={{
-                    flex: 1,
-                    fontSize: 16,
-                    color: selected ? "#92400e" : "#374151",
-                    fontWeight: selected ? "600" : "400",
-                }}
-            >
-                {MATCHING_TYPE_LABELS[type] ?? type}
-            </Text>
-        </Pressable>
-    );
-}
-
 export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props) {
+    const selectedItem = SELECTABLE_DATA.find((d) => d.value === (data as any).type);
+
     return (
         <View className="gap-4 px-4">
-            {/* Zone Type selector */}
+            {/* Zone Type dropdown */}
             <View className="gap-2">
                 <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                     Zone Type
                 </Text>
-                <Text className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-                    Basic
-                </Text>
-                {MATCHING_BASIC_TYPES.map((type) => (
-                    <TypeRow
-                        key={type}
-                        type={type}
-                        selected={data.type === type}
-                        onPress={() => {
-                            (data as any).type = type;
-                            if (
-                                type === "zone" ||
-                                type === "letter-zone"
-                            ) {
-                                if (!(data as any).cat) {
-                                    (data as any).cat = { adminLevel: 4 };
-                                }
-                            }
-                            questionModified();
-                        }}
-                    />
-                ))}
-                <Text className="text-xs text-gray-400 uppercase tracking-wide font-medium mt-1">
-                    Home Game
-                </Text>
-                {MATCHING_POI_TYPES.map((type) => (
-                    <TypeRow
-                        key={type}
-                        type={type}
-                        selected={data.type === type}
-                        onPress={() => {
-                            (data as any).type = type;
-                            questionModified();
-                        }}
-                    />
-                ))}
+                <Dropdown
+                    data={DROPDOWN_DATA}
+                    labelField="label"
+                    valueField="value"
+                    value={selectedItem?.value ?? null}
+                    onChange={(item) => {
+                        if (item.isHeader) return;
+                        (data as any).type = item.value;
+                        if (item.value === "zone" || item.value === "letter-zone") {
+                            if (!(data as any).cat) (data as any).cat = { adminLevel: 4 };
+                        }
+                        questionModified();
+                    }}
+                    renderItem={(item) => {
+                        if (item.isHeader) {
+                            return (
+                                <View style={groupHeaderStyle}>
+                                    <Text style={groupHeaderTextStyle}>{item.label}</Text>
+                                </View>
+                            );
+                        }
+                        const selected = item.value === (data as any).type;
+                        return (
+                            <View style={[dropdownItemStyle, selected && { backgroundColor: "#fffbeb" }]}>
+                                <Text style={[dropdownItemTextStyle, selected && { color: "#92400e", fontWeight: "600" }]}>
+                                    {item.label}
+                                </Text>
+                            </View>
+                        );
+                    }}
+                    style={dropdownStyle.container}
+                    selectedTextStyle={dropdownStyle.selectedText}
+                    activeColor="#fffbeb"
+                    placeholder="Select type…"
+                />
             </View>
 
             {/* Admin level picker — only for zone / letter-zone */}
-            {(data.type === "zone" || data.type === "letter-zone") && (
+            {((data as any).type === "zone" || (data as any).type === "letter-zone") && (
                 <View className="gap-2">
                     <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                         Admin Level
                     </Text>
                     <View style={editorStyles.segmentRow}>
-                        {([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map(
-                            (level) => {
-                                const selected =
-                                    (data as any).cat?.adminLevel === level;
-                                return (
-                                    <Pressable
-                                        key={level}
-                                        onPress={() => {
-                                            if (!(data as any).cat)
-                                                (data as any).cat = {};
-                                            (data as any).cat.adminLevel =
-                                                level;
-                                            questionModified();
-                                        }}
+                        {([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((level) => {
+                            const selected = (data as any).cat?.adminLevel === level;
+                            return (
+                                <Pressable
+                                    key={level}
+                                    onPress={() => {
+                                        if (!(data as any).cat) (data as any).cat = {};
+                                        (data as any).cat.adminLevel = level;
+                                        questionModified();
+                                    }}
+                                    style={[
+                                        editorStyles.segmentItem,
+                                        selected && { backgroundColor: colors.MATCHING },
+                                    ]}
+                                >
+                                    <Text
                                         style={[
-                                            editorStyles.segmentItem,
-                                            selected && {
-                                                backgroundColor:
-                                                    colors.MATCHING,
-                                            },
+                                            editorStyles.segmentText,
+                                            selected && editorStyles.segmentTextSelected,
                                         ]}
                                     >
-                                        <Text
-                                            style={[
-                                                editorStyles.segmentText,
-                                                selected &&
-                                                    editorStyles.segmentTextSelected,
-                                            ]}
-                                        >
-                                            {level}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            },
-                        )}
+                                        {level}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
                     </View>
                 </View>
             )}
@@ -220,16 +143,13 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                                 style={[
                                     editorStyles.segmentItem,
                                     editorStyles.segmentItemWide,
-                                    selected && {
-                                        backgroundColor: colors.MATCHING,
-                                    },
+                                    selected && { backgroundColor: colors.MATCHING },
                                 ]}
                             >
                                 <Text
                                     style={[
                                         editorStyles.segmentText,
-                                        selected &&
-                                            editorStyles.segmentTextSelected,
+                                        selected && editorStyles.segmentTextSelected,
                                     ]}
                                 >
                                     {val ? "Same" : "Different"}
@@ -260,3 +180,43 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
         </View>
     );
 }
+
+const dropdownStyle = {
+    container: {
+        height: 44,
+        borderWidth: 1,
+        borderColor: "#d1d5db",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        backgroundColor: "#fff",
+    },
+    selectedText: {
+        fontSize: 15,
+        color: "#1f2937",
+    },
+};
+
+const groupHeaderStyle = {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 4,
+    backgroundColor: "#f9fafb",
+};
+
+const groupHeaderTextStyle = {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#9ca3af",
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.8,
+};
+
+const dropdownItemStyle = {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+};
+
+const dropdownItemTextStyle = {
+    fontSize: 15,
+    color: "#374151",
+};

@@ -64,6 +64,7 @@ out center;`;
         if (fc.features.find((f: any) => f.properties?.iata === iata)) continue;
         fc.features.push(turf.point([lon, lat], { iata, name: el.tags?.name }));
     }
+    fc.features = fc.features.slice(0, 100);
     airportsCache = fc;
     return fc;
 }
@@ -93,6 +94,7 @@ out center;`;
         const name = el.tags?.["name:en"] ?? el.tags?.name;
         fc.features.push(turf.point([lon, lat], { name }));
     }
+    fc.features = fc.features.slice(0, 100);
     citiesCache = fc;
     return fc;
 }
@@ -167,6 +169,7 @@ out center;`;
         const name = el.tags?.["name:en"] ?? el.tags?.name;
         fc.features.push(turf.point([lon, lat], { name }));
     }
+    fc.features = fc.features.slice(0, 100);
     poiCache.set(cacheKey, fc);
     return fc;
 }

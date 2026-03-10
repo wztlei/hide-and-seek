@@ -80,16 +80,24 @@ export function TentaclesEditor({ data, editingKey, onPickLocationOnMap }: Props
         setReloadCount((c) => c + 1);
     };
 
-    const poiOptions = pois.map((poi) => ({
-        label: (poi as any).properties.name as string,
-        value: (poi as any).properties.name as string,
-        poi,
-    }));
-
     const selectedPoiName =
         data.location !== false
             ? (data.location as any).properties?.name ?? null
             : null;
+
+    const poiOptions = [...pois]
+        .sort((a, b) => {
+            const aSelected = (a as any).properties.name === selectedPoiName;
+            const bSelected = (b as any).properties.name === selectedPoiName;
+            if (aSelected) return -1;
+            if (bSelected) return 1;
+            return 0;
+        })
+        .map((poi) => ({
+            label: (poi as any).properties.name as string,
+            value: (poi as any).properties.name as string,
+            poi,
+        }));
 
     return (
         <View className="gap-4 px-4">
@@ -128,6 +136,7 @@ export function TentaclesEditor({ data, editingKey, onPickLocationOnMap }: Props
                             }
                         }}
                         keyboardType="numeric"
+                        returnKeyType="done"
                         style={editorStyles.radiusInput}
                         selectTextOnFocus
                     />
@@ -200,80 +209,77 @@ export function TentaclesEditor({ data, editingKey, onPickLocationOnMap }: Props
                 </View>
             </View>
 
-            {data.within && (
-                <>
-                    <View className="gap-2">
-                        <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                            Location Type
-                        </Text>
-                        <Dropdown
-                            data={LOCATION_TYPE_OPTIONS}
-                            labelField="label"
-                            valueField="value"
-                            value={data.locationType}
-                            onChange={(item) => {
-                                data.locationType = item.value as any;
-                                data.location = false;
-                                questionModified();
-                            }}
-                            style={dropdownStyle.container}
-                            selectedTextStyle={dropdownStyle.selectedText}
-                            itemTextStyle={dropdownStyle.itemText}
-                            activeColor="#dcfce7"
-                            placeholder="Select type…"
-                        />
-                    </View>
+            <View className="gap-2">
+                <Text className="text-sm font-semibold uppercase tracking-wide" style={{ color: data.within ? "#6b7280" : "#d1d5db" }}>
+                    Location Type
+                </Text>
+                <Dropdown
+                    data={LOCATION_TYPE_OPTIONS}
+                    labelField="label"
+                    valueField="value"
+                    value={data.locationType}
+                    onChange={(item) => {
+                        data.locationType = item.value as any;
+                        data.location = false;
+                        questionModified();
+                    }}
+                    disable={!data.within}
+                    style={[dropdownStyle.container, !data.within && { opacity: 0.45 }]}
+                    selectedTextStyle={dropdownStyle.selectedText}
+                    itemTextStyle={dropdownStyle.itemText}
+                    activeColor="#dcfce7"
+                    placeholder="Select type…"
+                />
+            </View>
 
-                    <View className="gap-2">
-                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                            <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                                Location
-                            </Text>
-                            <Pressable onPress={handleReload} hitSlop={8} style={{ padding: 2 }}>
-                                <Ionicons name="refresh-outline" size={18} color="#6b7280" />
-                            </Pressable>
-                        </View>
-                        {loading ? (
-                            <View className="flex-row items-center gap-3 px-1 py-3">
-                                <ActivityIndicator size="small" color={colors.TENTACLES} />
-                                <Text className="text-base text-gray-400">
-                                    Loading{" "}
-                                    {LOCATION_TYPE_LABELS[data.locationType] ??
-                                        data.locationType}
-                                    …
-                                </Text>
-                            </View>
-                        ) : (
-                            <Dropdown
-                                data={poiOptions}
-                                labelField="label"
-                                valueField="value"
-                                value={selectedPoiName}
-                                onChange={(item) => {
-                                    data.location = item.poi as any;
-                                    questionModified();
-                                }}
-                                search
-                                searchPlaceholder="Search…"
-                                placeholder={
-                                    pois.length === 0
-                                        ? "No locations found nearby"
-                                        : "Select a location…"
-                                }
-                                disable={pois.length === 0}
-                                style={[
-                                    dropdownStyle.container,
-                                    pois.length === 0 && { opacity: 0.45 },
-                                ]}
-                                selectedTextStyle={dropdownStyle.selectedText}
-                                itemTextStyle={dropdownStyle.itemText}
-                                inputSearchStyle={dropdownStyle.searchInput}
-                                activeColor="#dcfce7"
-                            />
-                        )}
+            <View className="gap-2">
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text className="text-sm font-semibold uppercase tracking-wide" style={{ color: data.within ? "#6b7280" : "#d1d5db" }}>
+                        Location
+                    </Text>
+                    <Pressable onPress={handleReload} hitSlop={8} style={{ padding: 2 }} disabled={!data.within}>
+                        <Ionicons name="refresh-outline" size={18} color={data.within ? "#6b7280" : "#d1d5db"} />
+                    </Pressable>
+                </View>
+                {loading ? (
+                    <View className="flex-row items-center gap-3 px-1 py-3">
+                        <ActivityIndicator size="small" color={colors.TENTACLES} />
+                        <Text className="text-base text-gray-400">
+                            Loading{" "}
+                            {LOCATION_TYPE_LABELS[data.locationType] ??
+                                data.locationType}
+                            …
+                        </Text>
                     </View>
-                </>
-            )}
+                ) : (
+                    <Dropdown
+                        data={poiOptions}
+                        labelField="label"
+                        valueField="value"
+                        value={selectedPoiName}
+                        onChange={(item) => {
+                            data.location = item.poi as any;
+                            questionModified();
+                        }}
+                        search
+                        searchPlaceholder="Search…"
+                        placeholder={
+                            pois.length === 0
+                                ? "No locations found nearby"
+                                : "Select a location…"
+                        }
+                        disable={!data.within || pois.length === 0}
+                        style={[
+                            dropdownStyle.container,
+                            (!data.within || pois.length === 0) && { opacity: 0.45 },
+                        ]}
+                        selectedTextStyle={dropdownStyle.selectedText}
+                        itemTextStyle={dropdownStyle.itemText}
+                        inputSearchStyle={dropdownStyle.searchInput}
+                        activeColor="#dcfce7"
+                    />
+                )}
+            </View>
         </View>
     );
 }

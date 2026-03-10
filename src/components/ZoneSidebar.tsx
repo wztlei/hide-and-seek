@@ -1234,6 +1234,7 @@ async function selectionProcess(
                         lng: station.properties.geometry.coordinates[0],
                         radius: radius,
                         unit: "miles",
+                        within: false,
                         location: false,
                         locationType: question.data.type,
                         drag: false,
