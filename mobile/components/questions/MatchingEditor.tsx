@@ -22,7 +22,7 @@ const DROPDOWN_DATA: DropdownItem[] = [
     { label: "Administrative zone", value: "zone" },
     { label: "Airport", value: "airport" },
     // { label: "Major city", value: "major-city" }, // TODO: re-enable after testing but this is not an official question
-    { isHeader: true, label: "Home Game", value: "__header_home" },
+    { isHeader: true, label: "Points of Interest", value: "__header_poi" },
     { label: "Aquarium", value: "aquarium" },
     { label: "Zoo", value: "zoo" },
     { label: "Theme park", value: "theme_park" },

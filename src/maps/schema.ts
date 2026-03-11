@@ -322,8 +322,12 @@ export const matchingQuestionSchema = z.union([
 
 const baseMeasuringQuestionSchema = ordinaryBaseQuestionSchema.extend({
     hiderCloser: z.boolean().default(true),
-    /** km radius around the seeker for Overpass bbox queries; null = full game-zone bbox. Mobile-only. */
+    /** km radius around the search center for Overpass bbox queries; null = full game-zone bbox. Mobile-only. */
     poiSearchRadius: z.number().nullable().optional(),
+    /** Search center latitude for Overpass bbox queries. Defaults to seeker lat if not set. Mobile-only. */
+    poiSearchLat: z.number().optional(),
+    /** Search center longitude for Overpass bbox queries. Defaults to seeker lng if not set. Mobile-only. */
+    poiSearchLng: z.number().optional(),
 });
 
 const ordinaryMeasuringQuestionSchema = baseMeasuringQuestionSchema.extend({

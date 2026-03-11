@@ -8,6 +8,56 @@ import type {
 } from "geojson";
 
 import { LOCATION_FIRST_TAG, OVERPASS_API } from "../../src/maps/api/constants";
+import { deleteCached, getCached, setCached } from "./storage";
+
+// ── Persistent LRU cache (airports, cities, POI types) ────────────────────────
+//
+// Entries are stored in AsyncStorage (via the memStore mirror in storage.ts)
+// under keys "meas-poi:<type>:<rounded-bbox>". An LRU list is kept at
+// "meas-poi:__lru__" to bound the total number of stored entries to
+// MEAS_POI_CACHE_MAX.  Bbox coordinates are rounded to 2 decimal places
+// (~1 km) so trivial zone adjustments still hit the cache.
+//
+// The "meas-poi:" prefix keeps measuring entries separate from matching's
+// "poi:" namespace.
+
+const MEAS_POI_CACHE_MAX = 50;
+const MEAS_POI_LRU_KEY = "meas-poi:__lru__";
+
+function measStoreKey(type: string, bbox: [number, number, number, number]): string {
+    return `meas-poi:${type}:${bbox.map((n) => n.toFixed(2)).join(",")}`;
+}
+
+function lruRead(): string[] {
+    const raw = getCached(MEAS_POI_LRU_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+}
+
+function lruTouch(list: string[], key: string): string[] {
+    const idx = list.indexOf(key);
+    if (idx !== -1) list.splice(idx, 1);
+    list.push(key); // most-recently-used goes to the end
+    return list;
+}
+
+function measPersistentGet(key: string): Feature<Point>[] | null {
+    const raw = getCached(key);
+    if (!raw) return null;
+    setCached(MEAS_POI_LRU_KEY, JSON.stringify(lruTouch(lruRead(), key)));
+    return JSON.parse(raw) as Feature<Point>[];
+}
+
+function measPersistentSet(key: string, features: Feature<Point>[]): void {
+    setCached(key, JSON.stringify(features));
+    const lru = lruTouch(lruRead(), key);
+    while (lru.length > MEAS_POI_CACHE_MAX) {
+        deleteCached(lru.shift()!);
+    }
+    setCached(MEAS_POI_LRU_KEY, JSON.stringify(lru));
+}
+
+// In-flight dedup — prevents duplicate concurrent Overpass requests within a session.
+const measPoiInFlight = new Map<string, Promise<Feature<Point>[]>>();
 
 // ── Coastline ─────────────────────────────────────────────────────────────────
 
@@ -21,9 +71,6 @@ const COASTLINE_URL =
 /**
  * Loads the Natural Earth 1:50m coastline as a FeatureCollection of
  * LineString features. Cached in-memory permanently after first load.
- *
- * The file is fetched from the deployed GitHub Pages static asset (same URL
- * used by the web app).
  */
 export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
     if (coastlineCache) return coastlineCache as FeatureCollection<LineString>;
@@ -38,67 +85,95 @@ export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
 
 // ── Airports ──────────────────────────────────────────────────────────────────
 
-const airportsCache = new Map<string, FeatureCollection<Point>>();
-
 /**
  * Fetches commercial airports (with IATA codes) from Overpass API within the
- * given bounding box. Cached per bbox after first load.
+ * given bounding box. Persistently cached per bbox.
  */
 export async function fetchAirports(
     bbox: [number, number, number, number],
 ): Promise<FeatureCollection<Point>> {
-    const [west, south, east, north] = bbox;
-    const cacheKey = `${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
-    if (airportsCache.has(cacheKey)) return airportsCache.get(cacheKey)!;
-    const query = `[out:json][timeout:60];nwr["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east});out center;`;
-    const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-    const t0 = Date.now();
-    const res = await fetch(url);
-    const data = await res.json();
-    console.log(`[fetchAirports] overpass: ${Date.now() - t0}ms, raw elements: ${data.elements.length}`);
-    const fc = turf.featureCollection<Point>([]);
-    for (const el of data.elements) {
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (lat == null || lon == null) continue;
-        const iata = el.tags?.iata;
-        if (!iata) continue;
-        if (fc.features.find((f: any) => f.properties?.iata === iata)) continue;
-        fc.features.push(turf.point([lon, lat], { iata, name: el.tags?.name }));
+    const storeKey = measStoreKey("airport", bbox);
+
+    const persisted = measPersistentGet(storeKey);
+    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+
+    const inflight = measPoiInFlight.get(storeKey);
+    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+
+    const promise = (async (): Promise<Feature<Point>[]> => {
+        const [west, south, east, north] = bbox;
+        // node+way only — aerodrome relations don't carry per-airport IATA codes.
+        // qt (quadtile order) enables streaming output for lower latency.
+        const query = `[out:json][timeout:30];(node["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east});way["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east}););out center qt;`;
+        const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const seen = new Set<string>();
+        const features: Feature<Point>[] = [];
+        for (const el of data.elements) {
+            const lat = el.lat ?? el.center?.lat;
+            const lon = el.lon ?? el.center?.lon;
+            if (lat == null || lon == null) continue;
+            const iata = el.tags?.iata;
+            if (!iata || seen.has(iata)) continue;
+            seen.add(iata);
+            features.push(turf.point([lon, lat], { iata, name: el.tags?.name }));
+        }
+        measPersistentSet(storeKey, features);
+        return features;
+    })();
+
+    measPoiInFlight.set(storeKey, promise);
+    try {
+        const features = await promise;
+        return turf.featureCollection(features) as FeatureCollection<Point>;
+    } finally {
+        measPoiInFlight.delete(storeKey);
     }
-    console.log(`[fetchAirports] parsed: ${fc.features.length} airports`);
-    airportsCache.set(cacheKey, fc);
-    return fc;
 }
 
 // ── Cities ────────────────────────────────────────────────────────────────────
 
-const citiesCache = new Map<string, FeatureCollection<Point>>();
-
 /**
  * Fetches cities with population >= 1,000,000 from Overpass API within the
- * given bounding box. Cached per bbox after first load.
+ * given bounding box. Persistently cached per bbox.
  */
 export async function fetchCities(
     bbox: [number, number, number, number],
 ): Promise<FeatureCollection<Point>> {
-    const [west, south, east, north] = bbox;
-    const cacheKey = `${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
-    if (citiesCache.has(cacheKey)) return citiesCache.get(cacheKey)!;
-    const query = `[out:json][timeout:60];node[place=city]["population"~"^[1-9][0-9]{6,}$"](${south},${west},${north},${east});out center;`;
-    const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const fc = turf.featureCollection<Point>([]);
-    for (const el of data.elements) {
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (lat == null || lon == null) continue;
-        const name = el.tags?.["name:en"] ?? el.tags?.name;
-        fc.features.push(turf.point([lon, lat], { name }));
+    const storeKey = measStoreKey("city", bbox);
+
+    const persisted = measPersistentGet(storeKey);
+    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+
+    const inflight = measPoiInFlight.get(storeKey);
+    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+
+    const promise = (async (): Promise<Feature<Point>[]> => {
+        const [west, south, east, north] = bbox;
+        const query = `[out:json][timeout:30];node[place=city]["population"~"^[1-9][0-9]{6,}$"](${south},${west},${north},${east});out qt;`;
+        const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const features: Feature<Point>[] = [];
+        for (const el of data.elements) {
+            const lat = el.lat ?? el.center?.lat;
+            const lon = el.lon ?? el.center?.lon;
+            if (lat == null || lon == null) continue;
+            const name = el.tags?.["name:en"] ?? el.tags?.name;
+            features.push(turf.point([lon, lat], { name }));
+        }
+        measPersistentSet(storeKey, features);
+        return features;
+    })();
+
+    measPoiInFlight.set(storeKey, promise);
+    try {
+        const features = await promise;
+        return turf.featureCollection(features) as FeatureCollection<Point>;
+    } finally {
+        measPoiInFlight.delete(storeKey);
     }
-    citiesCache.set(cacheKey, fc);
-    return fc;
 }
 
 // ── High-speed rail ───────────────────────────────────────────────────────────
@@ -131,12 +206,10 @@ export async function fetchHighSpeedRail(): Promise<FeatureCollection<LineString
 
 // ── POI types via Overpass ────────────────────────────────────────────────────
 
-const poiCache = new Map<string, FeatureCollection<Point>>();
-
 /**
  * Fetches POI features of the given type within the given bbox using Overpass.
  * Supported types match the measuring schema home-game POI types.
- * Results are cached by type+bbox key.
+ * Results are persistently cached by type+bbox key.
  */
 export async function fetchMeasuringPOIs(
     type: string,
@@ -147,25 +220,40 @@ export async function fetchMeasuringPOIs(
     const tag = LOCATION_FIRST_TAG[baseType as keyof typeof LOCATION_FIRST_TAG];
     if (!tag) return turf.featureCollection<Point>([]);
 
-    const [west, south, east, north] = bbox;
-    const cacheKey = `${baseType}:${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
-    if (poiCache.has(cacheKey)) return poiCache.get(cacheKey)!;
+    const storeKey = measStoreKey(baseType, bbox);
 
-    const query = `[out:json][timeout:25];nwr["${tag}"="${baseType}"](${south},${west},${north},${east});out center;`;
-    const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const fc = turf.featureCollection<Point>([]);
-    for (const el of data.elements) {
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (lat == null || lon == null) continue;
-        const name = el.tags?.["name:en"] ?? el.tags?.name;
-        fc.features.push(turf.point([lon, lat], { name }));
+    const persisted = measPersistentGet(storeKey);
+    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+
+    const inflight = measPoiInFlight.get(storeKey);
+    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+
+    const promise = (async (): Promise<Feature<Point>[]> => {
+        const [west, south, east, north] = bbox;
+        const query = `[out:json][timeout:25];nwr["${tag}"="${baseType}"](${south},${west},${north},${east});out center;`;
+        const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const features: Feature<Point>[] = [];
+        for (const el of data.elements) {
+            const lat = el.lat ?? el.center?.lat;
+            const lon = el.lon ?? el.center?.lon;
+            if (lat == null || lon == null) continue;
+            const name = el.tags?.["name:en"] ?? el.tags?.name;
+            features.push(turf.point([lon, lat], { name }));
+        }
+        const capped = features.slice(0, 100);
+        measPersistentSet(storeKey, capped);
+        return capped;
+    })();
+
+    measPoiInFlight.set(storeKey, promise);
+    try {
+        const features = await promise;
+        return turf.featureCollection(features) as FeatureCollection<Point>;
+    } finally {
+        measPoiInFlight.delete(storeKey);
     }
-    fc.features = fc.features.slice(0, 100);
-    poiCache.set(cacheKey, fc);
-    return fc;
 }
 
 // ── Distance helpers ──────────────────────────────────────────────────────────

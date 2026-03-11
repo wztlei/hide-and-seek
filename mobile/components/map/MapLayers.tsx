@@ -411,6 +411,21 @@ export function MapLayers({
                 }),
             )}
 
+            {/* Measuring additional-search-region POI dots */}
+            {measuringRegions.flatMap(({ key, additionalPois }) =>
+                (additionalPois ?? []).slice(0, 30).map((poi) => {
+                    const name = (poi as any).properties?.name as string;
+                    return (
+                        <MarkerView
+                            key={`meas-addpoi-${key}-${name}`}
+                            coordinate={poi.geometry.coordinates as [number, number]}
+                        >
+                            <View style={styles.measuringPOIDot} />
+                        </MarkerView>
+                    );
+                }),
+            )}
+
             {/* Matching seeker location markers */}
             {questions
                 .filter((q) => q.id === "matching")
@@ -438,6 +453,22 @@ export function MapLayers({
                         <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
                             <View style={styles.measuringMarker}>
                                 <Ionicons name="resize-outline" size={18} color="white" />
+                            </View>
+                        </Pressable>
+                    </MarkerView>
+                ))}
+
+            {/* Measuring additional-search-region markers — only when explicitly set */}
+            {questions
+                .filter((q) => q.id === "measuring" && (q.data as any).poiSearchLat != null)
+                .map((q) => (
+                    <MarkerView
+                        key={`meas-search-${q.key}`}
+                        coordinate={[(q.data as any).poiSearchLng, (q.data as any).poiSearchLat]}
+                    >
+                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                            <View style={styles.measuringSearchMarker}>
+                                <Ionicons name="search-outline" size={14} color="white" />
                             </View>
                         </Pressable>
                     </MarkerView>
@@ -564,6 +595,22 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
         elevation: 4,
+    },
+    measuringSearchMarker: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: colors.MEASURING,
+        borderWidth: 2,
+        borderColor: "white",
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+        opacity: 0.85,
     },
     pendingMarker: {
         width: 36,

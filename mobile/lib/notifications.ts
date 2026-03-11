@@ -16,6 +16,10 @@ export const toast = {
     loading: (message: string) =>
         Toast.show({ type: "info", text1: message, visibilityTime: 2000 }),
 
+    /** Warning toast for slow or unexpected operations (auto-hides in 6 s). */
+    warn: (message: string) =>
+        Toast.show({ type: "info", text1: message, visibilityTime: 6000 }),
+
     promise: async <T>(
         promise: Promise<T>,
         messages: { pending?: string; success?: string; error?: string },

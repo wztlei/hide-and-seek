@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
+import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
+import * as Clipboard from "expo-clipboard";
+import * as Location from "expo-location";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
 import { mapGeoJSON, questionModified } from "../../lib/context";
-import { fetchMeasuringPOIs } from "../../lib/measuringApi";
+import { fetchAirports, fetchCities, fetchMeasuringPOIs } from "../../lib/measuringApi";
 import { LocationButtons } from "./LocationButtons";
 import { editorStyles } from "./editorStyles";
+import { parseCoordinatesFromText } from "./utils";
 
 type MeasuringData = Extract<Questions[number], { id: "measuring" }>["data"];
 
@@ -20,10 +24,10 @@ type DropdownItem =
 const DROPDOWN_DATA: DropdownItem[] = [
     { isHeader: true, label: "Standard", value: "__header_standard" },
     { label: "Coastline", value: "coastline" },
-    { label: "Airport", value: "airport" },
     { label: "City", value: "city" },
     { label: "High-speed rail", value: "highspeed-measure-shinkansen" },
-    { isHeader: true, label: "Home Game", value: "__header_home" },
+    { isHeader: true, label: "Points of Interest", value: "__header_poi" },
+    { label: "Airport", value: "airport" },
     { label: "Aquarium", value: "aquarium" },
     { label: "Zoo", value: "zoo" },
     { label: "Theme park", value: "theme_park" },
@@ -82,6 +86,12 @@ const MEASURING_POI_TYPES = new Set([
     "golf_course-full", "consulate-full", "park-full",
 ]);
 
+// Types that support a configurable search area + search center (all Overpass-backed types).
+const MEASURING_SEARCH_TYPES = new Set([
+    "airport", "city",
+    ...MEASURING_POI_TYPES,
+]);
+
 const SEARCH_RADIUS_OPTIONS = [
     { km: 100, label: "100 km" },
     { km: 250, label: "250 km" },
@@ -98,14 +108,25 @@ interface Props {
 export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props) {
     const [poiCount, setPoiCount] = useState<number | null>(null);
     const [nearestPOIName, setNearestPOIName] = useState<string | null>(null);
+    const [nearestPOIDistanceKm, setNearestPOIDistanceKm] = useState<number | null>(null);
     const [loadingPOIs, setLoadingPOIs] = useState(false);
     const $mapGeoJSON = useStore(mapGeoJSON);
     const isPOIType = MEASURING_POI_TYPES.has(data.type);
+    const isSearchType = MEASURING_SEARCH_TYPES.has(data.type);
+    // poiSearchLat/Lng are undefined when the user has not explicitly set an
+    // additional search region — in that case the seeker location is used.
+    const hasAdditionalSearch = (data as any).poiSearchLat != null;
+    const additionalSearchLat = (data as any).poiSearchLat as number | undefined;
+    const additionalSearchLng = (data as any).poiSearchLng as number | undefined;
+    // Effective search center (falls back to seeker for bbox computation).
+    const searchLat = additionalSearchLat ?? data.lat;
+    const searchLng = additionalSearchLng ?? data.lng;
 
     useEffect(() => {
-        if (!isPOIType || !$mapGeoJSON) {
+        if (!isSearchType || !$mapGeoJSON) {
             setPoiCount(null);
             setNearestPOIName(null);
+            setNearestPOIDistanceKm(null);
             return;
         }
         let cancelled = false;
@@ -114,33 +135,44 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
         const sr = (data as any).poiSearchRadius as number | null | undefined;
         const radiusKm = sr === null ? null : (sr ?? 100);
         const bbox: [number, number, number, number] = radiusKm === null ? zoneBbox : (() => {
-            const cb = turf.bbox(
+            // Always cover both the seeker location and the search center.
+            const seekerCb = turf.bbox(
                 turf.circle([data.lng, data.lat], radiusKm, { units: "kilometers" }),
             ) as [number, number, number, number];
+            const searchCb = turf.bbox(
+                turf.circle([searchLng, searchLat], radiusKm, { units: "kilometers" }),
+            ) as [number, number, number, number];
+            // Union both bboxes, then clamp to the game zone.
             return [
-                Math.max(cb[0], zoneBbox[0]), Math.max(cb[1], zoneBbox[1]),
-                Math.min(cb[2], zoneBbox[2]), Math.min(cb[3], zoneBbox[3]),
+                Math.max(Math.min(seekerCb[0], searchCb[0]), zoneBbox[0]),
+                Math.max(Math.min(seekerCb[1], searchCb[1]), zoneBbox[1]),
+                Math.min(Math.max(seekerCb[2], searchCb[2]), zoneBbox[2]),
+                Math.min(Math.max(seekerCb[3], searchCb[3]), zoneBbox[3]),
             ];
         })();
-        fetchMeasuringPOIs(data.type, bbox)
+        const fetchPromise =
+            data.type === "airport" ? fetchAirports(bbox) :
+            data.type === "city"    ? fetchCities(bbox) :
+            fetchMeasuringPOIs(data.type, bbox);
+        fetchPromise
             .then((fc) => {
                 if (cancelled) return;
                 setPoiCount(fc.features.length);
                 if (fc.features.length > 0) {
-                    const nearest = turf.nearestPoint(
-                        turf.point([data.lng, data.lat]),
-                        fc as any,
-                    );
+                    const seekerPt = turf.point([data.lng, data.lat]);
+                    const nearest = turf.nearestPoint(seekerPt, fc as any);
                     setNearestPOIName((nearest as any).properties?.name ?? null);
+                    setNearestPOIDistanceKm(turf.distance(seekerPt, nearest, { units: "kilometers" }));
                 } else {
                     setNearestPOIName(null);
+                    setNearestPOIDistanceKm(null);
                 }
                 setLoadingPOIs(false);
             })
             .catch(() => { if (!cancelled) setLoadingPOIs(false); });
         return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.type, data.lat, data.lng, $mapGeoJSON, isPOIType, (data as any).poiSearchRadius]);
+    }, [data.type, data.lat, data.lng, searchLat, searchLng, $mapGeoJSON, isSearchType, (data as any).poiSearchRadius]);
 
     return (
         <View className="gap-4 px-4">
@@ -191,9 +223,8 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     }}
                 />
             </View>
-
-            {/* Search radius — only for POI types */}
-            {isPOIType && (
+            {/* Search Area — for all Overpass-backed types */}
+            {isSearchType && (
                 <View className="gap-2">
                     <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                         Search Area
@@ -226,36 +257,6 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                             );
                         })}
                     </View>
-                </View>
-            )}
-
-            {/* Nearby POIs — only for POI types */}
-            {isPOIType && (
-                <View className="gap-2">
-                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                        Nearby POIs
-                    </Text>
-                    {loadingPOIs ? (
-                        <View className="flex-row items-center gap-3 px-1 py-2">
-                            <ActivityIndicator size="small" color={colors.MEASURING} />
-                            <Text className="text-base text-gray-400">Searching nearby…</Text>
-                        </View>
-                    ) : poiCount === null ? (
-                        <Text className="text-base text-gray-400 px-1">No zone loaded</Text>
-                    ) : poiCount === 0 ? (
-                        <Text className="text-base text-gray-400 px-1">No locations found in this zone</Text>
-                    ) : (
-                        <View style={poiInfoBoxStyle}>
-                            <Text style={poiInfoCountStyle}>
-                                {poiCount} {poiCount === 1 ? "location" : "locations"} found
-                            </Text>
-                            {nearestPOIName && (
-                                <Text style={poiInfoNearestStyle} numberOfLines={1}>
-                                    Nearest: {nearestPOIName}
-                                </Text>
-                            )}
-                        </View>
-                    )}
                 </View>
             )}
 
@@ -311,6 +312,129 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     }}
                 />
             </View>
+            {/* Additional Search Region — for all Overpass-backed types */}
+            {isSearchType && (
+                <View className="gap-2">
+                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                        Additional Search Region
+                    </Text>
+                    {hasAdditionalSearch ? (
+                        <>
+                            <LocationButtons
+                                color={colors.MEASURING}
+                                lat={additionalSearchLat!}
+                                lng={additionalSearchLng!}
+                                editingKey={editingKey}
+                                field="B"
+                                onPickLocationOnMap={onPickLocationOnMap}
+                                onUpdate={(lat, lng) => {
+                                    (data as any).poiSearchLat = lat;
+                                    (data as any).poiSearchLng = lng;
+                                    questionModified();
+                                }}
+                            />
+                            <Pressable
+                                onPress={() => {
+                                    (data as any).poiSearchLat = undefined;
+                                    (data as any).poiSearchLng = undefined;
+                                    questionModified();
+                                }}
+                                className="active:opacity-70"
+                            >
+                                <Text className="text-sm text-center text-red-400">
+                                    Clear additional region
+                                </Text>
+                            </Pressable>
+                        </>
+                    ) : (
+                        <>
+                            <Text className="text-sm text-gray-400 px-1">
+                                Search POIs around a second point.
+                            </Text>
+                            <View className="flex-row gap-2">
+                                <Pressable
+                                    onPress={() => onPickLocationOnMap?.(editingKey, "B")}
+                                    style={editorStyles.locationBtn}
+                                    className="active:opacity-70"
+                                >
+                                    <Ionicons name="map-outline" size={20} color={colors.MEASURING} />
+                                    <Text className="text-xs mt-1 text-gray-500">Select on Map</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={async () => {
+                                        const { status } = await Location.requestForegroundPermissionsAsync();
+                                        if (status !== "granted") return;
+                                        const pos = await Location.getCurrentPositionAsync({
+                                            accuracy: Location.Accuracy.Balanced,
+                                        });
+                                        (data as any).poiSearchLat = pos.coords.latitude;
+                                        (data as any).poiSearchLng = pos.coords.longitude;
+                                        questionModified();
+                                    }}
+                                    style={editorStyles.locationBtn}
+                                    className="active:opacity-70"
+                                >
+                                    <Ionicons name="locate-outline" size={20} color={colors.MEASURING} />
+                                    <Text className="text-xs mt-1 text-gray-500">Set to Current</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={async () => {
+                                        const text = await Clipboard.getStringAsync();
+                                        const parsed = parseCoordinatesFromText(text);
+                                        if (parsed.lat !== null && parsed.lng !== null) {
+                                            (data as any).poiSearchLat = parsed.lat;
+                                            (data as any).poiSearchLng = parsed.lng;
+                                            questionModified();
+                                        }
+                                    }}
+                                    style={editorStyles.locationBtn}
+                                    className="active:opacity-70"
+                                >
+                                    <Ionicons name="clipboard-outline" size={20} color={colors.MEASURING} />
+                                    <Text className="text-xs mt-1 text-gray-500">Paste</Text>
+                                </Pressable>
+                            </View>
+                        </>
+                    )}
+                </View>
+            )}
+
+            {/* Nearby POIs — for all Overpass-backed types */}
+            {isSearchType && (
+                <View className="gap-2">
+                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                        Nearby POIs
+                    </Text>
+                    {loadingPOIs ? (
+                        <View className="flex-row items-center gap-3 px-1 py-2">
+                            <ActivityIndicator size="small" color={colors.MEASURING} />
+                            <Text className="text-base text-gray-400">Searching nearby…</Text>
+                        </View>
+                    ) : poiCount === null ? (
+                        <Text className="text-base text-gray-400 px-1">No zone loaded</Text>
+                    ) : poiCount === 0 ? (
+                        <Text className="text-base text-gray-400 px-1">No locations found in this zone</Text>
+                    ) : (
+                        <View style={poiInfoBoxStyle}>
+                            <Text style={poiInfoCountStyle}>
+                                {poiCount} {poiCount === 1 ? "location" : "locations"} found
+                            </Text>
+                            {nearestPOIName && (
+                                <>
+                                    <Text style={poiInfoNearestStyle} numberOfLines={1}>
+                                        <Text className="font-semibold">Nearest</Text>: {nearestPOIName}
+                                    </Text>
+                                    <Text style={poiInfoNearestStyle} numberOfLines={1}>
+                                        <Text className="font-semibold">Distance</Text>: {nearestPOIDistanceKm !== null && (
+                                            `${nearestPOIDistanceKm < 100 ? nearestPOIDistanceKm.toFixed(1) : Math.round(nearestPOIDistanceKm)} km`
+                                        )}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                    )}
+                </View>
+            )}
         </View>
     );
 }

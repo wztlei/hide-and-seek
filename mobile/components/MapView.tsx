@@ -205,6 +205,9 @@ export function AppMapView() {
                     (updated.data as any).lngB = pendingCoord[0];
                     (updated.data as any).latB = pendingCoord[1];
                 }
+            } else if (draft.id === "measuring" && pickingLocationField === "B") {
+                (updated.data as any).poiSearchLng = pendingCoord[0];
+                (updated.data as any).poiSearchLat = pendingCoord[1];
             } else {
                 (updated.data as any).lng = pendingCoord[0];
                 (updated.data as any).lat = pendingCoord[1];
@@ -230,8 +233,13 @@ export function AppMapView() {
             q.data.lat = pendingCoord[1];
             questionModified();
         } else if (q?.id === "measuring") {
-            q.data.lng = pendingCoord[0];
-            q.data.lat = pendingCoord[1];
+            if (pickingLocationField === "B") {
+                (q.data as any).poiSearchLng = pendingCoord[0];
+                (q.data as any).poiSearchLat = pendingCoord[1];
+            } else {
+                q.data.lng = pendingCoord[0];
+                q.data.lat = pendingCoord[1];
+            }
             questionModified();
         } else if (q?.id === "thermometer") {
             if (pickingLocationField === "A") {
