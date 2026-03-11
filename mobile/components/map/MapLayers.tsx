@@ -131,6 +131,26 @@ export function MapLayers({
                 </ShapeSource>
             ))}
 
+            {/* Measuring buffer circle outlines — one per POI */}
+            {measuringRegions.flatMap(({ key, circles }) =>
+                circles.map((circle, i) => (
+                    <ShapeSource
+                        key={`meas-circle-${key}-${i}`}
+                        id={`meas-circle-src-${key}-${i}`}
+                        shape={circle}
+                    >
+                        <LineLayer
+                            id={`meas-circle-line-${key}-${i}`}
+                            style={{
+                                lineColor: colors.MEASURING,
+                                lineWidth: 2,
+                                lineOpacity: 0.8,
+                            }}
+                        />
+                    </ShapeSource>
+                )),
+            )}
+
             {/* Indigo overlay covering the eliminated (impossible) zone */}
             {eliminationMask && (
                 <ShapeSource id="zone-mask" shape={eliminationMask}>
@@ -376,6 +396,21 @@ export function MapLayers({
                 }),
             )}
 
+            {/* Measuring POI dots — nearby POIs used for distance reference (capped to avoid OOM) */}
+            {measuringRegions.flatMap(({ key, pois }) =>
+                pois.slice(0, 30).map((poi) => {
+                    const name = (poi as any).properties?.name as string;
+                    return (
+                        <MarkerView
+                            key={`meas-poi-${key}-${name}`}
+                            coordinate={poi.geometry.coordinates as [number, number]}
+                        >
+                            <View style={styles.measuringPOIDot} />
+                        </MarkerView>
+                    );
+                }),
+            )}
+
             {/* Matching seeker location markers */}
             {questions
                 .filter((q) => q.id === "matching")
@@ -491,6 +526,15 @@ const styles = StyleSheet.create({
         height: 14,
         borderRadius: 14,
         backgroundColor: colors.MATCHING,
+        opacity: 0.8,
+        borderWidth: 1.5,
+        borderColor: "white",
+    },
+    measuringPOIDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 14,
+        backgroundColor: colors.MEASURING,
         opacity: 0.8,
         borderWidth: 1.5,
         borderColor: "white",

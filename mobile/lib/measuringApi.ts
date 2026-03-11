@@ -38,19 +38,24 @@ export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
 
 // ── Airports ──────────────────────────────────────────────────────────────────
 
-let airportsCache: FeatureCollection<Point> | null = null;
+const airportsCache = new Map<string, FeatureCollection<Point>>();
 
 /**
- * Fetches all commercial airports (with IATA codes) from Overpass API.
- * Uses a global bbox query for worldwide coverage. Cached after first load.
+ * Fetches commercial airports (with IATA codes) from Overpass API within the
+ * given bounding box. Cached per bbox after first load.
  */
-export async function fetchAirports(): Promise<FeatureCollection<Point>> {
-    if (airportsCache) return airportsCache;
-    // Query for all aerodrome nodes/ways that have an IATA code (= commercial airports)
-    const query = `[out:json][timeout:60];nwr["aeroway"="aerodrome"]["iata"];out center;`;
+export async function fetchAirports(
+    bbox: [number, number, number, number],
+): Promise<FeatureCollection<Point>> {
+    const [west, south, east, north] = bbox;
+    const cacheKey = `${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
+    if (airportsCache.has(cacheKey)) return airportsCache.get(cacheKey)!;
+    const query = `[out:json][timeout:60];nwr["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east});out center;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+    const t0 = Date.now();
     const res = await fetch(url);
     const data = await res.json();
+    console.log(`[fetchAirports] overpass: ${Date.now() - t0}ms, raw elements: ${data.elements.length}`);
     const fc = turf.featureCollection<Point>([]);
     for (const el of data.elements) {
         const lat = el.lat ?? el.center?.lat;
@@ -58,27 +63,29 @@ export async function fetchAirports(): Promise<FeatureCollection<Point>> {
         if (lat == null || lon == null) continue;
         const iata = el.tags?.iata;
         if (!iata) continue;
-        // Deduplicate by IATA code
         if (fc.features.find((f: any) => f.properties?.iata === iata)) continue;
         fc.features.push(turf.point([lon, lat], { iata, name: el.tags?.name }));
     }
-    fc.features = fc.features.slice(0, 100);
-    airportsCache = fc;
+    console.log(`[fetchAirports] parsed: ${fc.features.length} airports`);
+    airportsCache.set(cacheKey, fc);
     return fc;
 }
 
 // ── Cities ────────────────────────────────────────────────────────────────────
 
-let citiesCache: FeatureCollection<Point> | null = null;
+const citiesCache = new Map<string, FeatureCollection<Point>>();
 
 /**
- * Fetches all cities with population >= 1,000,000 from Overpass API.
- * Cached after first load.
+ * Fetches cities with population >= 1,000,000 from Overpass API within the
+ * given bounding box. Cached per bbox after first load.
  */
-export async function fetchCities(): Promise<FeatureCollection<Point>> {
-    if (citiesCache) return citiesCache;
-    // Regex matches populations starting with a non-zero digit followed by ≥6 more digits (≥1M)
-    const query = `[out:json][timeout:60];node[place=city]["population"~"^[1-9][0-9]{6,}$"];out center;`;
+export async function fetchCities(
+    bbox: [number, number, number, number],
+): Promise<FeatureCollection<Point>> {
+    const [west, south, east, north] = bbox;
+    const cacheKey = `${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
+    if (citiesCache.has(cacheKey)) return citiesCache.get(cacheKey)!;
+    const query = `[out:json][timeout:60];node[place=city]["population"~"^[1-9][0-9]{6,}$"](${south},${west},${north},${east});out center;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -90,8 +97,7 @@ export async function fetchCities(): Promise<FeatureCollection<Point>> {
         const name = el.tags?.["name:en"] ?? el.tags?.name;
         fc.features.push(turf.point([lon, lat], { name }));
     }
-    fc.features = fc.features.slice(0, 100);
-    citiesCache = fc;
+    citiesCache.set(cacheKey, fc);
     return fc;
 }
 

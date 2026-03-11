@@ -19,7 +19,6 @@ import {
     fetchCoastline,
     fetchHighSpeedRail,
     fetchMeasuringPOIs,
-    nearestPointAndDistance,
     nearestPointOnCoastline,
     nearestPointOnLines,
 } from "../lib/measuringApi";
@@ -53,6 +52,10 @@ export type MatchingRegion = {
 export type MeasuringRegion = {
     key: number;
     region: Feature<Polygon | MultiPolygon>;
+    /** POIs that form the distance reference (POI types only; empty for coastline/airport/city/rail). */
+    pois: Feature<Point>[];
+    /** Per-POI buffer circles (one per POI, radius = seeker's distance to that POI). */
+    circles: Feature<Polygon>[];
 };
 
 /**
@@ -167,19 +170,19 @@ export function useEliminationMask() {
                 setThermometerRegions(computeThermometerRegions(mapQuestions, zoneOrNull));
 
                 if (mapQuestions.some((q) => q.id === "tentacles"))
-                    toast.loading("Fetching nearby POIs…");
+                    toast.loading("Computing tentacles regions…");
                 const tentacles = await computeTentaclesRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (tentacles === null) return;
                 setTentaclesRegions(tentacles);
 
                 if (mapQuestions.some((q) => q.id === "matching"))
-                    toast.loading("Fetching matching boundaries…");
+                    toast.loading("Computing matching regions…");
                 const matching = await computeMatchingRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (matching === null) return;
                 setMatchingRegions(matching);
 
                 if (mapQuestions.some((q) => q.id === "measuring"))
-                    toast.loading("Fetching distance references…");
+                    toast.loading("Computing measuring regions…");
                 const measuring = await computeMeasuringRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (measuring === null) return;
                 setMeasuringRegions(measuring);
@@ -412,7 +415,7 @@ async function computeMatchingRegions(
                 ? turf.difference(turf.featureCollection([zone, result.boundary]))
                 : turf.intersect(turf.featureCollection([zone, result.boundary]));
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois });
+            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, circles: result.circles });
         } catch {
             // Network error — skip silently
         }
@@ -452,7 +455,7 @@ async function computeMeasuringRegions(
                 ? turf.difference(turf.featureCollection([zone, buffer]))
                 : turf.intersect(turf.featureCollection([zone, buffer]));
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated });
+            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, circles: result.circles });
         } catch {
             // Network error — skip silently
         }
@@ -551,10 +554,58 @@ async function resolveMatchingBoundary(
 
 // ── resolveMeasuringBuffer ────────────────────────────────────────────────────
 
+/**
+ * Builds a buffer polygon that is the union of per-POI circles, where each
+ * circle is centred on a POI with radius = seeker's distance to that POI.
+ *
+ * "Closer" valid zone  = inside the union (hider is closer to some POI than seeker is)
+ * "Farther" valid zone = outside the union (hider is farther from every POI than seeker is)
+ */
+// Max POIs passed to turf.union — distant ones produce huge circles covering the
+// entire zone anyway, so keeping only the nearest N is good enough for the game.
+const MAX_UNION_POIS = 50;
+
+function buildPOIUnionBuffer(
+    lng: number,
+    lat: number,
+    pois: Feature<Point>[],
+    label: string,
+): { union: Feature<Polygon | MultiPolygon>; circles: Feature<Polygon>[] } | null {
+    if (pois.length === 0) return null;
+    const seekerPt = turf.point([lng, lat]);
+
+    // Sort by distance ascending, then cap — keeps the nearest POIs and their circles.
+    const sorted = pois
+        .map((poi) => ({ poi, distKm: turf.distance(seekerPt, poi, { units: "kilometers" }) }))
+        .sort((a, b) => a.distKm - b.distKm)
+        .slice(0, MAX_UNION_POIS);
+
+    // Radius = distance from seeker to the nearest POI — all circles share this radius.
+    const radiusKm = sorted[0].distKm;
+
+    const t0 = Date.now();
+    // steps=8 (octagon) is sufficient precision for game shading and keeps
+    // vertex count low enough for turf.union to complete quickly.
+    const circles = sorted.map(({ poi }) =>
+        turf.circle(
+            poi.geometry.coordinates as [number, number],
+            radiusKm,
+            { units: "kilometers", steps: 16 },
+        ),
+    );
+    console.log(`[buildPOIUnionBuffer/${label}] ${sorted.length}/${pois.length} circles @ ${radiusKm.toFixed(1)} km built: ${Date.now() - t0}ms`);
+    if (circles.length === 1) return { union: circles[0], circles };
+    const t1 = Date.now();
+    const union = turf.union(turf.featureCollection(circles));
+    console.log(`[buildPOIUnionBuffer/${label}] turf.union: ${Date.now() - t1}ms`);
+    if (!union) return null;
+    return { union, circles };
+}
+
 async function resolveMeasuringBuffer(
     q: Extract<Question, { id: "measuring" }>,
     zoneOrNull: Feature<Polygon | MultiPolygon>,
-): Promise<{ buffer: Feature<Polygon | MultiPolygon> } | null> {
+): Promise<{ buffer: Feature<Polygon | MultiPolygon>; pois: Feature<Point>[]; circles: Feature<Polygon>[] } | null> {
     const { lat, lng, type } = q.data;
 
     switch (type) {
@@ -562,47 +613,41 @@ async function resolveMeasuringBuffer(
             const coastline = await fetchCoastline();
             const nearest = nearestPointOnCoastline(lng, lat, coastline);
             if (!nearest) return null;
-            // Simplify before buffering to avoid performance issues with large geometry
+            // Buffer the entire coastline at the seeker's distance — equivalent to
+            // the union of per-point circles for a continuous line feature.
             const simplified = turf.simplify(turf.featureCollection(coastline.features), {
                 tolerance: 0.01,
                 highQuality: false,
             });
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, { units: "kilometers" });
             const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer } : null;
+            return buffer ? { buffer, pois: [], circles: [] } : null;
         }
 
         case "airport": {
-            const pts = await fetchMeasuringAirports();
-            const nearest = nearestPointAndDistance(lng, lat, pts);
-            if (!nearest) return null;
-            const buffer = turf.circle(
-                nearest.nearest.geometry.coordinates as [number, number],
-                nearest.distanceKm,
-                { units: "kilometers", steps: 64 },
-            );
-            return { buffer };
+            const zoneBbox = turf.bbox(zoneOrNull) as [number, number, number, number];
+            const pts = await fetchMeasuringAirports(zoneBbox);
+            const result = buildPOIUnionBuffer(lng, lat, pts.features as Feature<Point>[], "airport");
+            if (!result) return null;
+            return { buffer: result.union, circles: result.circles, pois: pts.features as Feature<Point>[] };
         }
 
         case "city": {
-            const pts = await fetchCities();
-            const nearest = nearestPointAndDistance(lng, lat, pts);
-            if (!nearest) return null;
-            const buffer = turf.circle(
-                nearest.nearest.geometry.coordinates as [number, number],
-                nearest.distanceKm,
-                { units: "kilometers", steps: 64 },
-            );
-            return { buffer };
+            const zoneBbox = turf.bbox(zoneOrNull) as [number, number, number, number];
+            const pts = await fetchCities(zoneBbox);
+            const result = buildPOIUnionBuffer(lng, lat, pts.features as Feature<Point>[], "city");
+            if (!result) return null;
+            return { buffer: result.union, circles: result.circles, pois: pts.features as Feature<Point>[] };
         }
 
         case "highspeed-measure-shinkansen": {
             const lines = await fetchHighSpeedRail();
             const nearest = nearestPointOnLines(lng, lat, lines);
             if (!nearest) return null;
+            // Buffer the entire rail network at the seeker's distance.
             const bufferFC = turf.buffer(lines, nearest.distanceKm, { units: "kilometers" });
             const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer } : null;
+            return buffer ? { buffer, pois: [], circles: [] } : null;
         }
 
         case "aquarium":
@@ -630,14 +675,9 @@ async function resolveMeasuringBuffer(
             const bbox = poiBbox(lng, lat, (q.data as any).poiSearchRadius, zoneOrNull);
             const pts = await fetchMeasuringPOIs(type, bbox);
             const inZone = filterPoisByZone(pts.features as Feature<Point>[], zoneOrNull);
-            const nearest = nearestPointAndDistance(lng, lat, turf.featureCollection(inZone));
-            if (!nearest) return null;
-            const buffer = turf.circle(
-                nearest.nearest.geometry.coordinates as [number, number],
-                nearest.distanceKm,
-                { units: "kilometers", steps: 64 },
-            );
-            return { buffer };
+            const result = buildPOIUnionBuffer(lng, lat, inZone, type);
+            if (!result) return null;
+            return { buffer: result.union, circles: result.circles, pois: inZone };
         }
 
         // Phase 3: mcdonalds, seven11, rail-measure — not yet implemented on mobile
