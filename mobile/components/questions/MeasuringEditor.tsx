@@ -62,6 +62,20 @@ const MEASURING_HOME_GAME_TYPES = [
     "park",
 ] as const;
 
+const MEASURING_POI_TYPES = new Set([
+    ...MEASURING_HOME_GAME_TYPES,
+    "aquarium-full", "zoo-full", "theme_park-full", "peak-full",
+    "museum-full", "hospital-full", "cinema-full", "library-full",
+    "golf_course-full", "consulate-full", "park-full",
+]);
+
+const SEARCH_RADIUS_OPTIONS = [
+    { km: 100, label: "100 km" },
+    { km: 250, label: "250 km" },
+    { km: 500, label: "500 km" },
+    { km: null, label: "Full" },
+] as const;
+
 interface Props {
     data: MeasuringData;
     editingKey: number;
@@ -108,6 +122,7 @@ function TypeRow({
 }
 
 export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props) {
+    const isPOIType = MEASURING_POI_TYPES.has(data.type);
     return (
         <View className="gap-4 px-4">
             {/* Feature Type selector */}
@@ -144,6 +159,43 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     />
                 ))}
             </View>
+
+            {/* Search radius — only for POI types */}
+            {isPOIType && (
+                <View className="gap-2">
+                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                        Search Area
+                    </Text>
+                    <View style={editorStyles.segmentRow}>
+                        {SEARCH_RADIUS_OPTIONS.map(({ km, label }) => {
+                            const current = (data as any).poiSearchRadius as number | null | undefined;
+                            const selected = km === null
+                                ? current === null
+                                : (current === km || (km === 100 && current === undefined));
+                            return (
+                                <Pressable
+                                    key={String(km)}
+                                    onPress={() => {
+                                        (data as any).poiSearchRadius = km === 100 ? undefined : km;
+                                        questionModified();
+                                    }}
+                                    style={[
+                                        editorStyles.segmentItem,
+                                        selected && { backgroundColor: colors.MEASURING },
+                                    ]}
+                                >
+                                    <Text style={[
+                                        editorStyles.segmentText,
+                                        selected && editorStyles.segmentTextSelected,
+                                    ]}>
+                                        {label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </View>
+            )}
 
             {/* Closer / Farther toggle */}
             <View className="gap-2">

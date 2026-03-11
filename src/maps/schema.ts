@@ -202,6 +202,8 @@ export const tentacleQuestionSchema = z.union([
 const baseMatchingQuestionSchema = ordinaryBaseQuestionSchema.extend({
     same: z.boolean().default(true),
     lengthComparison: z.enum(["shorter", "longer", "same"]).optional(),
+    /** km radius around the seeker for Overpass bbox queries; null = full game-zone bbox. Mobile-only. */
+    poiSearchRadius: z.number().nullable().optional(),
 });
 
 const ordinaryMatchingQuestionSchema = baseMatchingQuestionSchema.extend({
@@ -320,6 +322,8 @@ export const matchingQuestionSchema = z.union([
 
 const baseMeasuringQuestionSchema = ordinaryBaseQuestionSchema.extend({
     hiderCloser: z.boolean().default(true),
+    /** km radius around the seeker for Overpass bbox queries; null = full game-zone bbox. Mobile-only. */
+    poiSearchRadius: z.number().nullable().optional(),
 });
 
 const ordinaryMeasuringQuestionSchema = baseMeasuringQuestionSchema.extend({

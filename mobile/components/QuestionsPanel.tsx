@@ -87,8 +87,7 @@ const LOCATION_TYPE_LABELS: Record<string, string> = {
 };
 
 const MATCHING_TYPE_LABELS: Record<string, string> = {
-    zone: "Admin zone",
-    "letter-zone": "Letter zone",
+    zone: "Administrative zone",
     airport: "Airport",
     "major-city": "Major city",
     aquarium: "Aquarium",
@@ -191,7 +190,11 @@ function subtitleForQuestion(q: Question): string | null {
         const type = (q.data as any).type as string;
         if (!type) return "Select a zone type";
         const typeLabel = MATCHING_TYPE_LABELS[type] ?? type;
-        return `${q.data.same ? "Same" : "Different"} · ${typeLabel}`;
+        const adminSuffix =
+            type === "zone" && (q.data as any).cat?.adminLevel
+                ? ` · admin level ${(q.data as any).cat.adminLevel}`
+                : "";
+        return `${q.data.same ? "Same" : "Different"} · ${typeLabel}${adminSuffix}`;
     }
     if (q.id === "measuring") {
         const type = (q.data as any).type as string;
@@ -274,6 +277,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 interface Props {
     visible: boolean;
     onClose: () => void;
+    /** Fired once the BottomSheet close animation fully completes. */
+    onSheetClosed?: () => void;
     getMapCenter: () => [number, number] | null;
     userCoord?: [number, number] | null;
     initialEditKey?: number | null;
@@ -283,6 +288,7 @@ interface Props {
 export const QuestionsPanel = memo(function QuestionsPanel({
     visible,
     onClose,
+    onSheetClosed,
     getMapCenter,
     userCoord,
     initialEditKey,
@@ -341,9 +347,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                     draftQuestion.set(null);
                 }
                 onClose();
+                onSheetClosed?.();
             }
         },
-        [onClose],
+        [onClose, onSheetClosed],
     );
 
     const renderBackdrop = useCallback(

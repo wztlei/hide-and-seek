@@ -5,10 +5,10 @@ import { startTransition, useEffect, useState } from "react";
 
 import type { Question, Questions } from "../../src/maps/schema";
 import { mapGeoJSON, questions } from "../lib/context";
+import { toast } from "../lib/notifications";
 import {
     fetchAdminBoundary,
     fetchAirports,
-    fetchLetterZoneBoundary,
     fetchMajorCities,
     fetchMatchingPOIs,
     findVoronoiCell,
@@ -46,6 +46,8 @@ export type TentaclesRegion = {
 export type MatchingRegion = {
     key: number;
     region: Feature<Polygon | MultiPolygon>;
+    /** POIs that form the Voronoi diagram (POI types only; empty for zone/airport/city). */
+    pois: Feature<Point>[];
 };
 
 export type MeasuringRegion = {
@@ -101,6 +103,7 @@ export function useEliminationMask() {
     );
     const [matchingRegions, setMatchingRegions] = useState<MatchingRegion[]>([]);
     const [measuringRegions, setMeasuringRegions] = useState<MeasuringRegion[]>([]);
+    const [isComputingLayers, setIsComputingLayers] = useState(false);
 
     useEffect(() => {
         if (!$mapGeoJSON) {
@@ -123,6 +126,7 @@ export function useEliminationMask() {
         const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
         const run = async () => {
+            setIsComputingLayers(true);
             try {
                 const features = $mapGeoJSON.features as Feature<
                     Polygon | MultiPolygon
@@ -162,19 +166,27 @@ export function useEliminationMask() {
                 await tick(); if (isCancelled()) return;
                 setThermometerRegions(computeThermometerRegions(mapQuestions, zoneOrNull));
 
+                if (mapQuestions.some((q) => q.id === "tentacles"))
+                    toast.loading("Fetching nearby POIs…");
                 const tentacles = await computeTentaclesRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (tentacles === null) return;
                 setTentaclesRegions(tentacles);
 
+                if (mapQuestions.some((q) => q.id === "matching"))
+                    toast.loading("Fetching matching boundaries…");
                 const matching = await computeMatchingRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (matching === null) return;
                 setMatchingRegions(matching);
 
+                if (mapQuestions.some((q) => q.id === "measuring"))
+                    toast.loading("Fetching distance references…");
                 const measuring = await computeMeasuringRegions(mapQuestions, zoneOrNull, isCancelled);
                 if (measuring === null) return;
                 setMeasuringRegions(measuring);
             } catch (e) {
                 console.error("Failed to compute zone mask:", e);
+            } finally {
+                if (!cancelled) setIsComputingLayers(false);
             }
         };
 
@@ -184,7 +196,7 @@ export function useEliminationMask() {
         };
     }, [$mapGeoJSON, mapQuestions]);
 
-    return { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions };
+    return { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions, isComputingLayers };
 }
 
 // ── Per-question region computers ────────────────────────────────────────────
@@ -385,22 +397,22 @@ async function computeMatchingRegions(
     for (const q of $questions) {
         if (q.id !== "matching") continue;
         try {
-            const boundary = await resolveMatchingBoundary(
+            const result = await resolveMatchingBoundary(
                 q as Extract<Question, { id: "matching" }>,
                 zone,
             );
             if (isCancelled()) return null;
-            if (!boundary) continue;
+            if (!result.boundary) continue;
 
             await tick(); if (isCancelled()) return null;
 
             // same=true: valid zone is the matching boundary → eliminate what's outside
             // same=false: valid zone excludes the matching boundary → eliminate what's inside
             const eliminated = q.data.same
-                ? turf.difference(turf.featureCollection([zone, boundary]))
-                : turf.intersect(turf.featureCollection([zone, boundary]));
+                ? turf.difference(turf.featureCollection([zone, result.boundary]))
+                : turf.intersect(turf.featureCollection([zone, result.boundary]));
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated });
+            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois });
         } catch {
             // Network error — skip silently
         }
@@ -449,35 +461,68 @@ async function computeMeasuringRegions(
     return regions;
 }
 
+// ── Shared POI bbox / zone-filter helpers ────────────────────────────────
+
+/**
+ * Returns a bbox for an Overpass POI query centred on the seeker position.
+ * When searchRadius is null the full game-zone bbox is used.
+ * Otherwise a circle of radiusKm (default 100) is built and clamped to the
+ * zone so Overpass doesn't scan area outside the game zone.
+ */
+function poiBbox(
+    lng: number,
+    lat: number,
+    searchRadius: number | null | undefined,
+    zone: Feature<Polygon | MultiPolygon>,
+): [number, number, number, number] {
+    const zoneBbox = turf.bbox(zone) as [number, number, number, number];
+    const radiusKm = searchRadius === null ? null : (searchRadius ?? 100);
+    if (radiusKm === null) return zoneBbox;
+    const circleBbox = turf.bbox(
+        turf.circle([lng, lat], radiusKm, { units: "kilometers" }),
+    ) as [number, number, number, number];
+    return [
+        Math.max(circleBbox[0], zoneBbox[0]),
+        Math.max(circleBbox[1], zoneBbox[1]),
+        Math.min(circleBbox[2], zoneBbox[2]),
+        Math.min(circleBbox[3], zoneBbox[3]),
+    ];
+}
+
+/** Removes POI features that lie outside the game zone polygon. */
+function filterPoisByZone(
+    pois: Feature<Point>[],
+    zone: Feature<Polygon | MultiPolygon>,
+): Feature<Point>[] {
+    return pois.filter((f) => {
+        try { return turf.booleanPointInPolygon(f, zone); }
+        catch { return false; }
+    });
+}
+
 // ── resolveMatchingBoundary ───────────────────────────────────────────────
 
 async function resolveMatchingBoundary(
     q: Extract<Question, { id: "matching" }>,
     zoneOrNull: Feature<Polygon | MultiPolygon>,
-): Promise<Feature<Polygon | MultiPolygon> | null> {
+): Promise<{ boundary: Feature<Polygon | MultiPolygon> | null; pois: Feature<Point>[] }> {
     const type = q.data.type;
     switch (type) {
         case "zone": {
-            return fetchAdminBoundary(
+            const boundary = await fetchAdminBoundary(
                 q.data.lat,
                 q.data.lng,
                 (q.data as any).cat?.adminLevel ?? 4,
             );
-        }
-        case "letter-zone": {
-            return fetchLetterZoneBoundary(
-                q.data.lat,
-                q.data.lng,
-                (q.data as any).cat?.adminLevel ?? 4,
-            );
+            return { boundary, pois: [] };
         }
         case "airport": {
             const pts = await fetchAirports();
-            return findVoronoiCell(q.data.lng, q.data.lat, pts);
+            return { boundary: findVoronoiCell(q.data.lng, q.data.lat, pts), pois: [] };
         }
         case "major-city": {
             const pts = await fetchMajorCities();
-            return findVoronoiCell(q.data.lng, q.data.lat, pts);
+            return { boundary: findVoronoiCell(q.data.lng, q.data.lat, pts), pois: [] };
         }
         case "aquarium":
         case "zoo":
@@ -490,13 +535,17 @@ async function resolveMatchingBoundary(
         case "golf_course":
         case "consulate":
         case "park": {
-            const bbox = turf.bbox(zoneOrNull) as [number, number, number, number];
+            const bbox = poiBbox(q.data.lng, q.data.lat, (q.data as any).poiSearchRadius, zoneOrNull);
             const pts = await fetchMatchingPOIs(type, bbox);
-            return findVoronoiCell(q.data.lng, q.data.lat, pts);
+            const inZone = filterPoisByZone(pts.features as Feature<Point>[], zoneOrNull);
+            return {
+                boundary: findVoronoiCell(q.data.lng, q.data.lat, turf.featureCollection(inZone)),
+                pois: inZone,
+            };
         }
         default:
             // Station types and other subtypes not yet implemented on mobile
-            return null;
+            return { boundary: null, pois: [] };
     }
 }
 
@@ -578,9 +627,10 @@ async function resolveMeasuringBuffer(
         case "golf_course-full":
         case "consulate-full":
         case "park-full": {
-            const bbox = turf.bbox(zoneOrNull) as [number, number, number, number];
+            const bbox = poiBbox(lng, lat, (q.data as any).poiSearchRadius, zoneOrNull);
             const pts = await fetchMeasuringPOIs(type, bbox);
-            const nearest = nearestPointAndDistance(lng, lat, pts);
+            const inZone = filterPoisByZone(pts.features as Feature<Point>[], zoneOrNull);
+            const nearest = nearestPointAndDistance(lng, lat, turf.featureCollection(inZone));
             if (!nearest) return null;
             const buffer = turf.circle(
                 nearest.nearest.geometry.coordinates as [number, number],

@@ -28,7 +28,7 @@ async function fetchGeoJSONForZone(
     const typeMap = { W: "way", R: "relation", N: "node" } as const;
     // [timeout:60] tells Overpass to allow up to 60 s of server-side processing
     // before giving up (default is 25 s, which is too short for large relations).
-    const query = `[out:json][timeout:60];${typeMap[osmType]}(${osmId});out geom;`;
+    const query = `[out:json][timeout:60];${typeMap[osmType]}(${osmId});out geom qt;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
 
     let lastError: Error | undefined;

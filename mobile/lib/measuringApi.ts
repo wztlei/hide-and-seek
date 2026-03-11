@@ -47,9 +47,7 @@ let airportsCache: FeatureCollection<Point> | null = null;
 export async function fetchAirports(): Promise<FeatureCollection<Point>> {
     if (airportsCache) return airportsCache;
     // Query for all aerodrome nodes/ways that have an IATA code (= commercial airports)
-    const query = `[out:json][timeout:60];
-nwr["aeroway"="aerodrome"]["iata"](if:count_tags()>0);
-out center;`;
+    const query = `[out:json][timeout:60];nwr["aeroway"="aerodrome"]["iata"];out center;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -80,9 +78,7 @@ let citiesCache: FeatureCollection<Point> | null = null;
 export async function fetchCities(): Promise<FeatureCollection<Point>> {
     if (citiesCache) return citiesCache;
     // Regex matches populations starting with a non-zero digit followed by ≥6 more digits (≥1M)
-    const query = `[out:json][timeout:60];
-nwr[place=city]["population"~"^[1-9][0-9]{6,}$"];
-out center;`;
+    const query = `[out:json][timeout:60];node[place=city]["population"~"^[1-9][0-9]{6,}$"];out center;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -110,9 +106,7 @@ let highSpeedRailCache: FeatureCollection<LineString | MultiLineString> | null =
  */
 export async function fetchHighSpeedRail(): Promise<FeatureCollection<LineString | MultiLineString>> {
     if (highSpeedRailCache) return highSpeedRailCache;
-    const query = `[out:json][timeout:60];
-way["highspeed"="yes"];
-out geom;`;
+    const query = `[out:json][timeout:60];way["railway"]["highspeed"="yes"];out geom qt;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -151,13 +145,7 @@ export async function fetchMeasuringPOIs(
     const cacheKey = `${baseType}:${south.toFixed(2)},${west.toFixed(2)},${north.toFixed(2)},${east.toFixed(2)}`;
     if (poiCache.has(cacheKey)) return poiCache.get(cacheKey)!;
 
-    const query = `[out:json][timeout:25];
-(
-  node["${tag}"="${baseType}"](${south},${west},${north},${east});
-  way["${tag}"="${baseType}"](${south},${west},${north},${east});
-  relation["${tag}"="${baseType}"](${south},${west},${north},${east});
-);
-out center;`;
+    const query = `[out:json][timeout:25];nwr["${tag}"="${baseType}"](${south},${west},${north},${east});out center;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();

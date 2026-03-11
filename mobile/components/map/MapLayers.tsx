@@ -361,6 +361,21 @@ export function MapLayers({
                     : [],
             )}
 
+            {/* Matching POI dots — nearby POIs forming the Voronoi boundaries */}
+            {matchingRegions.flatMap(({ key, pois }) =>
+                pois.slice(0, 30).map((poi) => {
+                    const name = (poi as any).properties?.name as string;
+                    return (
+                        <MarkerView
+                            key={`match-poi-${key}-${name}`}
+                            coordinate={poi.geometry.coordinates as [number, number]}
+                        >
+                            <View style={styles.matchingPOIDot} />
+                        </MarkerView>
+                    );
+                }),
+            )}
+
             {/* Matching seeker location markers */}
             {questions
                 .filter((q) => q.id === "matching")
@@ -467,6 +482,15 @@ const styles = StyleSheet.create({
         height: 14,
         borderRadius: 14,
         backgroundColor: colors.TENTACLES,
+        opacity: 0.8,
+        borderWidth: 1.5,
+        borderColor: "white",
+    },
+    matchingPOIDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 14,
+        backgroundColor: colors.MATCHING,
         opacity: 0.8,
         borderWidth: 1.5,
         borderColor: "white",

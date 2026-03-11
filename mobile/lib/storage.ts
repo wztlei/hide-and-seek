@@ -57,3 +57,9 @@ export function getCached(key: string): string | undefined {
 export function setCached(key: string, value: string): void {
     storageProxy[key] = value;
 }
+
+/** Delete from the in-memory mirror and remove from AsyncStorage. */
+export function deleteCached(key: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (storageProxy as Record<string, string>)[key];
+}

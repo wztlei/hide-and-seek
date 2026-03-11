@@ -43,6 +43,7 @@ export function useZoneBoundary() {
     useEffect(() => {
         let cancelled = false;
         setIsLoadingZone(true);
+        toast.loading("Loading zone boundary…");
         fetchAllZoneBoundaries()
             .then((boundary) => {
                 if (cancelled) return;

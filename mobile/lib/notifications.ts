@@ -12,6 +12,10 @@ export const toast = {
 
     info: (message: string) => Toast.show({ type: "info", text1: message }),
 
+    /** Brief informational toast for transient loading states (auto-hides in 2 s). */
+    loading: (message: string) =>
+        Toast.show({ type: "info", text1: message, visibilityTime: 2000 }),
+
     promise: async <T>(
         promise: Promise<T>,
         messages: { pending?: string; success?: string; error?: string },

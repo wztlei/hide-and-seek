@@ -8,7 +8,7 @@ import {
 } from "@maplibre/maplibre-react-native";
 import { useStore } from "@nanostores/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
@@ -92,7 +92,7 @@ export function AppMapView() {
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
-    const { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions } = useEliminationMask();
+    const { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions, isComputingLayers } = useEliminationMask();
     const { isLoadingZone } = useZoneBoundary();
     const {
         userCoord,
@@ -164,13 +164,16 @@ export function AppMapView() {
             setPendingCoord(null);
             setQuestionsVisible(false);
             setEditingQuestionKey(null);
-            // Allow map taps after the BottomSheet close animation (~300-400 ms).
-            setTimeout(() => {
-                pickReadyRef.current = true;
-            }, 500);
+            // pickReadyRef is set true by onSheetClosed once the BottomSheet
+            // close animation actually completes — see QuestionsPanel prop below.
         },
         [],
     );
+
+    /** Called by QuestionsPanel once its BottomSheet animation fully completes. */
+    const handleSheetClosed = useCallback(() => {
+        pickReadyRef.current = true;
+    }, []);
 
     const handleQuestionsClose = useCallback(() => {
         setQuestionsVisible(false);
@@ -259,7 +262,7 @@ export function AppMapView() {
                 compassEnabled
                 logoEnabled={false}
                 attributionEnabled={false}
-                onPress={(feature) => {
+onPress={(feature) => {
                     if (
                         pickingLocationForKey === null ||
                         !pickReadyRef.current
@@ -303,6 +306,14 @@ export function AppMapView() {
                 />
             </MLMapView>
 
+            {isComputingLayers && (
+                <View style={styles.mapSpinner} pointerEvents="none">
+                    <View style={styles.mapSpinnerPill}>
+                        <ActivityIndicator size="small" color="#4f46e5" />
+                    </View>
+                </View>
+            )}
+
             {pickingLocationForKey !== null && (
                 <PickLocationBanner
                     pendingCoord={pendingCoord}
@@ -333,6 +344,7 @@ export function AppMapView() {
             <QuestionsPanel
                 visible={questionsVisible}
                 onClose={handleQuestionsClose}
+                onSheetClosed={handleSheetClosed}
                 getMapCenter={getMapCenter}
                 userCoord={userCoord}
                 initialEditKey={editingQuestionKey}
@@ -346,4 +358,19 @@ export function AppMapView() {
 
 const styles = StyleSheet.create({
     map: { flex: 1 },
+    mapSpinner: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    mapSpinnerPill: {
+        backgroundColor: "rgba(255,255,255, 1)",
+        borderRadius: 20,
+        padding: 10,
+        shadowColor: "#000",
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+    },
 });
