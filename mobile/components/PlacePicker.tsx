@@ -253,7 +253,8 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                     text: "Reset",
                     style: "destructive",
                     onPress: () => {
-                        const hadAdditional = additionalMapGeoLocations.get().length > 0;
+                        const hadAdditional =
+                            additionalMapGeoLocations.get().length > 0;
                         polyGeoJSON.set(null);
                         questions.set([]);
                         additionalMapGeoLocations.set([]);

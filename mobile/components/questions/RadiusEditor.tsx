@@ -41,40 +41,42 @@ export function RadiusEditor({ data, editingKey, onPickLocationOnMap }: Props) {
                         selectTextOnFocus
                     />
                     <View style={editorStyles.segmentRow}>
-                        {(["miles", "kilometers", "meters"] as const).map((u) => {
-                            const selected = data.unit === u;
-                            const label =
-                                u === "miles"
-                                    ? "mi"
-                                    : u === "kilometers"
-                                      ? "km"
-                                      : "m";
-                            return (
-                                <Pressable
-                                    key={u}
-                                    onPress={() => {
-                                        data.unit = u;
-                                        questionModified();
-                                    }}
-                                    style={[
-                                        editorStyles.segmentItem,
-                                        selected && {
-                                            backgroundColor: colors.RADIUS,
-                                        },
-                                    ]}
-                                >
-                                    <Text
+                        {(["miles", "kilometers", "meters"] as const).map(
+                            (u) => {
+                                const selected = data.unit === u;
+                                const label =
+                                    u === "miles"
+                                        ? "mi"
+                                        : u === "kilometers"
+                                          ? "km"
+                                          : "m";
+                                return (
+                                    <Pressable
+                                        key={u}
+                                        onPress={() => {
+                                            data.unit = u;
+                                            questionModified();
+                                        }}
                                         style={[
-                                            editorStyles.segmentText,
-                                            selected &&
-                                                editorStyles.segmentTextSelected,
+                                            editorStyles.segmentItem,
+                                            selected && {
+                                                backgroundColor: colors.RADIUS,
+                                            },
                                         ]}
                                     >
-                                        {label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
+                                        <Text
+                                            style={[
+                                                editorStyles.segmentText,
+                                                selected &&
+                                                    editorStyles.segmentTextSelected,
+                                            ]}
+                                        >
+                                            {label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            },
+                        )}
                     </View>
                 </View>
             </View>

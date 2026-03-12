@@ -24,7 +24,10 @@ import { deleteCached, getCached, setCached } from "./storage";
 const MEAS_POI_CACHE_MAX = 50;
 const MEAS_POI_LRU_KEY = "meas-poi:__lru__";
 
-function measStoreKey(type: string, bbox: [number, number, number, number]): string {
+function measStoreKey(
+    type: string,
+    bbox: [number, number, number, number],
+): string {
     return `meas-poi:${type}:${bbox.map((n) => n.toFixed(2)).join(",")}`;
 }
 
@@ -95,10 +98,14 @@ export async function fetchAirports(
     const storeKey = measStoreKey("airport", bbox);
 
     const persisted = measPersistentGet(storeKey);
-    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+    if (persisted)
+        return turf.featureCollection(persisted) as FeatureCollection<Point>;
 
     const inflight = measPoiInFlight.get(storeKey);
-    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+    if (inflight)
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<Point>;
 
     const promise = (async (): Promise<Feature<Point>[]> => {
         const [west, south, east, north] = bbox;
@@ -117,7 +124,9 @@ export async function fetchAirports(
             const iata = el.tags?.iata;
             if (!iata || seen.has(iata)) continue;
             seen.add(iata);
-            features.push(turf.point([lon, lat], { iata, name: el.tags?.name }));
+            features.push(
+                turf.point([lon, lat], { iata, name: el.tags?.name }),
+            );
         }
         measPersistentSet(storeKey, features);
         return features;
@@ -144,10 +153,14 @@ export async function fetchCities(
     const storeKey = measStoreKey("city", bbox);
 
     const persisted = measPersistentGet(storeKey);
-    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+    if (persisted)
+        return turf.featureCollection(persisted) as FeatureCollection<Point>;
 
     const inflight = measPoiInFlight.get(storeKey);
-    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+    if (inflight)
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<Point>;
 
     const promise = (async (): Promise<Feature<Point>[]> => {
         const [west, south, east, north] = bbox;
@@ -178,14 +191,17 @@ export async function fetchCities(
 
 // ── High-speed rail ───────────────────────────────────────────────────────────
 
-let highSpeedRailCache: FeatureCollection<LineString | MultiLineString> | null = null;
+let highSpeedRailCache: FeatureCollection<LineString | MultiLineString> | null =
+    null;
 
 /**
  * Fetches all high-speed rail lines from Overpass API worldwide.
  * Returns a FeatureCollection of LineString/MultiLineString features.
  * Cached after first load.
  */
-export async function fetchHighSpeedRail(): Promise<FeatureCollection<LineString | MultiLineString>> {
+export async function fetchHighSpeedRail(): Promise<
+    FeatureCollection<LineString | MultiLineString>
+> {
     if (highSpeedRailCache) return highSpeedRailCache;
     const query = `[out:json][timeout:60];way["railway"]["highspeed"="yes"];out geom qt;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
@@ -195,7 +211,8 @@ export async function fetchHighSpeedRail(): Promise<FeatureCollection<LineString
     for (const el of data.elements) {
         if (el.type !== "way" || !el.geometry) continue;
         const coords: [number, number][] = el.geometry.map(
-            (node: { lat: number; lon: number }) => [node.lon, node.lat] as [number, number],
+            (node: { lat: number; lon: number }) =>
+                [node.lon, node.lat] as [number, number],
         );
         if (coords.length < 2) continue;
         fc.features.push(turf.lineString(coords, { name: el.tags?.name }));
@@ -223,10 +240,14 @@ export async function fetchMeasuringPOIs(
     const storeKey = measStoreKey(baseType, bbox);
 
     const persisted = measPersistentGet(storeKey);
-    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<Point>;
+    if (persisted)
+        return turf.featureCollection(persisted) as FeatureCollection<Point>;
 
     const inflight = measPoiInFlight.get(storeKey);
-    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+    if (inflight)
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<Point>;
 
     const promise = (async (): Promise<Feature<Point>[]> => {
         const [west, south, east, north] = bbox;
@@ -300,7 +321,9 @@ export function nearestPointOnLines(
 
         for (const ls of lineStrings) {
             try {
-                const np = turf.nearestPointOnLine(ls, target, { units: "kilometers" });
+                const np = turf.nearestPointOnLine(ls, target, {
+                    units: "kilometers",
+                });
                 const dist = np.properties.dist ?? Infinity;
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -326,5 +349,9 @@ export function nearestPointOnCoastline(
     lat: number,
     coastline: FeatureCollection<LineString>,
 ): { nearestCoord: [number, number]; distanceKm: number } | null {
-    return nearestPointOnLines(lng, lat, coastline as FeatureCollection<LineString | MultiLineString>);
+    return nearestPointOnLines(
+        lng,
+        lat,
+        coastline as FeatureCollection<LineString | MultiLineString>,
+    );
 }

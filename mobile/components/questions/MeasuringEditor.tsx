@@ -10,7 +10,11 @@ import * as Location from "expo-location";
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
 import { mapGeoJSON, questionModified } from "../../lib/context";
-import { fetchAirports, fetchCities, fetchMeasuringPOIs } from "../../lib/measuringApi";
+import {
+    fetchAirports,
+    fetchCities,
+    fetchMeasuringPOIs,
+} from "../../lib/measuringApi";
 import { LocationButtons } from "./LocationButtons";
 import { editorStyles } from "./editorStyles";
 import { parseCoordinatesFromText } from "./utils";
@@ -44,24 +48,27 @@ const DROPDOWN_DATA: DropdownItem[] = [
 const SELECTABLE_DATA = DROPDOWN_DATA.filter((d) => !d.isHeader);
 
 // Heights must match the rendered item styles below so getItemLayout is accurate.
-const DROPDOWN_ITEM_HEIGHT = 44;   // paddingVertical 12 * 2 + ~20 text
+const DROPDOWN_ITEM_HEIGHT = 44; // paddingVertical 12 * 2 + ~20 text
 const DROPDOWN_HEADER_HEIGHT = 28; // paddingTop 10 + paddingBottom 4 + ~14 text
 
 // Precompute cumulative offsets once so getItemLayout is O(1).
-const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<{ length: number; offset: number }[]>(
-    (acc, item, i) => {
-        const length = item.isHeader ? DROPDOWN_HEADER_HEIGHT : DROPDOWN_ITEM_HEIGHT;
-        const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
-        acc.push({ length, offset });
-        return acc;
-    },
-    [],
-);
+const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<
+    { length: number; offset: number }[]
+>((acc, item, i) => {
+    const length = item.isHeader
+        ? DROPDOWN_HEADER_HEIGHT
+        : DROPDOWN_ITEM_HEIGHT;
+    const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
+    acc.push({ length, offset });
+    return acc;
+}, []);
 
 /** Returns the index in DROPDOWN_DATA for the given value, or undefined if not found / empty. */
 function dropdownInitialIndex(selectedValue: string): number | undefined {
     if (!selectedValue) return undefined;
-    const idx = DROPDOWN_DATA.findIndex((d) => !d.isHeader && d.value === selectedValue);
+    const idx = DROPDOWN_DATA.findIndex(
+        (d) => !d.isHeader && d.value === selectedValue,
+    );
     return idx > 0 ? idx : undefined;
 }
 
@@ -81,14 +88,23 @@ const MEASURING_HOME_GAME_TYPES = [
 
 const MEASURING_POI_TYPES = new Set([
     ...MEASURING_HOME_GAME_TYPES,
-    "aquarium-full", "zoo-full", "theme_park-full", "peak-full",
-    "museum-full", "hospital-full", "cinema-full", "library-full",
-    "golf_course-full", "consulate-full", "park-full",
+    "aquarium-full",
+    "zoo-full",
+    "theme_park-full",
+    "peak-full",
+    "museum-full",
+    "hospital-full",
+    "cinema-full",
+    "library-full",
+    "golf_course-full",
+    "consulate-full",
+    "park-full",
 ]);
 
 // Types that support a configurable search area + search center (all Overpass-backed types).
 const MEASURING_SEARCH_TYPES = new Set([
-    "airport", "city",
+    "airport",
+    "city",
     ...MEASURING_POI_TYPES,
 ]);
 
@@ -105,10 +121,16 @@ interface Props {
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
-export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props) {
+export function MeasuringEditor({
+    data,
+    editingKey,
+    onPickLocationOnMap,
+}: Props) {
     const [poiCount, setPoiCount] = useState<number | null>(null);
     const [nearestPOIName, setNearestPOIName] = useState<string | null>(null);
-    const [nearestPOIDistanceKm, setNearestPOIDistanceKm] = useState<number | null>(null);
+    const [nearestPOIDistanceKm, setNearestPOIDistanceKm] = useState<
+        number | null
+    >(null);
     const [loadingPOIs, setLoadingPOIs] = useState(false);
     const $mapGeoJSON = useStore(mapGeoJSON);
     const isPOIType = MEASURING_POI_TYPES.has(data.type);
@@ -131,24 +153,36 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
         }
         let cancelled = false;
         setLoadingPOIs(true);
-        const zoneBbox = turf.bbox($mapGeoJSON) as [number, number, number, number];
+        const zoneBbox = turf.bbox($mapGeoJSON) as [
+            number,
+            number,
+            number,
+            number,
+        ];
         const sr = (data as any).poiSearchRadius as number | null | undefined;
         const radiusKm = sr === null ? null : (sr ?? 100);
-        const bbox: [number, number, number, number] = radiusKm === null ? zoneBbox : (() => {
-            const cb = turf.bbox(
-                turf.circle([searchLng, searchLat], radiusKm, { units: "kilometers" }),
-            ) as [number, number, number, number];
-            return [
-                Math.max(cb[0], zoneBbox[0]),
-                Math.max(cb[1], zoneBbox[1]),
-                Math.min(cb[2], zoneBbox[2]),
-                Math.min(cb[3], zoneBbox[3]),
-            ];
-        })();
+        const bbox: [number, number, number, number] =
+            radiusKm === null
+                ? zoneBbox
+                : (() => {
+                      const cb = turf.bbox(
+                          turf.circle([searchLng, searchLat], radiusKm, {
+                              units: "kilometers",
+                          }),
+                      ) as [number, number, number, number];
+                      return [
+                          Math.max(cb[0], zoneBbox[0]),
+                          Math.max(cb[1], zoneBbox[1]),
+                          Math.min(cb[2], zoneBbox[2]),
+                          Math.min(cb[3], zoneBbox[3]),
+                      ];
+                  })();
         const fetchPromise =
-            data.type === "airport" ? fetchAirports(bbox) :
-            data.type === "city"    ? fetchCities(bbox) :
-            fetchMeasuringPOIs(data.type, bbox);
+            data.type === "airport"
+                ? fetchAirports(bbox)
+                : data.type === "city"
+                  ? fetchCities(bbox)
+                  : fetchMeasuringPOIs(data.type, bbox);
         fetchPromise
             .then((fc) => {
                 if (cancelled) return;
@@ -156,18 +190,37 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                 if (fc.features.length > 0) {
                     const seekerPt = turf.point([data.lng, data.lat]);
                     const nearest = turf.nearestPoint(seekerPt, fc as any);
-                    setNearestPOIName((nearest as any).properties?.name ?? null);
-                    setNearestPOIDistanceKm(turf.distance(seekerPt, nearest, { units: "kilometers" }));
+                    setNearestPOIName(
+                        (nearest as any).properties?.name ?? null,
+                    );
+                    setNearestPOIDistanceKm(
+                        turf.distance(seekerPt, nearest, {
+                            units: "kilometers",
+                        }),
+                    );
                 } else {
                     setNearestPOIName(null);
                     setNearestPOIDistanceKm(null);
                 }
                 setLoadingPOIs(false);
             })
-            .catch(() => { if (!cancelled) setLoadingPOIs(false); });
-        return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.type, data.lat, data.lng, searchLat, searchLng, $mapGeoJSON, isSearchType, (data as any).poiSearchRadius]);
+            .catch(() => {
+                if (!cancelled) setLoadingPOIs(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        data.type,
+        data.lat,
+        data.lng,
+        searchLat,
+        searchLng,
+        $mapGeoJSON,
+        isSearchType,
+        (data as any).poiSearchRadius,
+    ]);
 
     return (
         <View className="gap-4 px-4">
@@ -180,7 +233,10 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     data={DROPDOWN_DATA}
                     labelField="label"
                     valueField="value"
-                    value={SELECTABLE_DATA.find((d) => d.value === data.type)?.value ?? null}
+                    value={
+                        SELECTABLE_DATA.find((d) => d.value === data.type)
+                            ?.value ?? null
+                    }
                     onChange={(item) => {
                         if (item.isHeader) return;
                         (data as any).type = item.value;
@@ -190,14 +246,29 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                         if (item.isHeader) {
                             return (
                                 <View style={groupHeaderStyle}>
-                                    <Text style={groupHeaderTextStyle}>{item.label}</Text>
+                                    <Text style={groupHeaderTextStyle}>
+                                        {item.label}
+                                    </Text>
                                 </View>
                             );
                         }
                         const selected = item.value === data.type;
                         return (
-                            <View style={[dropdownItemStyle, selected && { backgroundColor: "#ecfeff" }]}>
-                                <Text style={[dropdownItemTextStyle, selected && { color: "#164e63", fontWeight: "600" }]}>
+                            <View
+                                style={[
+                                    dropdownItemStyle,
+                                    selected && { backgroundColor: "#ecfeff" },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        dropdownItemTextStyle,
+                                        selected && {
+                                            color: "#164e63",
+                                            fontWeight: "600",
+                                        },
+                                    ]}
+                                >
                                     {item.label}
                                 </Text>
                             </View>
@@ -209,9 +280,13 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     placeholder="Select type…"
                     autoScroll={false}
                     flatListProps={{
-                        initialScrollIndex: dropdownInitialIndex(data.type ?? ""),
+                        initialScrollIndex: dropdownInitialIndex(
+                            data.type ?? "",
+                        ),
                         getItemLayout: (_, index) => ({
-                            length: DROPDOWN_ITEM_LAYOUTS[index]?.length ?? DROPDOWN_ITEM_HEIGHT,
+                            length:
+                                DROPDOWN_ITEM_LAYOUTS[index]?.length ??
+                                DROPDOWN_ITEM_HEIGHT,
                             offset: DROPDOWN_ITEM_LAYOUTS[index]?.offset ?? 0,
                             index,
                         }),
@@ -226,26 +301,37 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     </Text>
                     <View style={editorStyles.segmentRow}>
                         {SEARCH_RADIUS_OPTIONS.map(({ km, label }) => {
-                            const current = (data as any).poiSearchRadius as number | null | undefined;
-                            const selected = km === null
-                                ? current === null
-                                : (current === km || (km === 100 && current === undefined));
+                            const current = (data as any).poiSearchRadius as
+                                | number
+                                | null
+                                | undefined;
+                            const selected =
+                                km === null
+                                    ? current === null
+                                    : current === km ||
+                                      (km === 100 && current === undefined);
                             return (
                                 <Pressable
                                     key={String(km)}
                                     onPress={() => {
-                                        (data as any).poiSearchRadius = km === 100 ? undefined : km;
+                                        (data as any).poiSearchRadius =
+                                            km === 100 ? undefined : km;
                                         questionModified();
                                     }}
                                     style={[
                                         editorStyles.segmentItem,
-                                        selected && { backgroundColor: colors.MEASURING },
+                                        selected && {
+                                            backgroundColor: colors.MEASURING,
+                                        },
                                     ]}
                                 >
-                                    <Text style={[
-                                        editorStyles.segmentText,
-                                        selected && editorStyles.segmentTextSelected,
-                                    ]}>
+                                    <Text
+                                        style={[
+                                            editorStyles.segmentText,
+                                            selected &&
+                                                editorStyles.segmentTextSelected,
+                                        ]}
+                                    >
                                         {label}
                                     </Text>
                                 </Pressable>
@@ -273,13 +359,16 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                                 style={[
                                     editorStyles.segmentItem,
                                     editorStyles.segmentItemWide,
-                                    selected && { backgroundColor: colors.MEASURING },
+                                    selected && {
+                                        backgroundColor: colors.MEASURING,
+                                    },
                                 ]}
                             >
                                 <Text
                                     style={[
                                         editorStyles.segmentText,
-                                        selected && editorStyles.segmentTextSelected,
+                                        selected &&
+                                            editorStyles.segmentTextSelected,
                                     ]}
                                 >
                                     {val ? "Closer" : "Farther"}
@@ -311,7 +400,7 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
             {isSearchType && (
                 <View className="gap-2">
                     <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                    Custom Search Region
+                        Custom Search Region
                     </Text>
                     {hasCustomSearch ? (
                         <>
@@ -348,45 +437,80 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                             </Text>
                             <View className="flex-row gap-2">
                                 <Pressable
-                                    onPress={() => onPickLocationOnMap?.(editingKey, "B")}
+                                    onPress={() =>
+                                        onPickLocationOnMap?.(editingKey, "B")
+                                    }
                                     style={editorStyles.locationBtn}
                                     className="active:opacity-70"
                                 >
-                                    <Ionicons name="map-outline" size={20} color={colors.MEASURING} />
-                                    <Text className="text-xs mt-1 text-gray-500">Select on Map</Text>
+                                    <Ionicons
+                                        name="map-outline"
+                                        size={20}
+                                        color={colors.MEASURING}
+                                    />
+                                    <Text className="text-xs mt-1 text-gray-500">
+                                        Select on Map
+                                    </Text>
                                 </Pressable>
                                 <Pressable
                                     onPress={async () => {
-                                        const { status } = await Location.requestForegroundPermissionsAsync();
+                                        const { status } =
+                                            await Location.requestForegroundPermissionsAsync();
                                         if (status !== "granted") return;
-                                        const pos = await Location.getCurrentPositionAsync({
-                                            accuracy: Location.Accuracy.Balanced,
-                                        });
-                                        (data as any).poiSearchLat = pos.coords.latitude;
-                                        (data as any).poiSearchLng = pos.coords.longitude;
+                                        const pos =
+                                            await Location.getCurrentPositionAsync(
+                                                {
+                                                    accuracy:
+                                                        Location.Accuracy
+                                                            .Balanced,
+                                                },
+                                            );
+                                        (data as any).poiSearchLat =
+                                            pos.coords.latitude;
+                                        (data as any).poiSearchLng =
+                                            pos.coords.longitude;
                                         questionModified();
                                     }}
                                     style={editorStyles.locationBtn}
                                     className="active:opacity-70"
                                 >
-                                    <Ionicons name="locate-outline" size={20} color={colors.MEASURING} />
-                                    <Text className="text-xs mt-1 text-gray-500">Set to Current</Text>
+                                    <Ionicons
+                                        name="locate-outline"
+                                        size={20}
+                                        color={colors.MEASURING}
+                                    />
+                                    <Text className="text-xs mt-1 text-gray-500">
+                                        Set to Current
+                                    </Text>
                                 </Pressable>
                                 <Pressable
                                     onPress={async () => {
-                                        const text = await Clipboard.getStringAsync();
-                                        const parsed = parseCoordinatesFromText(text);
-                                        if (parsed.lat !== null && parsed.lng !== null) {
-                                            (data as any).poiSearchLat = parsed.lat;
-                                            (data as any).poiSearchLng = parsed.lng;
+                                        const text =
+                                            await Clipboard.getStringAsync();
+                                        const parsed =
+                                            parseCoordinatesFromText(text);
+                                        if (
+                                            parsed.lat !== null &&
+                                            parsed.lng !== null
+                                        ) {
+                                            (data as any).poiSearchLat =
+                                                parsed.lat;
+                                            (data as any).poiSearchLng =
+                                                parsed.lng;
                                             questionModified();
                                         }
                                     }}
                                     style={editorStyles.locationBtn}
                                     className="active:opacity-70"
                                 >
-                                    <Ionicons name="clipboard-outline" size={20} color={colors.MEASURING} />
-                                    <Text className="text-xs mt-1 text-gray-500">Paste</Text>
+                                    <Ionicons
+                                        name="clipboard-outline"
+                                        size={20}
+                                        color={colors.MEASURING}
+                                    />
+                                    <Text className="text-xs mt-1 text-gray-500">
+                                        Paste
+                                    </Text>
                                 </Pressable>
                             </View>
                         </>
@@ -402,27 +526,50 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     </Text>
                     {loadingPOIs ? (
                         <View className="flex-row items-center gap-3 px-1 py-2">
-                            <ActivityIndicator size="small" color={colors.MEASURING} />
-                            <Text className="text-base text-gray-400">Searching nearby…</Text>
+                            <ActivityIndicator
+                                size="small"
+                                color={colors.MEASURING}
+                            />
+                            <Text className="text-base text-gray-400">
+                                Searching nearby…
+                            </Text>
                         </View>
                     ) : poiCount === null ? (
-                        <Text className="text-base text-gray-400 px-1">No zone loaded</Text>
+                        <Text className="text-base text-gray-400 px-1">
+                            No zone loaded
+                        </Text>
                     ) : poiCount === 0 ? (
-                        <Text className="text-base text-gray-400 px-1">No locations found in this zone</Text>
+                        <Text className="text-base text-gray-400 px-1">
+                            No locations found in this zone
+                        </Text>
                     ) : (
                         <View style={poiInfoBoxStyle}>
                             <Text style={poiInfoCountStyle}>
-                                {poiCount} {poiCount === 1 ? "location" : "locations"} found
+                                {poiCount}{" "}
+                                {poiCount === 1 ? "location" : "locations"}{" "}
+                                found
                             </Text>
                             {nearestPOIName && (
                                 <>
-                                    <Text style={poiInfoNearestStyle} numberOfLines={1}>
-                                        <Text className="font-semibold">Nearest</Text>: {nearestPOIName}
+                                    <Text
+                                        style={poiInfoNearestStyle}
+                                        numberOfLines={1}
+                                    >
+                                        <Text className="font-semibold">
+                                            Nearest
+                                        </Text>
+                                        : {nearestPOIName}
                                     </Text>
-                                    <Text style={poiInfoNearestStyle} numberOfLines={1}>
-                                        <Text className="font-semibold">Distance</Text>: {nearestPOIDistanceKm !== null && (
-                                            `${nearestPOIDistanceKm < 100 ? nearestPOIDistanceKm.toFixed(1) : Math.round(nearestPOIDistanceKm)} km`
-                                        )}
+                                    <Text
+                                        style={poiInfoNearestStyle}
+                                        numberOfLines={1}
+                                    >
+                                        <Text className="font-semibold">
+                                            Distance
+                                        </Text>
+                                        :{" "}
+                                        {nearestPOIDistanceKm !== null &&
+                                            `${nearestPOIDistanceKm < 100 ? nearestPOIDistanceKm.toFixed(1) : Math.round(nearestPOIDistanceKm)} km`}
                                     </Text>
                                 </>
                             )}

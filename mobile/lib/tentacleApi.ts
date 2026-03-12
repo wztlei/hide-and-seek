@@ -16,7 +16,10 @@ const TENT_CACHE_MAX = 30;
 const TENT_LRU_KEY = "tent:__lru__";
 
 function tentStoreKey(
-    question: Pick<TraditionalTentacleQuestion, "lat" | "lng" | "radius" | "unit" | "locationType">,
+    question: Pick<
+        TraditionalTentacleQuestion,
+        "lat" | "lng" | "radius" | "unit" | "locationType"
+    >,
 ): string {
     const radiusMeters = Math.round(
         turf.convertLength(question.radius, question.unit, "meters"),
@@ -85,7 +88,10 @@ function parseElements(elements: any[]): Feature<Point>[] {
  * evicted automatically when the cap is exceeded.
  */
 export async function fetchTentacleLocations(
-    question: Pick<TraditionalTentacleQuestion, "lat" | "lng" | "radius" | "unit" | "locationType">,
+    question: Pick<
+        TraditionalTentacleQuestion,
+        "lat" | "lng" | "radius" | "unit" | "locationType"
+    >,
 ): Promise<FeatureCollection<Point>> {
     const storeKey = tentStoreKey(question);
 
@@ -98,7 +104,9 @@ export async function fetchTentacleLocations(
     // 2. In-flight dedup — return existing promise for concurrent callers.
     const inflight = tentInFlight.get(storeKey);
     if (inflight) {
-        return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<Point>;
     }
 
     // 3. Fetch from Overpass, persist, return.

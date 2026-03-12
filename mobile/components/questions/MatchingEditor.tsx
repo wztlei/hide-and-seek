@@ -6,8 +6,16 @@ import * as turf from "@turf/turf";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { mapGeoJSON, mapGeoLocation, questionModified } from "../../lib/context";
-import { fetchAvailableAdminLevels, fetchMatchingPOIs, type AdminSubLevel } from "../../lib/matchingApi";
+import {
+    mapGeoJSON,
+    mapGeoLocation,
+    questionModified,
+} from "../../lib/context";
+import {
+    fetchAvailableAdminLevels,
+    fetchMatchingPOIs,
+    type AdminSubLevel,
+} from "../../lib/matchingApi";
 import { LocationButtons } from "./LocationButtons";
 import { editorStyles } from "./editorStyles";
 
@@ -45,8 +53,17 @@ interface Props {
 }
 
 const POI_TYPES = new Set([
-    "aquarium", "zoo", "theme_park", "peak", "museum", "hospital",
-    "cinema", "library", "golf_course", "consulate", "park",
+    "aquarium",
+    "zoo",
+    "theme_park",
+    "peak",
+    "museum",
+    "hospital",
+    "cinema",
+    "library",
+    "golf_course",
+    "consulate",
+    "park",
 ]);
 
 const SEARCH_RADIUS_OPTIONS = [
@@ -56,7 +73,11 @@ const SEARCH_RADIUS_OPTIONS = [
     { km: null, label: "Full" },
 ] as const;
 
-export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props) {
+export function MatchingEditor({
+    data,
+    editingKey,
+    onPickLocationOnMap,
+}: Props) {
     const $mapGeoLocation = useStore(mapGeoLocation);
     const $mapGeoJSON = useStore(mapGeoJSON);
     const zoneOsmId = $mapGeoLocation.properties.osm_id;
@@ -83,8 +104,13 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                 setLoadingLevels(false);
                 // If the stored osmLevel is no longer in the list, reset to the
                 // first (most general) available level.
-                const current = (data as any).cat?.adminLevel as number | undefined;
-                if (levels.length > 0 && !levels.find((l) => l.osmLevel === current)) {
+                const current = (data as any).cat?.adminLevel as
+                    | number
+                    | undefined;
+                if (
+                    levels.length > 0 &&
+                    !levels.find((l) => l.osmLevel === current)
+                ) {
                     (data as any).cat = { adminLevel: levels[0].osmLevel };
                     questionModified();
                 }
@@ -92,7 +118,9 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
             .catch(() => {
                 if (!cancelled) setLoadingLevels(false);
             });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [data.lat, data.lng, zoneOsmId, isAdminType]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch nearby POIs for POI-based matching types.
@@ -104,13 +132,30 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
         }
         let cancelled = false;
         setLoadingPOIs(true);
-        const zoneBbox = turf.bbox($mapGeoJSON) as [number, number, number, number];
+        const zoneBbox = turf.bbox($mapGeoJSON) as [
+            number,
+            number,
+            number,
+            number,
+        ];
         const sr = (data as any).poiSearchRadius as number | null | undefined;
         const radiusKm = sr === null ? null : (sr ?? 100);
-        const bbox: [number, number, number, number] = radiusKm === null ? zoneBbox : (() => {
-            const cb = turf.bbox(turf.circle([data.lng, data.lat], radiusKm, { units: "kilometers" })) as [number, number, number, number];
-            return [Math.max(cb[0], zoneBbox[0]), Math.max(cb[1], zoneBbox[1]), Math.min(cb[2], zoneBbox[2]), Math.min(cb[3], zoneBbox[3])];
-        })();
+        const bbox: [number, number, number, number] =
+            radiusKm === null
+                ? zoneBbox
+                : (() => {
+                      const cb = turf.bbox(
+                          turf.circle([data.lng, data.lat], radiusKm, {
+                              units: "kilometers",
+                          }),
+                      ) as [number, number, number, number];
+                      return [
+                          Math.max(cb[0], zoneBbox[0]),
+                          Math.max(cb[1], zoneBbox[1]),
+                          Math.min(cb[2], zoneBbox[2]),
+                          Math.min(cb[3], zoneBbox[3]),
+                      ];
+                  })();
         fetchMatchingPOIs((data as any).type, bbox)
             .then((fc) => {
                 if (cancelled) return;
@@ -120,7 +165,9 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                         turf.point([data.lng, data.lat]),
                         fc as any,
                     );
-                    setNearestPOIName((nearest as any).properties?.name ?? null);
+                    setNearestPOIName(
+                        (nearest as any).properties?.name ?? null,
+                    );
                 } else {
                     setNearestPOIName(null);
                 }
@@ -129,10 +176,21 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
             .catch(() => {
                 if (!cancelled) setLoadingPOIs(false);
             });
-        return () => { cancelled = true; };
-    }, [(data as any).type, data.lat, data.lng, $mapGeoJSON, isPOIType, (data as any).poiSearchRadius]); // eslint-disable-line react-hooks/exhaustive-deps
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        (data as any).type,
+        data.lat,
+        data.lng,
+        $mapGeoJSON,
+        isPOIType,
+        (data as any).poiSearchRadius,
+    ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const selectedItem = SELECTABLE_DATA.find((d) => d.value === (data as any).type);
+    const selectedItem = SELECTABLE_DATA.find(
+        (d) => d.value === (data as any).type,
+    );
     const currentOsmLevel = (data as any).cat?.adminLevel as number | undefined;
 
     return (
@@ -151,7 +209,8 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                         if (item.isHeader) return;
                         (data as any).type = item.value;
                         if (item.value === "zone") {
-                            if (!(data as any).cat) (data as any).cat = { adminLevel: 4 };
+                            if (!(data as any).cat)
+                                (data as any).cat = { adminLevel: 4 };
                         }
                         questionModified();
                     }}
@@ -159,14 +218,29 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                         if (item.isHeader) {
                             return (
                                 <View style={groupHeaderStyle}>
-                                    <Text style={groupHeaderTextStyle}>{item.label}</Text>
+                                    <Text style={groupHeaderTextStyle}>
+                                        {item.label}
+                                    </Text>
                                 </View>
                             );
                         }
                         const selected = item.value === (data as any).type;
                         return (
-                            <View style={[dropdownItemStyle, selected && { backgroundColor: "#fffbeb" }]}>
-                                <Text style={[dropdownItemTextStyle, selected && { color: "#92400e", fontWeight: "600" }]}>
+                            <View
+                                style={[
+                                    dropdownItemStyle,
+                                    selected && { backgroundColor: "#fffbeb" },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        dropdownItemTextStyle,
+                                        selected && {
+                                            color: "#92400e",
+                                            fontWeight: "600",
+                                        },
+                                    ]}
+                                >
                                     {item.label}
                                 </Text>
                             </View>
@@ -178,9 +252,13 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                     placeholder="Select type…"
                     autoScroll={false}
                     flatListProps={{
-                        initialScrollIndex: dropdownInitialIndex((data as any).type ?? ""),
+                        initialScrollIndex: dropdownInitialIndex(
+                            (data as any).type ?? "",
+                        ),
                         getItemLayout: (_, index) => ({
-                            length: DROPDOWN_ITEM_LAYOUTS[index]?.length ?? DROPDOWN_ITEM_HEIGHT,
+                            length:
+                                DROPDOWN_ITEM_LAYOUTS[index]?.length ??
+                                DROPDOWN_ITEM_HEIGHT,
                             offset: DROPDOWN_ITEM_LAYOUTS[index]?.offset ?? 0,
                             index,
                         }),
@@ -196,26 +274,37 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                     </Text>
                     <View style={editorStyles.segmentRow}>
                         {SEARCH_RADIUS_OPTIONS.map(({ km, label }) => {
-                            const current = (data as any).poiSearchRadius as number | null | undefined;
-                            const selected = km === null
-                                ? current === null
-                                : (current === km || (km === 100 && current === undefined));
+                            const current = (data as any).poiSearchRadius as
+                                | number
+                                | null
+                                | undefined;
+                            const selected =
+                                km === null
+                                    ? current === null
+                                    : current === km ||
+                                      (km === 100 && current === undefined);
                             return (
                                 <Pressable
                                     key={String(km)}
                                     onPress={() => {
-                                        (data as any).poiSearchRadius = km === 100 ? undefined : km;
+                                        (data as any).poiSearchRadius =
+                                            km === 100 ? undefined : km;
                                         questionModified();
                                     }}
                                     style={[
                                         editorStyles.segmentItem,
-                                        selected && { backgroundColor: colors.MATCHING },
+                                        selected && {
+                                            backgroundColor: colors.MATCHING,
+                                        },
                                     ]}
                                 >
-                                    <Text style={[
-                                        editorStyles.segmentText,
-                                        selected && editorStyles.segmentTextSelected,
-                                    ]}>
+                                    <Text
+                                        style={[
+                                            editorStyles.segmentText,
+                                            selected &&
+                                                editorStyles.segmentTextSelected,
+                                        ]}
+                                    >
                                         {label}
                                     </Text>
                                 </Pressable>
@@ -234,7 +323,10 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
 
                     {loadingLevels ? (
                         <View className="flex-row items-center gap-3 px-1 py-2">
-                            <ActivityIndicator size="small" color={colors.MATCHING} />
+                            <ActivityIndicator
+                                size="small"
+                                color={colors.MATCHING}
+                            />
                             <Text className="text-base text-gray-400">
                                 Detecting sub-zones…
                             </Text>
@@ -250,24 +342,36 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                                 <Pressable
                                     key={level.osmLevel}
                                     onPress={() => {
-                                        if (!(data as any).cat) (data as any).cat = {};
-                                        (data as any).cat.adminLevel = level.osmLevel;
+                                        if (!(data as any).cat)
+                                            (data as any).cat = {};
+                                        (data as any).cat.adminLevel =
+                                            level.osmLevel;
                                         questionModified();
                                     }}
                                     style={[
                                         levelRowStyle,
-                                        selected && { backgroundColor: "#fffbeb", borderColor: colors.MATCHING },
+                                        selected && {
+                                            backgroundColor: "#fffbeb",
+                                            borderColor: colors.MATCHING,
+                                        },
                                     ]}
                                 >
                                     <View style={levelBadgeStyle(selected)}>
-                                        <Text style={levelBadgeTextStyle(selected)}>
+                                        <Text
+                                            style={levelBadgeTextStyle(
+                                                selected,
+                                            )}
+                                        >
                                             {level.relativeLevel}
                                         </Text>
                                     </View>
                                     <Text
                                         style={[
                                             levelNameStyle,
-                                            selected && { color: "#92400e", fontWeight: "600" },
+                                            selected && {
+                                                color: "#92400e",
+                                                fontWeight: "600",
+                                            },
                                         ]}
                                         numberOfLines={1}
                                     >
@@ -298,13 +402,16 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                                 style={[
                                     editorStyles.segmentItem,
                                     editorStyles.segmentItemWide,
-                                    selected && { backgroundColor: colors.MATCHING },
+                                    selected && {
+                                        backgroundColor: colors.MATCHING,
+                                    },
                                 ]}
                             >
                                 <Text
                                     style={[
                                         editorStyles.segmentText,
-                                        selected && editorStyles.segmentTextSelected,
+                                        selected &&
+                                            editorStyles.segmentTextSelected,
                                     ]}
                                 >
                                     {val ? "Same" : "Different"}
@@ -341,7 +448,10 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                     </Text>
                     {loadingPOIs ? (
                         <View className="flex-row items-center gap-3 px-1 py-2">
-                            <ActivityIndicator size="small" color={colors.MATCHING} />
+                            <ActivityIndicator
+                                size="small"
+                                color={colors.MATCHING}
+                            />
                             <Text className="text-base text-gray-400">
                                 Searching nearby…
                             </Text>
@@ -357,12 +467,17 @@ export function MatchingEditor({ data, editingKey, onPickLocationOnMap }: Props)
                     ) : (
                         <View style={poiInfoBoxStyle}>
                             {nearestPOIName && (
-                                <Text style={poiInfoNearestStyle} numberOfLines={1}>
+                                <Text
+                                    style={poiInfoNearestStyle}
+                                    numberOfLines={1}
+                                >
                                     Nearest: {nearestPOIName}
                                 </Text>
                             )}
                             <Text style={poiInfoCountStyle}>
-                                {poiCount} {poiCount === 1 ? "location" : "locations"} fetched
+                                {poiCount}{" "}
+                                {poiCount === 1 ? "location" : "locations"}{" "}
+                                fetched
                             </Text>
                         </View>
                     )}
@@ -388,24 +503,27 @@ const dropdownStyle = {
 };
 
 // Heights must match the rendered item styles below so getItemLayout is accurate.
-const DROPDOWN_ITEM_HEIGHT = 44;   // paddingVertical 12 * 2 + ~20 text
+const DROPDOWN_ITEM_HEIGHT = 44; // paddingVertical 12 * 2 + ~20 text
 const DROPDOWN_HEADER_HEIGHT = 28; // paddingTop 10 + paddingBottom 4 + ~14 text
 
 // Precompute cumulative offsets once so getItemLayout is O(1).
-const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<{ length: number; offset: number }[]>(
-    (acc, item, i) => {
-        const length = item.isHeader ? DROPDOWN_HEADER_HEIGHT : DROPDOWN_ITEM_HEIGHT;
-        const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
-        acc.push({ length, offset });
-        return acc;
-    },
-    [],
-);
+const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<
+    { length: number; offset: number }[]
+>((acc, item, i) => {
+    const length = item.isHeader
+        ? DROPDOWN_HEADER_HEIGHT
+        : DROPDOWN_ITEM_HEIGHT;
+    const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
+    acc.push({ length, offset });
+    return acc;
+}, []);
 
 /** Returns the index in DROPDOWN_DATA for the given value, or undefined if not found / empty. */
 function dropdownInitialIndex(selectedValue: string): number | undefined {
     if (!selectedValue) return undefined;
-    const idx = DROPDOWN_DATA.findIndex((d) => !d.isHeader && d.value === selectedValue);
+    const idx = DROPDOWN_DATA.findIndex(
+        (d) => !d.isHeader && d.value === selectedValue,
+    );
     return idx > 0 ? idx : undefined;
 }
 

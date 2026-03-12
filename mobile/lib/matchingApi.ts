@@ -1,5 +1,11 @@
 import * as turf from "@turf/turf";
-import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
+import type {
+    Feature,
+    FeatureCollection,
+    MultiPolygon,
+    Point,
+    Polygon,
+} from "geojson";
 import osmtogeojson from "osmtogeojson";
 
 import { LOCATION_FIRST_TAG, OVERPASS_API } from "../../src/maps/api/constants";
@@ -7,10 +13,16 @@ import { deleteCached, getCached, setCached } from "./storage";
 
 // ── In-memory caches keyed on stringified params ───────────────────────────
 
-const adminBoundaryCache = new Map<string, Promise<Feature<Polygon | MultiPolygon> | null>>();
+const adminBoundaryCache = new Map<
+    string,
+    Promise<Feature<Polygon | MultiPolygon> | null>
+>();
 const adminSubLevelsCache = new Map<string, Promise<AdminSubLevel[]>>();
-const airportsCache: { promise: Promise<FeatureCollection<Point>> | null } = { promise: null };
-const majorCitiesCache: { promise: Promise<FeatureCollection<Point>> | null } = { promise: null };
+const airportsCache: { promise: Promise<FeatureCollection<Point>> | null } = {
+    promise: null,
+};
+const majorCitiesCache: { promise: Promise<FeatureCollection<Point>> | null } =
+    { promise: null };
 
 // ── POI persistent LRU cache ──────────────────────────────────────────────
 //
@@ -24,7 +36,10 @@ const majorCitiesCache: { promise: Promise<FeatureCollection<Point>> | null } = 
 const POI_CACHE_MAX = 50;
 const POI_LRU_KEY = "poi:__lru__";
 
-function poiStoreKey(type: string, bbox: [number, number, number, number]): string {
+function poiStoreKey(
+    type: string,
+    bbox: [number, number, number, number],
+): string {
     return `poi:${type}:${bbox.map((n) => n.toFixed(2)).join(",")}`;
 }
 
@@ -85,7 +100,8 @@ export async function fetchAdminBoundary(
         const feature = geo.features.find(
             (f: any) =>
                 f.geometry &&
-                (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon"),
+                (f.geometry.type === "Polygon" ||
+                    f.geometry.type === "MultiPolygon"),
         ) as Feature<Polygon | MultiPolygon> | undefined;
         if (!feature) return null;
 
@@ -155,7 +171,10 @@ export async function fetchAvailableAdminLevels(
         });
 
         // Sort ascending (most general first) and deduplicate by osmLevel.
-        filtered.sort((a, b) => parseInt(a.tags.admin_level) - parseInt(b.tags.admin_level));
+        filtered.sort(
+            (a, b) =>
+                parseInt(a.tags.admin_level) - parseInt(b.tags.admin_level),
+        );
         const seen = new Set<number>();
         const result: AdminSubLevel[] = [];
         for (const el of filtered) {
@@ -165,7 +184,10 @@ export async function fetchAvailableAdminLevels(
             result.push({
                 osmLevel,
                 relativeLevel: result.length + 1,
-                name: el.tags["name:en"] ?? el.tags["name"] ?? `Level ${result.length + 1}`,
+                name:
+                    el.tags["name:en"] ??
+                    el.tags["name"] ??
+                    `Level ${result.length + 1}`,
             });
         }
         return result;
@@ -174,7 +196,6 @@ export async function fetchAvailableAdminLevels(
     adminSubLevelsCache.set(key, promise);
     return promise;
 }
-
 
 // ── Airports (Overpass, global) ────────────────────────────────────────────
 
@@ -273,7 +294,9 @@ export async function fetchMatchingPOIs(
     // 2. In-flight dedup — return existing promise for the same key.
     const inflight = poiInFlight.get(storeKey);
     if (inflight) {
-        return turf.featureCollection(await inflight) as FeatureCollection<Point>;
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<Point>;
     }
 
     // 3. Fetch from Overpass, persist, return.

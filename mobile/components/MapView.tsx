@@ -12,7 +12,13 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
-import { mapGeoJSON, mapGeoLocation, questionModified, questions, thunderforestApiKey } from "../lib/context";
+import {
+    mapGeoJSON,
+    mapGeoLocation,
+    questionModified,
+    questions,
+    thunderforestApiKey,
+} from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useUserLocation } from "../hooks/useUserLocation";
@@ -92,7 +98,16 @@ export function AppMapView() {
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
-    const { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions, isComputingLayers } = useEliminationMask();
+    const {
+        eliminationMask,
+        zoneBoundary,
+        radiusRegions,
+        thermometerRegions,
+        tentaclesRegions,
+        matchingRegions,
+        measuringRegions,
+        isComputingLayers,
+    } = useEliminationMask();
     const { isLoadingZone } = useZoneBoundary();
     const {
         userCoord,
@@ -149,8 +164,11 @@ export function AppMapView() {
     const mapCenterRef = useRef<[number, number]>(initialCenter);
 
     const getMapCenter = useCallback((): [number, number] => {
-        mapRef.current?.getCenter()
-            .then((c) => { if (c) mapCenterRef.current = c as [number, number]; })
+        mapRef.current
+            ?.getCenter()
+            .then((c) => {
+                if (c) mapCenterRef.current = c as [number, number];
+            })
             .catch(() => {});
         return mapCenterRef.current;
     }, []);
@@ -196,7 +214,10 @@ export function AppMapView() {
         // Draft questions live outside the store — update the atom directly.
         const draft = draftQuestion.get();
         if (draft && draft.key === pickingLocationForKey) {
-            const updated = { ...draft, data: { ...draft.data } } as typeof draft;
+            const updated = {
+                ...draft,
+                data: { ...draft.data },
+            } as typeof draft;
             if (draft.id === "thermometer") {
                 if (pickingLocationField === "A") {
                     (updated.data as any).lngA = pendingCoord[0];
@@ -205,7 +226,10 @@ export function AppMapView() {
                     (updated.data as any).lngB = pendingCoord[0];
                     (updated.data as any).latB = pendingCoord[1];
                 }
-            } else if (draft.id === "measuring" && pickingLocationField === "B") {
+            } else if (
+                draft.id === "measuring" &&
+                pickingLocationField === "B"
+            ) {
                 (updated.data as any).poiSearchLng = pendingCoord[0];
                 (updated.data as any).poiSearchLat = pendingCoord[1];
             } else {
@@ -252,7 +276,12 @@ export function AppMapView() {
             questionModified();
         }
         finishPicking(pickingLocationForKey);
-    }, [pendingCoord, pickingLocationForKey, pickingLocationField, finishPicking]);
+    }, [
+        pendingCoord,
+        pickingLocationForKey,
+        pickingLocationField,
+        finishPicking,
+    ]);
 
     const handleMarkerPress = useCallback((key: number) => {
         setEditingQuestionKey(key);
@@ -270,11 +299,8 @@ export function AppMapView() {
                 compassEnabled
                 logoEnabled={false}
                 attributionEnabled={false}
-onPress={(feature) => {
-                    if (
-                        pickingLocationForKey === null ||
-                        !pickReadyRef.current
-                    )
+                onPress={(feature) => {
+                    if (pickingLocationForKey === null || !pickReadyRef.current)
                         return;
                     if (feature.geometry.type !== "Point") return;
                     const [lng, lat] = feature.geometry.coordinates as [
@@ -314,7 +340,7 @@ onPress={(feature) => {
                 />
             </MLMapView>
 
-            {(isComputingLayers) && (
+            {isComputingLayers && (
                 <View style={styles.mapSpinner} pointerEvents="none">
                     <View style={styles.mapSpinnerPill}>
                         <ActivityIndicator size="small" color="#4f46e5" />

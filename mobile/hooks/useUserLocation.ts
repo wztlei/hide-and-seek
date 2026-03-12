@@ -28,10 +28,7 @@ export function useUserLocation(cameraRef: RefObject<CameraRef | null>) {
             });
             if (cancelled) return;
             cameraRef.current?.setCamera({
-                centerCoordinate: [
-                    pos.coords.longitude,
-                    pos.coords.latitude,
-                ],
+                centerCoordinate: [pos.coords.longitude, pos.coords.latitude],
                 zoomLevel: 13,
                 animationMode: "flyTo",
                 animationDuration: 800,
@@ -64,5 +61,10 @@ export function useUserLocation(cameraRef: RefObject<CameraRef | null>) {
         [],
     );
 
-    return { userCoord, hasLocationPermission, zoomToUserLocation, handleLocationUpdate };
+    return {
+        userCoord,
+        hasLocationPermission,
+        zoomToUserLocation,
+        handleLocationUpdate,
+    };
 }

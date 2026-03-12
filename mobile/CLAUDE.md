@@ -171,24 +171,26 @@ Wrap the app root with `<GestureHandlerRootView>` (react-native-gesture-handler)
 
 ```tsx
 import BottomSheet, {
-  BottomSheetScrollView,
-  BottomSheetBackdrop,
-} from '@gorhom/bottom-sheet';
+    BottomSheetScrollView,
+    BottomSheetBackdrop,
+} from "@gorhom/bottom-sheet";
 
 <BottomSheet
-  ref={sheetRef}
-  snapPoints={['80%']}
-  enableDynamicSizing={false}   // REQUIRED when using snapPoints — see note below
-  enablePanDownToClose
-  backdropComponent={(props) => (
-    <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
-  )}
-  onClose={handleClose}
+    ref={sheetRef}
+    snapPoints={["80%"]}
+    enableDynamicSizing={false} // REQUIRED when using snapPoints — see note below
+    enablePanDownToClose
+    backdropComponent={(props) => (
+        <BottomSheetBackdrop
+            {...props}
+            disappearsOnIndex={-1}
+            appearsOnIndex={0}
+        />
+    )}
+    onClose={handleClose}
 >
-  <BottomSheetScrollView>
-    {/* content */}
-  </BottomSheetScrollView>
-</BottomSheet>
+    <BottomSheetScrollView>{/* content */}</BottomSheetScrollView>
+</BottomSheet>;
 ```
 
 ### Critical: `enableDynamicSizing={false}`
@@ -198,7 +200,7 @@ In v5, `enableDynamicSizing` defaults to `true`. When `snapPoints` are also prov
 ### Imperative control
 
 ```ts
-sheetRef.current?.expand();   // open to first snap point
-sheetRef.current?.close();    // animate closed
+sheetRef.current?.expand(); // open to first snap point
+sheetRef.current?.close(); // animate closed
 sheetRef.current?.snapToIndex(0);
 ```

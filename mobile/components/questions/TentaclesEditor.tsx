@@ -1,7 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import {
+    ActivityIndicator,
+    Pressable,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
 
 import type { Feature, Point } from "geojson";
@@ -36,7 +42,12 @@ interface Props {
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
 }
 
-export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }: Props) {
+export function TentaclesEditor({
+    data,
+    editingKey,
+    isNew,
+    onPickLocationOnMap,
+}: Props) {
     const $questions = useStore(questions) as Questions;
     const $draftQuestion = useStore(draftQuestion);
 
@@ -56,7 +67,8 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
         const stored = $questions.find((x) => x.key === editingKey);
         const q =
             (stored?.id === "tentacles" ? stored : null) ??
-            ($draftQuestion?.key === editingKey && $draftQuestion.id === "tentacles"
+            ($draftQuestion?.key === editingKey &&
+            $draftQuestion.id === "tentacles"
                 ? $draftQuestion
                 : null);
         if (!q) return null;
@@ -95,7 +107,7 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
 
     const selectedPoiName =
         data.location !== false
-            ? (data.location as any).properties?.name ?? null
+            ? ((data.location as any).properties?.name ?? null)
             : null;
 
     const poiOptions = [...pois]
@@ -137,7 +149,13 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
                 <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                     Radius
                 </Text>
-                <View style={{ flexDirection: "row", alignItems: "stretch", gap: 12 }}>
+                <View
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "stretch",
+                        gap: 12,
+                    }}
+                >
                     <TextInput
                         value={radiusText}
                         onChangeText={(text) => {
@@ -154,33 +172,43 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
                         selectTextOnFocus
                     />
                     <View style={[editorStyles.segmentRow, { height: 44 }]}>
-                        {(["miles", "kilometers", "meters"] as const).map((u) => {
-                            const selected = data.unit === u;
-                            const label =
-                                u === "miles" ? "mi" : u === "kilometers" ? "km" : "m";
-                            return (
-                                <Pressable
-                                    key={u}
-                                    onPress={() => {
-                                        data.unit = u;
-                                        questionModified();
-                                    }}
-                                    style={[
-                                        editorStyles.segmentItem,
-                                        selected && { backgroundColor: colors.TENTACLES },
-                                    ]}
-                                >
-                                    <Text
+                        {(["miles", "kilometers", "meters"] as const).map(
+                            (u) => {
+                                const selected = data.unit === u;
+                                const label =
+                                    u === "miles"
+                                        ? "mi"
+                                        : u === "kilometers"
+                                          ? "km"
+                                          : "m";
+                                return (
+                                    <Pressable
+                                        key={u}
+                                        onPress={() => {
+                                            data.unit = u;
+                                            questionModified();
+                                        }}
                                         style={[
-                                            editorStyles.segmentText,
-                                            selected && editorStyles.segmentTextSelected,
+                                            editorStyles.segmentItem,
+                                            selected && {
+                                                backgroundColor:
+                                                    colors.TENTACLES,
+                                            },
                                         ]}
                                     >
-                                        {label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
+                                        <Text
+                                            style={[
+                                                editorStyles.segmentText,
+                                                selected &&
+                                                    editorStyles.segmentTextSelected,
+                                            ]}
+                                        >
+                                            {label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            },
+                        )}
                     </View>
                 </View>
             </View>
@@ -205,13 +233,16 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
                                 style={[
                                     editorStyles.segmentItem,
                                     editorStyles.segmentItemWide,
-                                    selected && { backgroundColor: colors.TENTACLES },
+                                    selected && {
+                                        backgroundColor: colors.TENTACLES,
+                                    },
                                 ]}
                             >
                                 <Text
                                     style={[
                                         editorStyles.segmentText,
-                                        selected && editorStyles.segmentTextSelected,
+                                        selected &&
+                                            editorStyles.segmentTextSelected,
                                     ]}
                                 >
                                     {label}
@@ -223,7 +254,10 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
             </View>
 
             <View className="gap-2">
-                <Text className="text-sm font-semibold uppercase tracking-wide" style={{ color: data.within ? "#6b7280" : "#d1d5db" }}>
+                <Text
+                    className="text-sm font-semibold uppercase tracking-wide"
+                    style={{ color: data.within ? "#6b7280" : "#d1d5db" }}
+                >
                     Location Type
                 </Text>
                 <Dropdown
@@ -238,7 +272,10 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
                         questionModified();
                     }}
                     disable={!data.within}
-                    style={[dropdownStyle.container, !data.within && { opacity: 0.45 }]}
+                    style={[
+                        dropdownStyle.container,
+                        !data.within && { opacity: 0.45 },
+                    ]}
                     selectedTextStyle={dropdownStyle.selectedText}
                     itemTextStyle={dropdownStyle.itemText}
                     activeColor="#dcfce7"
@@ -247,17 +284,38 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
             </View>
 
             <View className="gap-2">
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text className="text-sm font-semibold uppercase tracking-wide" style={{ color: data.within ? "#6b7280" : "#d1d5db" }}>
+                <View
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                    }}
+                >
+                    <Text
+                        className="text-sm font-semibold uppercase tracking-wide"
+                        style={{ color: data.within ? "#6b7280" : "#d1d5db" }}
+                    >
                         Location
                     </Text>
-                    <Pressable onPress={handleReload} hitSlop={8} style={{ padding: 2 }} disabled={!data.within}>
-                        <Ionicons name="refresh-outline" size={18} color={data.within ? "#6b7280" : "#d1d5db"} />
+                    <Pressable
+                        onPress={handleReload}
+                        hitSlop={8}
+                        style={{ padding: 2 }}
+                        disabled={!data.within}
+                    >
+                        <Ionicons
+                            name="refresh-outline"
+                            size={18}
+                            color={data.within ? "#6b7280" : "#d1d5db"}
+                        />
                     </Pressable>
                 </View>
                 {loading ? (
                     <View className="flex-row items-center gap-3 px-1 py-3">
-                        <ActivityIndicator size="small" color={colors.TENTACLES} />
+                        <ActivityIndicator
+                            size="small"
+                            color={colors.TENTACLES}
+                        />
                         <Text className="text-base text-gray-400">
                             Loading{" "}
                             {LOCATION_TYPE_LABELS[data.locationType] ??
@@ -285,7 +343,9 @@ export function TentaclesEditor({ data, editingKey, isNew, onPickLocationOnMap }
                         disable={!data.within || pois.length === 0}
                         style={[
                             dropdownStyle.container,
-                            (!data.within || pois.length === 0) && { opacity: 0.45 },
+                            (!data.within || pois.length === 0) && {
+                                opacity: 0.45,
+                            },
                         ]}
                         selectedTextStyle={dropdownStyle.selectedText}
                         itemTextStyle={dropdownStyle.itemText}

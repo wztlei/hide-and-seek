@@ -48,11 +48,7 @@ export function PickLocationBanner({
                         hitSlop={8}
                         className="active:opacity-70"
                     >
-                        <Ionicons
-                            name="close-circle"
-                            size={26}
-                            color="white"
-                        />
+                        <Ionicons name="close-circle" size={26} color="white" />
                     </Pressable>
                 </>
             ) : (
@@ -74,11 +70,7 @@ export function PickLocationBanner({
                         hitSlop={8}
                         className="active:opacity-70"
                     >
-                        <Ionicons
-                            name="close-circle"
-                            size={26}
-                            color="white"
-                        />
+                        <Ionicons name="close-circle" size={26} color="white" />
                     </Pressable>
                 </>
             )}
