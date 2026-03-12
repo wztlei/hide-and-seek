@@ -41,7 +41,7 @@
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",
-          "project": "react-native",
+          "project": "jet-lag-hide-and-seek",
           "organization": "wztlei"
         }
       ]
