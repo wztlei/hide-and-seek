@@ -764,10 +764,10 @@ async function resolveMeasuringBuffer(
         case "coastline": {
             const coastline = await fetchCoastline();
 
-            // Pre-filter to candidates within ±5° (~555 km) before the expensive
-            // nearestPointOnLine loop, reducing 1400+ global features to ~10.
+            // Use a ±5° rough pad around the seeker to find the nearest coast
+            // distance, reducing 1400+ global features to ~10 for the search.
             const ROUGH_PAD = 5;
-            const candidates = coastline.features.filter((f) => {
+            const seekerCandidates = coastline.features.filter((f) => {
                 const [w, s, e, n] = turf.bbox(f);
                 return (
                     w <= lng + ROUGH_PAD &&
@@ -776,16 +776,12 @@ async function resolveMeasuringBuffer(
                     n >= lat - ROUGH_PAD
                 );
             });
-            if (!candidates.length) return null;
+            if (!seekerCandidates.length) return null;
 
-            // Find the nearest point across all candidates, recording the feature
-            // and its `location` (distance along the line in km) so we can slice
-            // out just the relevant strip before buffering.
+            // Find the seeker's distance to the nearest coastline segment.
             const target = turf.point([lng, lat]);
             let bestDist = Infinity;
-            let bestFeature: Feature<LineString> | null = null;
-            let bestLocation = 0;
-            for (const f of candidates) {
+            for (const f of seekerCandidates) {
                 try {
                     const np = turf.nearestPointOnLine(
                         f as Feature<LineString>,
@@ -793,44 +789,42 @@ async function resolveMeasuringBuffer(
                         { units: "kilometers" },
                     );
                     const d = np.properties.dist ?? Infinity;
-                    if (d < bestDist) {
-                        bestDist = d;
-                        bestLocation = np.properties.location ?? 0;
-                        bestFeature = f as Feature<LineString>;
-                    }
+                    if (d < bestDist) bestDist = d;
                 } catch {
                     // skip degenerate segments
                 }
             }
-            if (!bestFeature || !isFinite(bestDist)) return null;
+            if (!isFinite(bestDist)) return null;
 
-            // Slice just the relevant strip of the coastline (±2× buffer distance
-            // around the nearest point) so we buffer ~10–120 km instead of the
-            // entire global feature.
-            let segment: Feature<LineString> = bestFeature;
-            try {
-                segment = turf.lineSliceAlong(
-                    bestFeature,
-                    Math.max(0, bestLocation - bestDist * 2),
-                    bestLocation + bestDist * 2,
-                    { units: "kilometers" },
-                );
-            } catch {
-                // fallback to full feature if slice fails
-            }
-
-            const simplified = turf.simplify(segment, {
-                tolerance: 0.01,
-                highQuality: false,
+            // Buffer all coastline features that overlap the game zone — not just
+            // the strip nearest the seeker — so the result covers the whole zone.
+            const [zw, zs, ze, zn] = turf.bbox(zoneOrNull);
+            const zoneFeatures = coastline.features.filter((f) => {
+                const [w, s, e, n] = turf.bbox(f);
+                return w <= ze && e >= zw && s <= zn && n >= zs;
             });
+            if (!zoneFeatures.length) return null;
 
-            const buffered = turf.buffer(simplified, bestDist, {
+            const simplified = turf.simplify(
+                turf.featureCollection(zoneFeatures),
+                { tolerance: 0.01, highQuality: false },
+            );
+
+            const bufferFC = turf.buffer(simplified, bestDist, {
                 units: "kilometers",
             });
-            if (!buffered) return null;
+            if (!bufferFC?.features.length) return null;
+
+            const buffer =
+                bufferFC.features.length === 1
+                    ? (bufferFC.features[0] as Feature<Polygon | MultiPolygon>)
+                    : (turf.union(
+                          turf.featureCollection(bufferFC.features),
+                      ) as Feature<Polygon | MultiPolygon> | null);
+            if (!buffer) return null;
 
             return {
-                buffer: trunc(buffered as Feature<Polygon | MultiPolygon>),
+                buffer: trunc(buffer),
                 pois: [],
                 circles: [],
             };
