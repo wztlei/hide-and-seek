@@ -350,6 +350,7 @@ export function AppMapView() {
                     userCoord={userCoord}
                     pendingCoord={pendingCoord}
                     onMarkerPress={handleMarkerPress}
+                    isPickMode={pickingLocationForKey !== null}
                 />
             </MLMapView>
 

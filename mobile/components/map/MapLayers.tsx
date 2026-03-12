@@ -51,6 +51,8 @@ interface Props {
     pendingCoord: [number, number] | null;
     /** Called when any question marker is tapped. Opens the edit panel. */
     onMarkerPress: (key: number) => void;
+    /** When true (pick-mode active), marker Pressables are disabled so taps reach the map. */
+    isPickMode: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ export function MapLayers({
     userCoord,
     pendingCoord,
     onMarkerPress,
+    isPickMode,
 }: Props) {
     // ── Consolidated FeatureCollections (one per question type) ──────────────
     // Each replaces N per-question ShapeSources with a single source, reducing
@@ -391,6 +394,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View style={styles.radiusMarker}>
@@ -414,6 +418,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View
@@ -432,6 +437,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View
@@ -456,6 +462,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View style={styles.tentaclesMarker}>
@@ -484,6 +491,7 @@ export function MapLayers({
                           >
                               <Pressable
                                   onPress={() => onMarkerPress(key)}
+                                  pointerEvents={isPickMode ? "none" : "auto"}
                                   hitSlop={8}
                               >
                                   <View style={styles.tentaclesLocationMarker}>
@@ -509,6 +517,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View style={styles.matchingMarker}>
@@ -532,6 +541,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View style={styles.measuringMarker}>
@@ -562,6 +572,7 @@ export function MapLayers({
                     >
                         <Pressable
                             onPress={() => onMarkerPress(q.key)}
+                            pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
                             <View style={styles.measuringSearchMarker}>
