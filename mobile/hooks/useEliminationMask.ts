@@ -52,11 +52,9 @@ export type MatchingRegion = {
 export type MeasuringRegion = {
     key: number;
     region: Feature<Polygon | MultiPolygon>;
-    /** POIs near the seeker location used as distance reference. */
+    /** POIs used as distance reference (fetched around the active search center). */
     pois: Feature<Point>[];
-    /** POIs found exclusively via the additional search region (deduplicated against pois). */
-    additionalPois: Feature<Point>[];
-    /** Per-POI buffer circles (seeker + additional area, proportionally capped). */
+    /** Per-POI buffer circles. */
     circles: Feature<Polygon>[];
 };
 
@@ -464,7 +462,7 @@ async function computeMeasuringRegions(
                 ? turf.difference(turf.featureCollection([zone, buffer]))
                 : turf.intersect(turf.featureCollection([zone, buffer]));
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, additionalPois: result.additionalPois, circles: result.circles });
+            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, circles: result.circles });
         } catch {
             // Network error — skip silently
         }
@@ -504,18 +502,6 @@ function poiBbox(
  * (rounded to 4 dp, ~11 m precision). Used to deduplicate additional-region
  * fetches against the seeker-region fetch.
  */
-function deduplicatePois(
-    candidates: Feature<Point>[],
-    existing: Feature<Point>[],
-): Feature<Point>[] {
-    const seen = new Set(
-        existing.map((f) => `${f.geometry.coordinates[0].toFixed(4)},${f.geometry.coordinates[1].toFixed(4)}`),
-    );
-    return candidates.filter(
-        (f) => !seen.has(`${f.geometry.coordinates[0].toFixed(4)},${f.geometry.coordinates[1].toFixed(4)}`),
-    );
-}
-
 /** Removes POI features that lie outside the game zone polygon. */
 function filterPoisByZone(
     pois: Feature<Point>[],
@@ -592,43 +578,17 @@ const MAX_UNION_POIS = 50;
 function buildPOIUnionBuffer(
     lng: number,
     lat: number,
-    seekerPois: Feature<Point>[],
-    additionalCenterLng: number,
-    additionalCenterLat: number,
-    additionalPois: Feature<Point>[],
+    pois: Feature<Point>[],
     label: string,
 ): { union: Feature<Polygon | MultiPolygon>; circles: Feature<Polygon>[] } | null {
-    if (seekerPois.length === 0 && additionalPois.length === 0) return null;
+    if (pois.length === 0) return null;
 
     const seekerPt = turf.point([lng, lat]);
-    const additionalPt = turf.point([additionalCenterLng, additionalCenterLat]);
 
-    // Sort seeker POIs by distance from the seeker; additional POIs by distance
-    // from their own center so the nearest ones are always represented.
-    const sortedSeeker = seekerPois
+    const selected = pois
         .map((poi) => ({ poi, seekerDist: turf.distance(seekerPt, poi, { units: "kilometers" }) }))
-        .sort((a, b) => a.seekerDist - b.seekerDist);
-    const sortedAdditional = additionalPois
-        .map((poi) => ({
-            poi,
-            seekerDist: turf.distance(seekerPt, poi, { units: "kilometers" }),
-            addDist: turf.distance(additionalPt, poi, { units: "kilometers" }),
-        }))
-        .sort((a, b) => a.addDist - b.addDist);
-
-    // Proportional cap: each group gets up to half of MAX_UNION_POIS,
-    // with unused slots redistributed to the other group.
-    const half = Math.ceil(MAX_UNION_POIS / 2);
-    const seekerCount = Math.min(
-        sortedSeeker.length,
-        half + Math.max(0, half - sortedAdditional.length),
-    );
-    const additionalCount = Math.min(sortedAdditional.length, MAX_UNION_POIS - seekerCount);
-
-    const selected = [
-        ...sortedSeeker.slice(0, seekerCount).map(({ poi, seekerDist }) => ({ poi, seekerDist })),
-        ...sortedAdditional.slice(0, additionalCount).map(({ poi, seekerDist }) => ({ poi, seekerDist })),
-    ];
+        .sort((a, b) => a.seekerDist - b.seekerDist)
+        .slice(0, MAX_UNION_POIS);
     if (selected.length === 0) return null;
 
     // Radius = seeker → nearest POI across all selected POIs.
@@ -658,13 +618,11 @@ async function resolveMeasuringBuffer(
 ): Promise<{
     buffer: Feature<Polygon | MultiPolygon>;
     pois: Feature<Point>[];
-    additionalPois: Feature<Point>[];
     circles: Feature<Polygon>[];
 } | null> {
     const { lat, lng, type } = q.data;
-    const hasAdditionalSearch = (q.data as any).poiSearchLat != null;
     const searchRadius = (q.data as any).poiSearchRadius as number | null | undefined;
-    // Effective search center — falls back to seeker when not explicitly set.
+    // Search center — falls back to seeker when not explicitly set.
     const searchLat = (q.data as any).poiSearchLat as number | undefined ?? lat;
     const searchLng = (q.data as any).poiSearchLng as number | undefined ?? lng;
 
@@ -679,35 +637,23 @@ async function resolveMeasuringBuffer(
             });
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, { units: "kilometers" });
             const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer, pois: [], additionalPois: [], circles: [] } : null;
+            return buffer ? { buffer, pois: [], circles: [] } : null;
         }
 
         case "airport": {
-            const seekerBbox = poiBbox(lng, lat, searchRadius, zoneOrNull);
-            const seekerPts = (await fetchMeasuringAirports(seekerBbox)).features as Feature<Point>[];
-            let additionalPts: Feature<Point>[] = [];
-            if (hasAdditionalSearch) {
-                const addBbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
-                const addFc = await fetchMeasuringAirports(addBbox);
-                additionalPts = deduplicatePois(addFc.features as Feature<Point>[], seekerPts);
-            }
-            const result = buildPOIUnionBuffer(lng, lat, seekerPts, searchLng, searchLat, additionalPts, "airport");
+            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
+            const pts = (await fetchMeasuringAirports(bbox)).features as Feature<Point>[];
+            const result = buildPOIUnionBuffer(lng, lat, pts, "airport");
             if (!result) return null;
-            return { buffer: result.union, circles: result.circles, pois: seekerPts, additionalPois: additionalPts };
+            return { buffer: result.union, circles: result.circles, pois: pts };
         }
 
         case "city": {
-            const seekerBbox = poiBbox(lng, lat, searchRadius, zoneOrNull);
-            const seekerPts = (await fetchCities(seekerBbox)).features as Feature<Point>[];
-            let additionalPts: Feature<Point>[] = [];
-            if (hasAdditionalSearch) {
-                const addBbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
-                const addFc = await fetchCities(addBbox);
-                additionalPts = deduplicatePois(addFc.features as Feature<Point>[], seekerPts);
-            }
-            const result = buildPOIUnionBuffer(lng, lat, seekerPts, searchLng, searchLat, additionalPts, "city");
+            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
+            const pts = (await fetchCities(bbox)).features as Feature<Point>[];
+            const result = buildPOIUnionBuffer(lng, lat, pts, "city");
             if (!result) return null;
-            return { buffer: result.union, circles: result.circles, pois: seekerPts, additionalPois: additionalPts };
+            return { buffer: result.union, circles: result.circles, pois: pts };
         }
 
         case "highspeed-measure-shinkansen": {
@@ -716,7 +662,7 @@ async function resolveMeasuringBuffer(
             if (!nearest) return null;
             const bufferFC = turf.buffer(lines, nearest.distanceKm, { units: "kilometers" });
             const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer, pois: [], additionalPois: [], circles: [] } : null;
+            return buffer ? { buffer, pois: [], circles: [] } : null;
         }
 
         case "aquarium":
@@ -741,23 +687,14 @@ async function resolveMeasuringBuffer(
         case "golf_course-full":
         case "consulate-full":
         case "park-full": {
-            const seekerBbox = poiBbox(lng, lat, searchRadius, zoneOrNull);
-            const seekerPts = filterPoisByZone(
-                (await fetchMeasuringPOIs(type, seekerBbox)).features as Feature<Point>[],
+            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
+            const pts = filterPoisByZone(
+                (await fetchMeasuringPOIs(type, bbox)).features as Feature<Point>[],
                 zoneOrNull,
             );
-            let additionalPts: Feature<Point>[] = [];
-            if (hasAdditionalSearch) {
-                const addBbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
-                const addFiltered = filterPoisByZone(
-                    (await fetchMeasuringPOIs(type, addBbox)).features as Feature<Point>[],
-                    zoneOrNull,
-                );
-                additionalPts = deduplicatePois(addFiltered, seekerPts);
-            }
-            const result = buildPOIUnionBuffer(lng, lat, seekerPts, searchLng, searchLat, additionalPts, type);
+            const result = buildPOIUnionBuffer(lng, lat, pts, type);
             if (!result) return null;
-            return { buffer: result.union, circles: result.circles, pois: seekerPts, additionalPois: additionalPts };
+            return { buffer: result.union, circles: result.circles, pois: pts };
         }
 
         // Phase 3: mcdonalds, seven11, rail-measure — not yet implemented on mobile

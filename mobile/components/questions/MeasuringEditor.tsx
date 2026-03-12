@@ -114,13 +114,13 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
     const isPOIType = MEASURING_POI_TYPES.has(data.type);
     const isSearchType = MEASURING_SEARCH_TYPES.has(data.type);
     // poiSearchLat/Lng are undefined when the user has not explicitly set an
-    // additional search region — in that case the seeker location is used.
-    const hasAdditionalSearch = (data as any).poiSearchLat != null;
-    const additionalSearchLat = (data as any).poiSearchLat as number | undefined;
-    const additionalSearchLng = (data as any).poiSearchLng as number | undefined;
+    // custom search region — in that case the seeker location is used.
+    const hasCustomSearch = (data as any).poiSearchLat != null;
+    const customSearchLat = (data as any).poiSearchLat as number | undefined;
+    const customSearchLng = (data as any).poiSearchLng as number | undefined;
     // Effective search center (falls back to seeker for bbox computation).
-    const searchLat = additionalSearchLat ?? data.lat;
-    const searchLng = additionalSearchLng ?? data.lng;
+    const searchLat = customSearchLat ?? data.lat;
+    const searchLng = customSearchLng ?? data.lng;
 
     useEffect(() => {
         if (!isSearchType || !$mapGeoJSON) {
@@ -135,19 +135,14 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
         const sr = (data as any).poiSearchRadius as number | null | undefined;
         const radiusKm = sr === null ? null : (sr ?? 100);
         const bbox: [number, number, number, number] = radiusKm === null ? zoneBbox : (() => {
-            // Always cover both the seeker location and the search center.
-            const seekerCb = turf.bbox(
-                turf.circle([data.lng, data.lat], radiusKm, { units: "kilometers" }),
-            ) as [number, number, number, number];
-            const searchCb = turf.bbox(
+            const cb = turf.bbox(
                 turf.circle([searchLng, searchLat], radiusKm, { units: "kilometers" }),
             ) as [number, number, number, number];
-            // Union both bboxes, then clamp to the game zone.
             return [
-                Math.max(Math.min(seekerCb[0], searchCb[0]), zoneBbox[0]),
-                Math.max(Math.min(seekerCb[1], searchCb[1]), zoneBbox[1]),
-                Math.min(Math.max(seekerCb[2], searchCb[2]), zoneBbox[2]),
-                Math.min(Math.max(seekerCb[3], searchCb[3]), zoneBbox[3]),
+                Math.max(cb[0], zoneBbox[0]),
+                Math.max(cb[1], zoneBbox[1]),
+                Math.min(cb[2], zoneBbox[2]),
+                Math.min(cb[3], zoneBbox[3]),
             ];
         })();
         const fetchPromise =
@@ -312,18 +307,18 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                     }}
                 />
             </View>
-            {/* Additional Search Region — for all Overpass-backed types */}
+            {/* Custom Search Region — for all Overpass-backed types */}
             {isSearchType && (
                 <View className="gap-2">
                     <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                        Additional Search Region
+                    Custom Search Region
                     </Text>
-                    {hasAdditionalSearch ? (
+                    {hasCustomSearch ? (
                         <>
                             <LocationButtons
                                 color={colors.MEASURING}
-                                lat={additionalSearchLat!}
-                                lng={additionalSearchLng!}
+                                lat={customSearchLat!}
+                                lng={customSearchLng!}
                                 editingKey={editingKey}
                                 field="B"
                                 onPickLocationOnMap={onPickLocationOnMap}
@@ -342,7 +337,7 @@ export function MeasuringEditor({ data, editingKey, onPickLocationOnMap }: Props
                                 className="active:opacity-70"
                             >
                                 <Text className="text-sm text-center text-red-400">
-                                    Clear additional region
+                                    Reset to Seeker Location
                                 </Text>
                             </Pressable>
                         </>

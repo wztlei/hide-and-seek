@@ -314,7 +314,7 @@ onPress={(feature) => {
                 />
             </MLMapView>
 
-            {isComputingLayers && (
+            {(isComputingLayers) && (
                 <View style={styles.mapSpinner} pointerEvents="none">
                     <View style={styles.mapSpinnerPill}>
                         <ActivityIndicator size="small" color="#4f46e5" />

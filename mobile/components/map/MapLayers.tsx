@@ -399,25 +399,10 @@ export function MapLayers({
             {/* Measuring POI dots — nearby POIs used for distance reference (capped to avoid OOM) */}
             {measuringRegions.flatMap(({ key, pois }) =>
                 pois.slice(0, 30).map((poi) => {
-                    const name = (poi as any).properties?.name as string;
+                    const [pLng, pLat] = poi.geometry.coordinates;
                     return (
                         <MarkerView
-                            key={`meas-poi-${key}-${name}`}
-                            coordinate={poi.geometry.coordinates as [number, number]}
-                        >
-                            <View style={styles.measuringPOIDot} />
-                        </MarkerView>
-                    );
-                }),
-            )}
-
-            {/* Measuring additional-search-region POI dots */}
-            {measuringRegions.flatMap(({ key, additionalPois }) =>
-                (additionalPois ?? []).slice(0, 30).map((poi) => {
-                    const name = (poi as any).properties?.name as string;
-                    return (
-                        <MarkerView
-                            key={`meas-addpoi-${key}-${name}`}
+                            key={`meas-poi-${key}-${pLng}-${pLat}`}
                             coordinate={poi.geometry.coordinates as [number, number]}
                         >
                             <View style={styles.measuringPOIDot} />
