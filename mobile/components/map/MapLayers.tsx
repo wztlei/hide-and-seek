@@ -1,17 +1,35 @@
 import {
+    CircleLayer,
     FillLayer,
     LineLayer,
     MarkerView,
     ShapeSource,
 } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Feature, MultiPolygon, Polygon } from "geojson";
+import type {
+    Feature,
+    FeatureCollection,
+    MultiPolygon,
+    Point,
+    Polygon,
+} from "geojson";
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { radiusCircle, tentaclesCircle, thermometerBisector } from "../../lib/mapGeometry";
-import type { MatchingRegion, MeasuringRegion, RadiusRegion, TentaclesRegion, ThermometerRegion } from "../../hooks/useEliminationMask";
+import {
+    radiusCircle,
+    tentaclesCircle,
+    thermometerBisector,
+} from "../../lib/mapGeometry";
+import type {
+    MatchingRegion,
+    MeasuringRegion,
+    RadiusRegion,
+    TentaclesRegion,
+    ThermometerRegion,
+} from "../../hooks/useEliminationMask";
 import { UserLocationDot } from "./UserLocationDot";
 
 interface Props {
@@ -60,6 +78,47 @@ export function MapLayers({
     pendingCoord,
     onMarkerPress,
 }: Props) {
+    // Merge all POI dots across question types into a single FeatureCollection.
+    // Rendering via CircleLayer is ~100x faster than individual MarkerViews.
+    const poiDotCollection = useMemo<FeatureCollection<Point>>(() => {
+        const features: Feature<Point>[] = [];
+
+        tentaclesRegions.forEach(({ location, pois }) => {
+            const locationName = (location as any)?.properties?.name;
+            pois.filter(
+                (poi) => (poi as any).properties?.name !== locationName,
+            ).forEach((poi) => {
+                features.push({
+                    type: "Feature",
+                    geometry: poi.geometry,
+                    properties: { ...(poi.properties ?? {}), _qt: "tentacles" },
+                });
+            });
+        });
+
+        matchingRegions.forEach(({ pois }) => {
+            pois.forEach((poi) => {
+                features.push({
+                    type: "Feature",
+                    geometry: poi.geometry,
+                    properties: { ...(poi.properties ?? {}), _qt: "matching" },
+                });
+            });
+        });
+
+        measuringRegions.forEach(({ pois }) => {
+            pois.forEach((poi) => {
+                features.push({
+                    type: "Feature",
+                    geometry: poi.geometry,
+                    properties: { ...(poi.properties ?? {}), _qt: "measuring" },
+                });
+            });
+        });
+
+        return { type: "FeatureCollection", features };
+    }, [tentaclesRegions, matchingRegions, measuringRegions]);
+
     return (
         <>
             {userCoord && (
@@ -78,7 +137,10 @@ export function MapLayers({
                 >
                     <FillLayer
                         id={`tent-fill-layer-${key}`}
-                        style={{ fillColor: colors.TENTACLES, fillOpacity: 0.2 }}
+                        style={{
+                            fillColor: colors.TENTACLES,
+                            fillOpacity: 0.2,
+                        }}
                     />
                 </ShapeSource>
             ))}
@@ -126,7 +188,10 @@ export function MapLayers({
                 >
                     <FillLayer
                         id={`meas-fill-layer-${key}`}
-                        style={{ fillColor: colors.MEASURING, fillOpacity: 0.2 }}
+                        style={{
+                            fillColor: colors.MEASURING,
+                            fillOpacity: 0.2,
+                        }}
                     />
                 </ShapeSource>
             ))}
@@ -156,7 +221,10 @@ export function MapLayers({
                 <ShapeSource id="zone-mask" shape={eliminationMask}>
                     <FillLayer
                         id="zone-mask-fill"
-                        style={{ fillColor: colors.ZONE_MASK, fillOpacity: 0.2 }}
+                        style={{
+                            fillColor: colors.ZONE_MASK,
+                            fillOpacity: 0.2,
+                        }}
                     />
                 </ShapeSource>
             )}
@@ -198,20 +266,20 @@ export function MapLayers({
             {questions
                 .filter((q) => q.id === "radius")
                 .map((q) => (
-                        <ShapeSource
-                            key={q.key}
-                            id={`radius-${q.key}`}
-                            shape={radiusCircle(q)}
-                        >
-                            <LineLayer
-                                id={`radius-line-${q.key}`}
-                                style={{
-                                    lineColor: colors.RADIUS,
-                                    lineWidth: 2,
-                                    lineOpacity: 0.8,
-                                }}
-                            />
-                        </ShapeSource>
+                    <ShapeSource
+                        key={q.key}
+                        id={`radius-${q.key}`}
+                        shape={radiusCircle(q)}
+                    >
+                        <LineLayer
+                            id={`radius-line-${q.key}`}
+                            style={{
+                                lineColor: colors.RADIUS,
+                                lineWidth: 2,
+                                lineOpacity: 0.8,
+                            }}
+                        />
+                    </ShapeSource>
                 ))}
 
             {/* Tentacles circle outlines */}
@@ -255,6 +323,33 @@ export function MapLayers({
                         />
                     </ShapeSource>
                 ))}
+
+            {/* All POI dots (tentacles / matching / measuring) — single GPU draw call.
+                Must come before interactive MarkerViews or MapLibre drops this layer. */}
+            {poiDotCollection.features.length > 0 && (
+                <ShapeSource id="poi-dots-src" shape={poiDotCollection}>
+                    <CircleLayer
+                        id="poi-dots-layer"
+                        style={{
+                            circleRadius: 7,
+                            circleColor: [
+                                "match",
+                                ["get", "_qt"],
+                                "tentacles",
+                                colors.TENTACLES,
+                                "matching",
+                                colors.MATCHING,
+                                "measuring",
+                                colors.MEASURING,
+                                "#999999",
+                            ],
+                            circleOpacity: 0.8,
+                            circleStrokeWidth: 1.5,
+                            circleStrokeColor: "white",
+                        }}
+                    />
+                </ShapeSource>
+            )}
 
             {/* Radius center markers */}
             {questions
@@ -329,37 +424,20 @@ export function MapLayers({
                         key={`tent-m-${q.key}`}
                         coordinate={[q.data.lng, q.data.lat]}
                     >
-                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                        <Pressable
+                            onPress={() => onMarkerPress(q.key)}
+                            hitSlop={8}
+                        >
                             <View style={styles.tentaclesMarker}>
-                                <Ionicons name="pie-chart-outline" size={18} color="white" />
+                                <Ionicons
+                                    name="pie-chart-outline"
+                                    size={18}
+                                    color="white"
+                                />
                             </View>
                         </Pressable>
                     </MarkerView>
                 ))}
-
-            {/* Tentacles POI dots — nearby POIs (capped to avoid OOM from too many MarkerViews) */}
-            {tentaclesRegions.flatMap(({ key, location, pois }) =>
-                pois
-                    .filter(
-                        (poi) =>
-                            (poi as any).properties?.name !==
-                            (location as any)?.properties?.name,
-                    )
-                    .slice(0, 30)
-                    .map((poi) => {
-                        const name = (poi as any).properties?.name as string;
-                        return (
-                            <MarkerView
-                                key={`tent-poi-${key}-${name}`}
-                                coordinate={
-                                    poi.geometry.coordinates as [number, number]
-                                }
-                            >
-                                <View style={styles.tentaclesPOIDot} />
-                            </MarkerView>
-                        );
-                    }),
-            )}
 
             {/* Tentacles selected-location markers — only in inside mode */}
             {tentaclesRegions.flatMap(({ key, location }) =>
@@ -368,47 +446,27 @@ export function MapLayers({
                           <MarkerView
                               key={`tent-loc-${key}`}
                               coordinate={
-                                  location.geometry.coordinates as [number, number]
+                                  location.geometry.coordinates as [
+                                      number,
+                                      number,
+                                  ]
                               }
                           >
-                              <Pressable onPress={() => onMarkerPress(key)} hitSlop={8}>
+                              <Pressable
+                                  onPress={() => onMarkerPress(key)}
+                                  hitSlop={8}
+                              >
                                   <View style={styles.tentaclesLocationMarker}>
-                                      <Ionicons name="location" size={14} color="white" />
+                                      <Ionicons
+                                          name="location"
+                                          size={14}
+                                          color="white"
+                                      />
                                   </View>
                               </Pressable>
                           </MarkerView>,
                       ]
                     : [],
-            )}
-
-            {/* Matching POI dots — nearby POIs forming the Voronoi boundaries */}
-            {matchingRegions.flatMap(({ key, pois }) =>
-                pois.slice(0, 30).map((poi) => {
-                    const name = (poi as any).properties?.name as string;
-                    return (
-                        <MarkerView
-                            key={`match-poi-${key}-${name}`}
-                            coordinate={poi.geometry.coordinates as [number, number]}
-                        >
-                            <View style={styles.matchingPOIDot} />
-                        </MarkerView>
-                    );
-                }),
-            )}
-
-            {/* Measuring POI dots — nearby POIs used for distance reference (capped to avoid OOM) */}
-            {measuringRegions.flatMap(({ key, pois }) =>
-                pois.slice(0, 30).map((poi) => {
-                    const [pLng, pLat] = poi.geometry.coordinates;
-                    return (
-                        <MarkerView
-                            key={`meas-poi-${key}-${pLng}-${pLat}`}
-                            coordinate={poi.geometry.coordinates as [number, number]}
-                        >
-                            <View style={styles.measuringPOIDot} />
-                        </MarkerView>
-                    );
-                }),
             )}
 
             {/* Matching seeker location markers */}
@@ -419,9 +477,16 @@ export function MapLayers({
                         key={`match-m-${q.key}`}
                         coordinate={[q.data.lng, q.data.lat]}
                     >
-                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                        <Pressable
+                            onPress={() => onMarkerPress(q.key)}
+                            hitSlop={8}
+                        >
                             <View style={styles.matchingMarker}>
-                                <Ionicons name="reorder-two-outline" size={18} color="white" />
+                                <Ionicons
+                                    name="reorder-two-outline"
+                                    size={18}
+                                    color="white"
+                                />
                             </View>
                         </Pressable>
                     </MarkerView>
@@ -435,9 +500,16 @@ export function MapLayers({
                         key={`meas-m-${q.key}`}
                         coordinate={[q.data.lng, q.data.lat]}
                     >
-                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                        <Pressable
+                            onPress={() => onMarkerPress(q.key)}
+                            hitSlop={8}
+                        >
                             <View style={styles.measuringMarker}>
-                                <Ionicons name="resize-outline" size={18} color="white" />
+                                <Ionicons
+                                    name="resize-outline"
+                                    size={18}
+                                    color="white"
+                                />
                             </View>
                         </Pressable>
                     </MarkerView>
@@ -445,15 +517,29 @@ export function MapLayers({
 
             {/* Measuring additional-search-region markers — only when explicitly set */}
             {questions
-                .filter((q) => q.id === "measuring" && (q.data as any).poiSearchLat != null)
+                .filter(
+                    (q) =>
+                        q.id === "measuring" &&
+                        (q.data as any).poiSearchLat != null,
+                )
                 .map((q) => (
                     <MarkerView
                         key={`meas-search-${q.key}`}
-                        coordinate={[(q.data as any).poiSearchLng, (q.data as any).poiSearchLat]}
+                        coordinate={[
+                            (q.data as any).poiSearchLng,
+                            (q.data as any).poiSearchLat,
+                        ]}
                     >
-                        <Pressable onPress={() => onMarkerPress(q.key)} hitSlop={8}>
+                        <Pressable
+                            onPress={() => onMarkerPress(q.key)}
+                            hitSlop={8}
+                        >
                             <View style={styles.measuringSearchMarker}>
-                                <Ionicons name="search-outline" size={14} color="white" />
+                                <Ionicons
+                                    name="search-outline"
+                                    size={14}
+                                    color="white"
+                                />
                             </View>
                         </Pressable>
                     </MarkerView>
@@ -527,33 +613,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
         elevation: 4,
-    },
-    tentaclesPOIDot: {
-        width: 14,
-        height: 14,
-        borderRadius: 14,
-        backgroundColor: colors.TENTACLES,
-        opacity: 0.8,
-        borderWidth: 1.5,
-        borderColor: "white",
-    },
-    matchingPOIDot: {
-        width: 14,
-        height: 14,
-        borderRadius: 14,
-        backgroundColor: colors.MATCHING,
-        opacity: 0.8,
-        borderWidth: 1.5,
-        borderColor: "white",
-    },
-    measuringPOIDot: {
-        width: 14,
-        height: 14,
-        borderRadius: 14,
-        backgroundColor: colors.MEASURING,
-        opacity: 0.8,
-        borderWidth: 1.5,
-        borderColor: "white",
     },
     matchingMarker: {
         width: 34,
