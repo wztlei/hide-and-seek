@@ -57,8 +57,8 @@ interface Props {
  * All data-driven children of the MapLibre MapView:
  *  - User location dot
  *  - Elimination mask (blue filled overlay outside the valid zone)
- *  - Radius question: circle fill + outline + center marker
- *  - Thermometer question: Voronoi dividing line + A/B point markers
+ *  - Per-type consolidated ShapeSource + Layer pairs (one source per question type)
+ *  - Interactive MarkerViews for question anchor points
  *  - Pending coord marker (orange pin shown during map-pick mode)
  *
  * Returns a Fragment so its children are rendered as direct siblings inside
@@ -78,8 +78,90 @@ export function MapLayers({
     pendingCoord,
     onMarkerPress,
 }: Props) {
-    // Merge all POI dots across question types into a single FeatureCollection.
-    // Rendering via CircleLayer is ~100x faster than individual MarkerViews.
+    // ── Consolidated FeatureCollections (one per question type) ──────────────
+    // Each replaces N per-question ShapeSources with a single source, reducing
+    // native layer objects from ~60 to ~12 regardless of question count.
+
+    const tentaclesFills = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: tentaclesRegions.map((r) => r.region),
+        }),
+        [tentaclesRegions],
+    );
+
+    const thermometerFills = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: thermometerRegions.map((r) => r.region),
+        }),
+        [thermometerRegions],
+    );
+
+    const matchingFills = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: matchingRegions.map((r) => r.region),
+        }),
+        [matchingRegions],
+    );
+
+    const measuringFills = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: measuringRegions.map((r) => r.region),
+        }),
+        [measuringRegions],
+    );
+
+    const measuringCircleLines = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: measuringRegions.flatMap((r) => r.circles),
+        }),
+        [measuringRegions],
+    );
+
+    const radiusFills = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: radiusRegions.map((r) => r.region),
+        }),
+        [radiusRegions],
+    );
+
+    const radiusCircleLines = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: questions
+                .filter((q) => q.id === "radius")
+                .map((q) => radiusCircle(q)),
+        }),
+        [questions],
+    );
+
+    const tentaclesCircleLines = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: questions
+                .filter((q) => q.id === "tentacles")
+                .map((q) => tentaclesCircle(q as any)),
+        }),
+        [questions],
+    );
+
+    const thermometerBisectorLines = useMemo<FeatureCollection>(
+        () => ({
+            type: "FeatureCollection",
+            features: questions
+                .filter((q) => q.id === "thermometer")
+                .map((q) => thermometerBisector(q)),
+        }),
+        [questions],
+    );
+
+    // ── Merged POI dots ──────────────────────────────────────────────────────
+    // Single CircleLayer across all question types — one GPU draw call.
     const poiDotCollection = useMemo<FeatureCollection<Point>>(() => {
         const features: Feature<Point>[] = [];
 
@@ -129,91 +211,66 @@ export function MapLayers({
 
             {/* Tentacles valid-region fills — rendered below the elimination mask
                 so the indigo mask on top correctly clips them to the game zone */}
-            {tentaclesRegions.map(({ key, region }) => (
-                <ShapeSource
-                    key={`tent-fill-${key}`}
-                    id={`tent-fill-src-${key}`}
-                    shape={region}
-                >
+            {tentaclesRegions.length > 0 && (
+                <ShapeSource id="tent-fills" shape={tentaclesFills}>
                     <FillLayer
-                        id={`tent-fill-layer-${key}`}
+                        id="tent-fill"
                         style={{
                             fillColor: colors.TENTACLES,
                             fillOpacity: 0.2,
                         }}
                     />
                 </ShapeSource>
-            ))}
+            )}
 
-            {/* Thermometer valid-half fills — rendered below the elimination mask
-                so the indigo mask on top correctly clips them to the game zone */}
-            {thermometerRegions.map(({ key, region }) => (
-                <ShapeSource
-                    key={`therm-fill-${key}`}
-                    id={`therm-fill-src-${key}`}
-                    shape={region}
-                >
+            {/* Thermometer valid-half fills */}
+            {thermometerRegions.length > 0 && (
+                <ShapeSource id="therm-fills" shape={thermometerFills}>
                     <FillLayer
-                        id={`therm-fill-layer-${key}`}
+                        id="therm-fill"
                         style={{
                             fillColor: colors.THERMOMETER,
                             fillOpacity: 0.15,
                         }}
                     />
                 </ShapeSource>
-            ))}
+            )}
 
-            {/* Matching eliminated-region fills — rendered below the elimination mask
-                so the indigo mask on top correctly clips them to the game zone */}
-            {matchingRegions.map(({ key, region }) => (
-                <ShapeSource
-                    key={`match-fill-${key}`}
-                    id={`match-fill-src-${key}`}
-                    shape={region}
-                >
+            {/* Matching eliminated-region fills */}
+            {matchingRegions.length > 0 && (
+                <ShapeSource id="match-fills" shape={matchingFills}>
                     <FillLayer
-                        id={`match-fill-layer-${key}`}
+                        id="match-fill"
                         style={{ fillColor: colors.MATCHING, fillOpacity: 0.2 }}
                     />
                 </ShapeSource>
-            ))}
+            )}
 
-            {/* Measuring eliminated-region fills — rendered below the elimination mask
-                so the indigo mask on top correctly clips them to the game zone */}
-            {measuringRegions.map(({ key, region }) => (
-                <ShapeSource
-                    key={`meas-fill-${key}`}
-                    id={`meas-fill-src-${key}`}
-                    shape={region}
-                >
+            {/* Measuring eliminated-region fills */}
+            {measuringRegions.length > 0 && (
+                <ShapeSource id="meas-fills" shape={measuringFills}>
                     <FillLayer
-                        id={`meas-fill-layer-${key}`}
+                        id="meas-fill"
                         style={{
                             fillColor: colors.MEASURING,
                             fillOpacity: 0.2,
                         }}
                     />
                 </ShapeSource>
-            ))}
+            )}
 
-            {/* Measuring buffer circle outlines — one per POI */}
-            {measuringRegions.flatMap(({ key, circles }) =>
-                circles.map((circle, i) => (
-                    <ShapeSource
-                        key={`meas-circle-${key}-${i}`}
-                        id={`meas-circle-src-${key}-${i}`}
-                        shape={circle}
-                    >
-                        <LineLayer
-                            id={`meas-circle-line-${key}-${i}`}
-                            style={{
-                                lineColor: colors.MEASURING,
-                                lineWidth: 2,
-                                lineOpacity: 0.8,
-                            }}
-                        />
-                    </ShapeSource>
-                )),
+            {/* Measuring buffer circle outlines — all POI circles across all questions */}
+            {measuringCircleLines.features.length > 0 && (
+                <ShapeSource id="meas-circles" shape={measuringCircleLines}>
+                    <LineLayer
+                        id="meas-circles-line"
+                        style={{
+                            lineColor: colors.MEASURING,
+                            lineWidth: 2,
+                            lineOpacity: 0.8,
+                        }}
+                    />
+                </ShapeSource>
             )}
 
             {/* Indigo overlay covering the eliminated (impossible) zone */}
@@ -229,8 +286,7 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
-            {/* Zone boundary line — always visible on top of the elimination mask
-                fill so the game area outline persists regardless of questions */}
+            {/* Zone boundary line — always visible on top of the elimination mask */}
             {zoneBoundary && (
                 <ShapeSource id="zone-boundary" shape={zoneBoundary}>
                     <LineLayer
@@ -244,85 +300,59 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
-            {/* Radius eliminated-area fills — only the portion removed by this
-                question is shaded; the valid region is left clear */}
-            {radiusRegions.map(({ key, region }) => (
-                <ShapeSource
-                    key={`radius-elim-${key}`}
-                    id={`radius-elim-src-${key}`}
-                    shape={region}
-                >
+            {/* Radius eliminated-area fills */}
+            {radiusRegions.length > 0 && (
+                <ShapeSource id="radius-fills" shape={radiusFills}>
                     <FillLayer
-                        id={`radius-elim-fill-${key}`}
+                        id="radius-fill"
+                        style={{ fillColor: colors.RADIUS, fillOpacity: 0.2 }}
+                    />
+                </ShapeSource>
+            )}
+
+            {/* Radius circle outlines — all radius circles in one source */}
+            {radiusCircleLines.features.length > 0 && (
+                <ShapeSource id="radius-circles" shape={radiusCircleLines}>
+                    <LineLayer
+                        id="radius-circles-line"
                         style={{
-                            fillColor: colors.RADIUS,
-                            fillOpacity: 0.2,
+                            lineColor: colors.RADIUS,
+                            lineWidth: 2,
+                            lineOpacity: 0.8,
                         }}
                     />
                 </ShapeSource>
-            ))}
-
-            {/* Radius circle outlines */}
-            {questions
-                .filter((q) => q.id === "radius")
-                .map((q) => (
-                    <ShapeSource
-                        key={q.key}
-                        id={`radius-${q.key}`}
-                        shape={radiusCircle(q)}
-                    >
-                        <LineLayer
-                            id={`radius-line-${q.key}`}
-                            style={{
-                                lineColor: colors.RADIUS,
-                                lineWidth: 2,
-                                lineOpacity: 0.8,
-                            }}
-                        />
-                    </ShapeSource>
-                ))}
+            )}
 
             {/* Tentacles circle outlines */}
-            {questions
-                .filter((q) => q.id === "tentacles")
-                .map((q) => (
-                    <ShapeSource
-                        key={`tent-circle-${q.key}`}
-                        id={`tent-circle-src-${q.key}`}
-                        shape={tentaclesCircle(q as any)}
-                    >
-                        <LineLayer
-                            id={`tent-circle-line-${q.key}`}
-                            style={{
-                                lineColor: colors.TENTACLES,
-                                lineWidth: 2,
-                                lineOpacity: 0.8,
-                            }}
-                        />
-                    </ShapeSource>
-                ))}
+            {tentaclesCircleLines.features.length > 0 && (
+                <ShapeSource id="tent-circles" shape={tentaclesCircleLines}>
+                    <LineLayer
+                        id="tent-circles-line"
+                        style={{
+                            lineColor: colors.TENTACLES,
+                            lineWidth: 2,
+                            lineOpacity: 0.8,
+                        }}
+                    />
+                </ShapeSource>
+            )}
 
-            {/* Thermometer dividing lines — perpendicular bisector of A↔B.
+            {/* Thermometer dividing lines — perpendicular bisectors of A↔B.
                 Must appear before any MarkerView blocks or MapLibre drops the layer. */}
-            {questions
-                .filter((q) => q.id === "thermometer")
-                .map((q) => (
-                    <ShapeSource
-                        key={`therm-${q.key}`}
-                        id={`therm-line-${q.key}`}
-                        shape={thermometerBisector(q)}
-                    >
-                        <LineLayer
-                            id={`therm-line-layer-${q.key}`}
-                            style={{
-                                lineColor: colors.THERMOMETER,
-                                lineWidth: 2,
-                                lineDasharray: [4, 3],
-                                lineOpacity: 0.8,
-                            }}
-                        />
-                    </ShapeSource>
-                ))}
+            {thermometerBisectorLines.features.length > 0 && (
+                <ShapeSource id="therm-lines" shape={thermometerBisectorLines}>
+                    <LineLayer
+                        id="therm-lines-line"
+                        style={{
+                            lineColor: colors.THERMOMETER,
+                            lineWidth: 2,
+                            lineDasharray: [4, 3],
+                            lineOpacity: 0.8,
+                        }}
+                    />
+                </ShapeSource>
+            )}
 
             {/* All POI dots (tentacles / matching / measuring) — single GPU draw call.
                 Must come before interactive MarkerViews or MapLibre drops this layer. */}
