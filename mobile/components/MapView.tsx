@@ -174,6 +174,7 @@ export function AppMapView() {
     /** Opens pick-mode: closes the panel and waits for a map tap. */
     const handlePickLocationOnMap = useCallback(
         (key: number, field?: "A" | "B") => {
+            console.log("[pickMode] entering pick mode — key:", key, "field:", field);
             setPickingLocationForKey(key);
             setPickingLocationField(field ?? null);
             setPendingCoord(null);
@@ -290,13 +291,20 @@ export function AppMapView() {
                 logoEnabled={false}
                 attributionEnabled={false}
                 onPress={(feature) => {
-                    if (pickingLocationForKey === null)
+                    console.log("[mapPress] fired — pickingLocationForKey:", pickingLocationForKey, "geomType:", feature.geometry.type);
+                    if (pickingLocationForKey === null) {
+                        console.log("[mapPress] ignored — not in pick mode");
                         return;
-                    if (feature.geometry.type !== "Point") return;
+                    }
+                    if (feature.geometry.type !== "Point") {
+                        console.log("[mapPress] ignored — geometry is not Point");
+                        return;
+                    }
                     const [lng, lat] = feature.geometry.coordinates as [
                         number,
                         number,
                     ];
+                    console.log("[mapPress] accepted — setting pendingCoord", lng, lat);
                     setPendingCoord([lng, lat]);
                 }}
             >
