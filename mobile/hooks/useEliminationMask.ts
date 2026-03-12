@@ -766,9 +766,9 @@ async function resolveMeasuringBuffer(
             const nearest = nearestPointOnCoastline(lng, lat, coastline);
             if (!nearest) return null;
 
-            // Clip to a bbox padded by the buffer distance so we only process
-            // coastline segments that could actually fall inside the buffer,
-            // rather than buffering the entire global dataset.
+            // Clip each LineString individually to a bbox padded by the buffer
+            // distance, so we only process segments near the seeker rather than
+            // the entire global coastline dataset.
             const padDeg = (nearest.distanceKm / 111) * 1.2;
             const clipBbox: [number, number, number, number] = [
                 lng - padDeg,
@@ -776,15 +776,20 @@ async function resolveMeasuringBuffer(
                 lng + padDeg,
                 lat + padDeg,
             ];
-            const clipped = turf.bboxClip(
-                turf.featureCollection(coastline.features) as any,
-                clipBbox,
-            );
-
-            const simplified = turf.simplify(clipped, {
-                tolerance: 0.01,
-                highQuality: false,
+            const clippedFeatures = coastline.features.flatMap((f) => {
+                try {
+                    const c = turf.bboxClip(f, clipBbox);
+                    return c.geometry.coordinates.length > 0 ? [c] : [];
+                } catch {
+                    return [];
+                }
             });
+            if (!clippedFeatures.length) return null;
+
+            const simplified = turf.simplify(
+                turf.featureCollection(clippedFeatures),
+                { tolerance: 0.01, highQuality: false },
+            );
             if (!simplified.features.length) return null;
 
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, {
