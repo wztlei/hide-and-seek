@@ -27,3 +27,4 @@ pnpm-debug.log*
 mobile/.expo/
 mobile/android/
 mobile/ios/
+mobile/eas.json
