@@ -762,8 +762,13 @@ async function resolveMeasuringBuffer(
 
     switch (type) {
         case "coastline": {
+            const t0 = Date.now();
             const coastline = await fetchCoastline();
+            console.log(`[coastline] fetchCoastline: ${Date.now() - t0} ms  (${coastline.features.length} features)`);
+
+            const t1 = Date.now();
             const nearest = nearestPointOnCoastline(lng, lat, coastline);
+            console.log(`[coastline] nearestPointOnCoastline: ${Date.now() - t1} ms  distanceKm=${nearest?.distanceKm.toFixed(2)}`);
             if (!nearest) return null;
 
             // Clip each LineString individually to a bbox padded by the buffer
@@ -776,6 +781,7 @@ async function resolveMeasuringBuffer(
                 lng + padDeg,
                 lat + padDeg,
             ];
+            const t2 = Date.now();
             const clippedFeatures = coastline.features.flatMap((f) => {
                 try {
                     const c = turf.bboxClip(f, clipBbox);
@@ -784,19 +790,25 @@ async function resolveMeasuringBuffer(
                     return [];
                 }
             });
+            console.log(`[coastline] bboxClip: ${Date.now() - t2} ms  (${clippedFeatures.length} features kept, padDeg=${padDeg.toFixed(3)})`);
             if (!clippedFeatures.length) return null;
 
+            const t3 = Date.now();
             const simplified = turf.simplify(
                 turf.featureCollection(clippedFeatures),
                 { tolerance: 0.01, highQuality: false },
             );
+            console.log(`[coastline] simplify: ${Date.now() - t3} ms  (${simplified.features.length} features)`);
             if (!simplified.features.length) return null;
 
+            const t4 = Date.now();
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, {
                 units: "kilometers",
             });
+            console.log(`[coastline] buffer: ${Date.now() - t4} ms  (${bufferFC?.features.length ?? 0} polygons)`);
             if (!bufferFC?.features.length) return null;
 
+            const t5 = Date.now();
             // Union all per-segment buffer polygons into one shape.
             const buffer =
                 bufferFC.features.length === 1
@@ -804,6 +816,8 @@ async function resolveMeasuringBuffer(
                     : (turf.union(
                           turf.featureCollection(bufferFC.features),
                       ) as Feature<Polygon | MultiPolygon> | null);
+            console.log(`[coastline] union: ${Date.now() - t5} ms`);
+            console.log(`[coastline] total: ${Date.now() - t0} ms`);
             return buffer
                 ? { buffer: trunc(buffer), pois: [], circles: [] }
                 : null;
