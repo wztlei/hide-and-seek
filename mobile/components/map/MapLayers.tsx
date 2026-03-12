@@ -14,7 +14,7 @@ import type {
     Polygon,
 } from "geojson";
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
@@ -397,7 +397,10 @@ export function MapLayers({
                             pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
-                            <View style={styles.radiusMarker}>
+                            <View
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.RADIUS }, markerShadow]}
+                            >
                                 <Ionicons
                                     name="disc-outline"
                                     size={18}
@@ -422,12 +425,10 @@ export function MapLayers({
                             hitSlop={8}
                         >
                             <View
-                                style={[
-                                    styles.thermMarker,
-                                    { backgroundColor: colors.THERMOMETER_A },
-                                ]}
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.THERMOMETER_A }, markerShadow]}
                             >
-                                <Text style={styles.thermMarkerLabel}>A</Text>
+                                <Text className="text-white text-sm font-bold">A</Text>
                             </View>
                         </Pressable>
                     </MarkerView>,
@@ -441,12 +442,10 @@ export function MapLayers({
                             hitSlop={8}
                         >
                             <View
-                                style={[
-                                    styles.thermMarker,
-                                    { backgroundColor: colors.THERMOMETER_B },
-                                ]}
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.THERMOMETER_B }, markerShadow]}
                             >
-                                <Text style={styles.thermMarkerLabel}>B</Text>
+                                <Text className="text-white text-sm font-bold">B</Text>
                             </View>
                         </Pressable>
                     </MarkerView>,
@@ -465,7 +464,10 @@ export function MapLayers({
                             pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
-                            <View style={styles.tentaclesMarker}>
+                            <View
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.TENTACLES }, markerShadow]}
+                            >
                                 <Ionicons
                                     name="pie-chart-outline"
                                     size={18}
@@ -494,7 +496,10 @@ export function MapLayers({
                                   pointerEvents={isPickMode ? "none" : "auto"}
                                   hitSlop={8}
                               >
-                                  <View style={styles.tentaclesLocationMarker}>
+                                  <View
+                                  className="w-[26px] h-[26px] rounded-full items-center justify-center"
+                                  style={[{ backgroundColor: colors.TENTACLES }, markerShadow]}
+                              >
                                       <Ionicons
                                           name="location"
                                           size={14}
@@ -520,7 +525,10 @@ export function MapLayers({
                             pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
-                            <View style={styles.matchingMarker}>
+                            <View
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.MATCHING }, markerShadow]}
+                            >
                                 <Ionicons
                                     name="reorder-two-outline"
                                     size={18}
@@ -544,7 +552,10 @@ export function MapLayers({
                             pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
-                            <View style={styles.measuringMarker}>
+                            <View
+                                className="w-[34px] h-[34px] rounded-full items-center justify-center"
+                                style={[{ backgroundColor: colors.MEASURING }, markerShadow]}
+                            >
                                 <Ionicons
                                     name="resize-outline"
                                     size={18}
@@ -575,7 +586,10 @@ export function MapLayers({
                             pointerEvents={isPickMode ? "none" : "auto"}
                             hitSlop={8}
                         >
-                            <View style={styles.measuringSearchMarker}>
+                            <View
+                                className="w-[26px] h-[26px] rounded-full border-2 border-white items-center justify-center opacity-[0.85]"
+                                style={[{ backgroundColor: colors.MEASURING }, markerShadow]}
+                            >
                                 <Ionicons
                                     name="search-outline"
                                     size={14}
@@ -589,7 +603,10 @@ export function MapLayers({
             {/* Orange pending-coord pin shown during map-pick mode phase 2 */}
             {pendingCoord && (
                 <MarkerView coordinate={pendingCoord}>
-                    <View style={styles.pendingMarker}>
+                    <View
+                        className="w-9 h-9 rounded-full border-2 border-white items-center justify-center"
+                        style={[{ backgroundColor: "#f97316" }, markerShadow]}
+                    >
                         <Ionicons name="location" size={22} color="white" />
                     </View>
                 </MarkerView>
@@ -598,118 +615,11 @@ export function MapLayers({
     );
 }
 
-const styles = StyleSheet.create({
-    radiusMarker: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: colors.RADIUS,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    thermMarker: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    thermMarkerLabel: {
-        color: "white",
-        fontSize: 14,
-        fontWeight: "700",
-    },
-    tentaclesMarker: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: colors.TENTACLES,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    tentaclesLocationMarker: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: colors.TENTACLES,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    matchingMarker: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: colors.MATCHING,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    measuringMarker: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: colors.MEASURING,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    measuringSearchMarker: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: colors.MEASURING,
-        borderWidth: 2,
-        borderColor: "white",
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-        opacity: 0.85,
-    },
-    pendingMarker: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: "#f97316", // orange — visually distinct from confirmed markers
-        borderWidth: 2,
-        borderColor: "white",
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-});
+// Shadow shared by all map markers — no NativeWind equivalent for shadow props
+const markerShadow = {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+} as const;

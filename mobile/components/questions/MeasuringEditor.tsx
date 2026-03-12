@@ -26,10 +26,10 @@ type DropdownItem =
     | { isHeader?: false; label: string; value: string };
 
 const DROPDOWN_DATA: DropdownItem[] = [
-    { isHeader: true, label: "Standard", value: "__header_standard" },
+    { isHeader: true, label: "Geography", value: "__header_standard" },
     { label: "Coastline", value: "coastline" },
     { label: "City", value: "city" },
-    { label: "High-speed rail", value: "highspeed-measure-shinkansen" },
+    // { label: "High-speed rail", value: "highspeed-measure-shinkansen" },
     { isHeader: true, label: "Points of Interest", value: "__header_poi" },
     { label: "Airport", value: "airport" },
     { label: "Aquarium", value: "aquarium" },

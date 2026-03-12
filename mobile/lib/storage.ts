@@ -13,6 +13,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setPersistentEngine } from "@nanostores/persistent";
+import * as Sentry from "@sentry/react-native";
 
 // In-memory mirror of AsyncStorage — populated before first render.
 const memStore: Record<string, string> = {};
@@ -20,12 +21,16 @@ const memStore: Record<string, string> = {};
 const storageProxy = new Proxy(memStore, {
     set(_target, key: string, value: string) {
         memStore[key] = value;
-        AsyncStorage.setItem(key, value).catch(console.error);
+        AsyncStorage.setItem(key, value).catch((err) =>
+            Sentry.captureException(err, { extra: { key } }),
+        );
         return true;
     },
     deleteProperty(_target, key: string) {
         delete memStore[key];
-        AsyncStorage.removeItem(key).catch(console.error);
+        AsyncStorage.removeItem(key).catch((err) =>
+            Sentry.captureException(err, { extra: { key } }),
+        );
         return true;
     },
 });
@@ -40,7 +45,9 @@ export const storageReady: Promise<void> = AsyncStorage.getAllKeys()
             if (value !== null) memStore[key] = value;
         }
     })
-    .catch(console.error)
+    .catch((err) => {
+        Sentry.captureException(err);
+    })
     .then(() => undefined);
 
 setPersistentEngine(storageProxy, {

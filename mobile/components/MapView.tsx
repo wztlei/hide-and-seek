@@ -8,7 +8,7 @@ import {
 } from "@maplibre/maplibre-react-native";
 import { useStore } from "@nanostores/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
@@ -29,6 +29,7 @@ import { MapLoadingOverlay } from "./map/MapLoadingOverlay";
 import { PickLocationBanner } from "./map/PickLocationBanner";
 import { PlacePicker } from "./PlacePicker";
 import { QuestionsPanel } from "./QuestionsPanel";
+import { SettingsSheet } from "./SettingsSheet";
 
 // MapLibre doesn't need a Mapbox token when using OSM tiles
 setAccessToken(null);
@@ -122,6 +123,7 @@ export function AppMapView() {
     );
     const [questionsVisible, setQuestionsVisible] = useState(false);
     const [zoneModalVisible, setZoneModalVisible] = useState(false);
+    const [settingsVisible, setSettingsVisible] = useState(false);
 
     // ── Pick-location-on-map state ──────────────────────────────────────────
     // pickingLocationForKey: which question is being edited (non-null = active)
@@ -355,8 +357,17 @@ export function AppMapView() {
             </MLMapView>
 
             {isComputingLayers && (
-                <View style={styles.mapSpinner} pointerEvents="none">
-                    <View style={styles.mapSpinnerPill}>
+                <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                    <View
+                        className="bg-white rounded-[20px] p-2.5"
+                        style={{
+                            shadowColor: "#000",
+                            shadowOpacity: 0.12,
+                            shadowRadius: 6,
+                            shadowOffset: { width: 0, height: 2 },
+                            elevation: 4,
+                        }}
+                    >
                         <ActivityIndicator size="small" color="#4f46e5" />
                     </View>
                 </View>
@@ -378,6 +389,7 @@ export function AppMapView() {
                 onQuestionsPress={() => setQuestionsVisible(true)}
                 onZonePress={() => setZoneModalVisible(true)}
                 onLocatePress={zoomToUserLocation}
+                onSettingsPress={() => setSettingsVisible(true)}
             />
 
             <PlacePicker
@@ -398,26 +410,14 @@ export function AppMapView() {
                 onPickLocationOnMap={handlePickLocationOnMap}
             />
 
+            <SettingsSheet
+                visible={settingsVisible}
+                onClose={() => setSettingsVisible(false)}
+            />
+
             {!$mapGeoJSON && <MapLoadingOverlay />}
         </View>
     );
 }
 
-const styles = StyleSheet.create({
-    map: { flex: 1 },
-    mapSpinner: {
-        ...StyleSheet.absoluteFillObject,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    mapSpinnerPill: {
-        backgroundColor: "rgba(255,255,255, 1)",
-        borderRadius: 20,
-        padding: 10,
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
-    },
-});
+const styles = { map: { flex: 1 } } as const;

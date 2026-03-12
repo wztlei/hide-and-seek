@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import * as turf from "@turf/turf";
 import type {
     Feature,
@@ -82,6 +83,7 @@ export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
         throw new Error(`Failed to fetch coastline: ${res.status}`);
     }
     const data = await res.json();
+    Sentry.addBreadcrumb({ category: "api", message: "Fetched coastline GeoJSON", level: "info" });
     coastlineCache = data;
     return data as FeatureCollection<LineString>;
 }
@@ -114,6 +116,7 @@ export async function fetchAirports(
         const query = `[out:json][timeout:30];(node["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east});way["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east}););out center qt;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`Overpass airports ${res.status}`);
         const data = await res.json();
         const seen = new Set<string>();
         const features: Feature<Point>[] = [];
@@ -167,6 +170,7 @@ export async function fetchCities(
         const query = `[out:json][timeout:30];node[place=city]["population"~"^[1-9][0-9]{6,}$"](${south},${west},${north},${east});out qt;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`Overpass cities ${res.status}`);
         const data = await res.json();
         const features: Feature<Point>[] = [];
         for (const el of data.elements) {
@@ -206,7 +210,9 @@ export async function fetchHighSpeedRail(): Promise<
     const query = `[out:json][timeout:60];way["railway"]["highspeed"="yes"];out geom qt;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`Overpass high-speed rail ${res.status}`);
     const data = await res.json();
+    Sentry.addBreadcrumb({ category: "api", message: `Fetched ${data.elements?.length ?? 0} rail segments`, level: "info" });
     const fc = turf.featureCollection<LineString | MultiLineString>([]);
     for (const el of data.elements) {
         if (el.type !== "way" || !el.geometry) continue;
@@ -254,6 +260,7 @@ export async function fetchMeasuringPOIs(
         const query = `[out:json][timeout:25];nwr["${tag}"="${baseType}"](${south},${west},${north},${east});out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`Overpass POI ${baseType} ${res.status}`);
         const data = await res.json();
         const features: Feature<Point>[] = [];
         for (const el of data.elements) {

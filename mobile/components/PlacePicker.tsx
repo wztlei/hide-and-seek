@@ -1,5 +1,7 @@
+import * as Sentry from "@sentry/react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
+import { usePostHog } from "posthog-react-native";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -84,17 +86,23 @@ function determineName(loc: OpenStreetMap): string {
 
 async function searchLocations(query: string): Promise<PhotonFeature[]> {
     if (!query.trim()) return [];
-    const res = await fetch(
-        `https://photon.komoot.io/api/?lang=en&q=${encodeURIComponent(query)}&limit=10`,
-    );
-    const data = await res.json();
-    const seen = new Set<number>();
-    return (data.features as PhotonFeature[]).filter((f) => {
-        if (f.properties.osm_type !== "R") return false;
-        if (seen.has(f.properties.osm_id)) return false;
-        seen.add(f.properties.osm_id);
-        return true;
-    });
+    try {
+        const res = await fetch(
+            `https://photon.komoot.io/api/?lang=en&q=${encodeURIComponent(query)}&limit=10`,
+        );
+        if (!res.ok) throw new Error(`Photon search ${res.status}`);
+        const data = await res.json();
+        const seen = new Set<number>();
+        return (data.features as PhotonFeature[]).filter((f) => {
+            if (f.properties.osm_type !== "R") return false;
+            if (seen.has(f.properties.osm_id)) return false;
+            seen.add(f.properties.osm_id);
+            return true;
+        });
+    } catch (err) {
+        Sentry.captureException(err, { tags: { location: "searchLocations" } });
+        return [];
+    }
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -108,6 +116,7 @@ interface Props {
 const SLIDE_DISTANCE = -700;
 
 export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
+    const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const slideAnim = useRef(new Animated.Value(SLIDE_DISTANCE)).current;
     const backdropAnim = useRef(new Animated.Value(0)).current;
@@ -194,6 +203,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
     function handleToggleAdded(rowIndex: number) {
         const additionalIndex = rowIndex - 1;
         const current = additionalMapGeoLocations.get();
+        const newAdded = !current[additionalIndex]?.added;
         additionalMapGeoLocations.set(
             current.map((item, i) =>
                 i === additionalIndex ? { ...item, added: !item.added } : item,
@@ -202,6 +212,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         mapGeoJSON.set(null);
         polyGeoJSON.set(null);
         questions.set([...questions.get()]);
+        posthog?.capture("zone_toggled", { added: newAdded });
     }
 
     function handleRemove(rowIndex: number, isBase: boolean) {
@@ -230,6 +241,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         mapGeoJSON.set(null);
         polyGeoJSON.set(null);
         questions.set([...questions.get()]);
+        posthog?.capture("zone_removed", { was_base: isBase });
     }
 
     function handleSelectResult(feature: PhotonFeature) {
@@ -241,6 +253,10 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
         polyGeoJSON.set(null);
         questions.set([...questions.get()]);
         setQuery("");
+        posthog?.capture("zone_added", {
+            zone_name: feature.properties.name,
+            osm_id: feature.properties.osm_id,
+        });
     }
 
     function handleClearZone() {
@@ -263,6 +279,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                         // unchanged) so mapGeoJSON would stay null and the base zone
                         // boundary would never reload.
                         if (hadAdditional) mapGeoJSON.set(null);
+                        posthog?.capture("zone_cleared");
                     },
                 },
             ],
@@ -297,10 +314,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
             <Animated.View
                 style={[
                     StyleSheet.absoluteFill,
-                    {
-                        opacity: backdropAnim,
-                        backgroundColor: "rgba(0,0,0,0.4)",
-                    },
+                    { opacity: backdropAnim, backgroundColor: "rgba(0,0,0,0.4)" },
                 ]}
             >
                 <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -311,6 +325,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                     styles.sheet,
                     {
                         paddingTop: insets.top + 12,
+                        maxHeight: "85%",
                         transform: [{ translateY: slideAnim }],
                     },
                 ]}
@@ -323,7 +338,6 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                     <Pressable
                         onPress={onClose}
                         hitSlop={8}
-                        className="active:opacity-60"
                     >
                         <Ionicons name="close" size={24} color="#555" />
                     </Pressable>
@@ -333,10 +347,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                 {selectedLocations.map((item, rowIndex) => (
                     <View
                         key={`${item.location.properties.osm_id}-${rowIndex}`}
-                        style={[
-                            styles.locationRow,
-                            !item.base && !item.added ? styles.excludedRow : "",
-                        ]}
+                        className={`flex-row items-center px-4 py-2${!item.base && !item.added ? " bg-[#e3e4e6]" : ""}`}
                     >
                         <Text
                             className="flex-1 text-lg mr-2"
@@ -347,7 +358,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                         >
                             {determineName(item.location)}
                         </Text>
-                        <View style={styles.locationActions}>
+                        <View className="flex-row items-center gap-2">
                             {!item.base && (
                                 <TouchableOpacity
                                     hitSlop={8}
@@ -389,7 +400,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                 <View className="mx-4 mb-3 flex flex-row items-center bg-gray-100 rounded-xl px-3 h-11">
                     <Ionicons name="search" size={18} color="#888" />
                     <TextInput
-                        className="flex-1 ml-2 text-gray-800 h-full"
+                        style={styles.searchInput}
                         placeholder="Search for a location…"
                         placeholderTextColor="#aaa"
                         value={query}
@@ -423,7 +434,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                         `${item.properties.osm_id}${item.properties.name}`
                     }
                     keyboardShouldPersistTaps="handled"
-                    style={styles.list}
+                    style={{ flexGrow: 0 }}
                     renderItem={({ item }) => {
                         const label = determineName(swapCoords(item));
                         const seen = (_placeSeen[label] =
@@ -435,7 +446,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                         return (
                             <Pressable
                                 onPress={() => handleSelectResult(item)}
-                                className="flex-row items-center px-4 py-3 active:bg-gray-50"
+                                style={styles.resultRow}
                             >
                                 <Ionicons
                                     name="location-outline"
@@ -488,7 +499,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation }: Props) {
                 <View className="p-4 border-t border-gray-100 gap-2">
                     <Pressable
                         onPress={handleClearZone}
-                        className="flex-row items-center justify-center bg-gray-100 rounded-xl h-12 active:opacity-70"
+                        style={styles.footerButton}
                     >
                         <Ionicons
                             name="trash-outline"
@@ -524,31 +535,31 @@ const styles = StyleSheet.create({
         backgroundColor: "white",
         borderBottomLeftRadius: 20,
         borderBottomRightRadius: 20,
-        maxHeight: "85%",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,
         elevation: 8,
     },
-    list: {
-        flexGrow: 0,
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        color: "#1f2937",
+        alignSelf: "stretch",
+        fontSize: 16,
     },
-    locationRow: {
+    resultRow: {
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingVertical: 12,
     },
-    altRow: {
-        backgroundColor: "#f9fafb",
-    },
-    excludedRow: {
-        backgroundColor: "#e3e4e6",
-    },
-    locationActions: {
+    footerButton: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
+        justifyContent: "center",
+        backgroundColor: "#f3f4f6",
+        borderRadius: 12,
+        height: 48,
     },
 });

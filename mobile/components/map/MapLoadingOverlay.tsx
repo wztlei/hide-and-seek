@@ -1,12 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
-import {
-    ActivityIndicator,
-    Animated,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
+import { ActivityIndicator, Animated, Text, View } from "react-native";
 
 import { colors } from "../../lib/colors";
 
@@ -36,51 +30,27 @@ export function MapLoadingOverlay() {
     }, [pulse]);
 
     return (
-        <View style={[StyleSheet.absoluteFill, styles.container]}>
+        <View className="absolute inset-0 bg-white items-center justify-center gap-3">
             <Animated.View style={{ opacity: pulse }}>
                 <Ionicons name="map" size={72} color={colors.PRIMARY} />
             </Animated.View>
 
-            <Text style={styles.title}>Hide and Seek</Text>
+            <Text className="text-[26px] font-bold text-gray-800 mt-2">
+                Hide and Seek
+            </Text>
 
             <ActivityIndicator
                 size="large"
                 color={colors.PRIMARY}
-                style={styles.spinner}
+                style={{ marginVertical: 8 }}
             />
 
-            <Text style={styles.subtitle}>
+            <Text className="text-base text-gray-500 text-center px-10">
                 Fetching zone boundary from OpenStreetMap…
             </Text>
-            <Text style={styles.hint}>This may take a few seconds.</Text>
+            <Text className="text-sm text-gray-400">
+                This may take a few seconds.
+            </Text>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        backgroundColor: "#ffffff",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-    },
-    title: {
-        fontSize: 26,
-        fontWeight: "700",
-        color: "#1f2937",
-        marginTop: 8,
-    },
-    spinner: {
-        marginVertical: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: "#6b7280",
-        textAlign: "center",
-        paddingHorizontal: 40,
-    },
-    hint: {
-        fontSize: 14,
-        color: "#9ca3af",
-    },
-});

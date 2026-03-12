@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 
 import { colors } from "../../lib/colors";
 
@@ -9,6 +9,7 @@ interface Props {
     onQuestionsPress: () => void;
     onZonePress: () => void;
     onLocatePress: () => void;
+    onSettingsPress: () => void;
 }
 
 /**
@@ -26,13 +27,25 @@ export function MapActionButtons({
     onQuestionsPress,
     onZonePress,
     onLocatePress,
+    onSettingsPress,
 }: Props) {
     return (
         <>
             <Pressable
+                onPress={onSettingsPress}
+                style={[styles.fab, { bottom: bottomInset + 231 }]}
+                hitSlop={8}
+            >
+                <Ionicons
+                    name="settings-outline"
+                    size={24}
+                    color={colors.PRIMARY}
+                />
+            </Pressable>
+
+            <Pressable
                 onPress={onQuestionsPress}
-                style={{ bottom: bottomInset + 159 }}
-                className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
+                style={[styles.fab, { bottom: bottomInset + 159 }]}
                 hitSlop={8}
             >
                 <Ionicons
@@ -44,8 +57,7 @@ export function MapActionButtons({
 
             <Pressable
                 onPress={onZonePress}
-                style={{ bottom: bottomInset + 87 }}
-                className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
+                style={[styles.fab, { bottom: bottomInset + 87 }]}
                 hitSlop={8}
             >
                 {isLoadingZone ? (
@@ -61,8 +73,7 @@ export function MapActionButtons({
 
             <Pressable
                 onPress={onLocatePress}
-                style={{ bottom: bottomInset + 15 }}
-                className="absolute right-4 w-14 h-14 rounded-full bg-white/90 items-center justify-center shadow active:opacity-70"
+                style={[styles.fab, { bottom: bottomInset + 15 }]}
                 hitSlop={8}
             >
                 <Ionicons
@@ -74,3 +85,21 @@ export function MapActionButtons({
         </>
     );
 }
+
+const styles = StyleSheet.create({
+    fab: {
+        position: "absolute",
+        right: 16,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: "rgba(255,255,255,0.9)",
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+});

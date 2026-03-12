@@ -3,6 +3,7 @@ import BottomSheet, {
     BottomSheetBackdrop,
     type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
+import { usePostHog } from "posthog-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
@@ -308,6 +309,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     initialEditKey,
     onPickLocationOnMap,
 }: Props) {
+    const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const $questions = useStore(questions) as Questions;
 
@@ -409,6 +411,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         const center = userCoord ?? getMapCenter();
         const parsed = questionSchema.parse(defaultPayloadForType(id, center));
         draftQuestion.set(parsed);
+        posthog?.capture("question_add_started", { question_type: id });
         goToEdit(parsed.key);
     }
 
@@ -429,13 +432,14 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             backgroundStyle={styles.sheetBackground}
         >
             <Animated.View
+                className="flex-row flex-1 overflow-hidden"
                 style={[
-                    styles.innerRow,
+                    { width: SCREEN_WIDTH * 3 },
                     { transform: [{ translateX: slideX }] },
                 ]}
             >
                 {/* ── Screen 1: Questions list ─────────────────────────────── */}
-                <View style={styles.screen}>
+                <View className="flex-1" style={{ width: SCREEN_WIDTH }}>
                     <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
                         <Text className="flex-1 text-2xl font-semibold text-gray-800">
                             Questions
@@ -452,6 +456,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                 text: "Clear All",
                                                 style: "destructive",
                                                 onPress: () => {
+                                                    posthog?.capture("questions_cleared", {
+                                                        count: $questions.length,
+                                                    });
                                                     questions.set([]);
                                                     questionModified();
                                                 },
@@ -523,6 +530,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                         text: "Delete",
                                                         style: "destructive",
                                                         onPress: () => {
+                                                            posthog?.capture("question_deleted", { question_type: q.id });
                                                             questions.set(
                                                                 (
                                                                     questions.get() as Questions
@@ -579,7 +587,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 </View>
 
                 {/* ── Screen 2: Add Question picker ────────────────────────── */}
-                <View style={styles.screen}>
+                <View className="flex-1" style={{ width: SCREEN_WIDTH }}>
                     <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
                         <Pressable
                             onPress={goBack}
@@ -644,7 +652,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 </View>
 
                 {/* ── Screen 3: Add / Edit Question ────────────────────────── */}
-                <View style={styles.screen}>
+                <View className="flex-1" style={{ width: SCREEN_WIDTH }}>
                     <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
                         <Pressable
                             onPress={() => {
@@ -682,6 +690,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                 text: "Delete",
                                                 style: "destructive",
                                                 onPress: () => {
+                                                    posthog?.capture("question_deleted", { question_type: editData.id });
                                                     questions.set(
                                                         (
                                                             questions.get() as Questions
@@ -769,7 +778,14 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             <Pressable
                                 onPress={() => {
                                     const draft = draftQuestion.get();
-                                    if (draft) addQuestion(draft);
+                                    if (draft) {
+                                        const isNew = isAddMode;
+                                        addQuestion(draft);
+                                        posthog?.capture(
+                                            isNew ? "question_saved_new" : "question_saved_edit",
+                                            { question_type: draft.id },
+                                        );
+                                    }
                                     draftQuestion.set(null);
                                     goBackToList();
                                 }}
@@ -797,6 +813,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     );
 });
 
+// These must remain StyleSheet — passed to BottomSheet via backgroundStyle/handleIndicatorStyle props
+// (third-party component props, not core RN style/className)
 const styles = StyleSheet.create({
     sheetBackground: {
         borderTopLeftRadius: 20,
@@ -805,15 +823,5 @@ const styles = StyleSheet.create({
     handleIndicator: {
         backgroundColor: "#d1d5db",
         width: 36,
-    },
-    innerRow: {
-        flexDirection: "row",
-        width: SCREEN_WIDTH * 3,
-        flex: 1,
-        overflow: "hidden",
-    },
-    screen: {
-        width: SCREEN_WIDTH,
-        flex: 1,
     },
 });

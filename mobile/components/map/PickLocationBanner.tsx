@@ -33,43 +33,42 @@ export function PickLocationBanner({
 }: Props) {
     return (
         <View
-            style={[styles.banner, { top: topInset + 16 }]}
+            style={[
+                styles.banner,
+                {
+                    top: topInset + 16,
+                    backgroundColor: colors.PRIMARY,
+                },
+            ]}
             pointerEvents="box-none"
         >
             {pendingCoord === null ? (
                 // Phase 1: waiting for a tap
                 <>
                     <Ionicons name="map-outline" size={20} color="white" />
-                    <Text style={styles.bannerText}>
+                    <Text className="flex-1 text-white text-[15px] font-semibold">
                         Tap the map to set location
                     </Text>
-                    <Pressable
-                        onPress={onCancel}
-                        hitSlop={8}
-                        className="active:opacity-70"
-                    >
+                    <Pressable onPress={onCancel} hitSlop={8}>
                         <Ionicons name="close-circle" size={26} color="white" />
                     </Pressable>
                 </>
             ) : (
                 // Phase 2: location tapped — confirm or re-tap
                 <>
-                    <Text style={[styles.bannerText, { fontSize: 13 }]}>
+                    <Text className="flex-1 text-white text-[13px] font-semibold">
                         {`${Math.abs(pendingCoord[1]).toFixed(4)}° ${pendingCoord[1] >= 0 ? "N" : "S"}, ${Math.abs(pendingCoord[0]).toFixed(4)}° ${pendingCoord[0] >= 0 ? "E" : "W"}`}
                     </Text>
                     <Pressable
                         onPress={onConfirm}
                         hitSlop={8}
-                        style={styles.confirmBtn}
-                        className="active:opacity-70"
+                        style={styles.confirmButton}
                     >
-                        <Text style={styles.confirmText}>Confirm</Text>
+                        <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>
+                            Confirm
+                        </Text>
                     </Pressable>
-                    <Pressable
-                        onPress={onRetap}
-                        hitSlop={8}
-                        className="active:opacity-70"
-                    >
+                    <Pressable onPress={onRetap} hitSlop={8}>
                         <Ionicons name="close-circle" size={26} color="white" />
                     </Pressable>
                 </>
@@ -83,7 +82,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 16,
         right: 16,
-        backgroundColor: colors.PRIMARY,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -96,21 +94,10 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 6,
     },
-    bannerText: {
-        flex: 1,
-        color: "white",
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    confirmBtn: {
+    confirmButton: {
         backgroundColor: "white",
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 6,
-    },
-    confirmText: {
-        color: colors.PRIMARY,
-        fontWeight: "700",
-        fontSize: 14,
     },
 });

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Jet Lag: Hide & Seek (Unofficial Companion)",
+    "slug": "jet-lag-hide-and-seek",
     "scheme": "jetlag-hide-seek",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,13 +10,16 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#E6F4FE"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wztlei.mobile"
+      "bundleIdentifier": "com.wztlei.jetlaghideandseek",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.wztlei.jetlaghideandseek",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

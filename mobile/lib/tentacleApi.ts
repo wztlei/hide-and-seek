@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import * as turf from "@turf/turf";
 import type { Feature, FeatureCollection, Point } from "geojson";
 
@@ -122,6 +123,7 @@ export async function fetchTentacleLocations(
         const query = `[out:json][timeout:25];nwr["${tag}"="${question.locationType}"](around:${radiusMeters},${question.lat},${question.lng});out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`Overpass tentacles ${question.locationType} ${res.status}`);
         const data = await res.json();
         const features = parseElements(data.elements);
         tentPersistentSet(storeKey, features);

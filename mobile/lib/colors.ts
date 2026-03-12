@@ -1,10 +1,10 @@
 export const colors = {
     // ── App chrome ────────────────────────────────────────────────────────────
     // Used for UI elements: FABs, banners, user location dot, zone overlay.
-    PRIMARY: "#6366f1", // indigo-500
+    PRIMARY: "#2d2d86", // dark navy-grey
 
     // ── Zone boundary overlay ─────────────────────────────────────────────────
-    ZONE_MASK: "#6366f1", // indigo-500 (fill at 0.2 opacity, line solid)
+    ZONE_MASK: "#2d2d86", // dark navy-grey (fill at 0.2 opacity, line solid)
 
     // ── Question types ────────────────────────────────────────────────────────
     RADIUS: "#ef4444", // red-500     — "within this circle?"

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
 import type { Feature, MultiPolygon, Point, Polygon } from "geojson";
@@ -136,7 +137,10 @@ export function useEliminationMask() {
 
             // Show a warning snackbar if rendering takes longer than 10 s.
             const slowTimer = setTimeout(() => {
-                if (!cancelled) toast.warn("Map rendering is taking a while…");
+                if (!cancelled) {
+                    toast.warn("Map rendering is taking a while…");
+                    Sentry.captureMessage("Map render slow (>10 s)", "warning");
+                }
             }, 10000);
 
             // Yields the JS thread for one macrotask, allowing touch events (e.g.
@@ -226,7 +230,9 @@ export function useEliminationMask() {
                     if (measuring === null) return;
                     setMeasuringRegions(measuring);
                 } catch (e) {
-                    console.error("Failed to compute zone mask:", e);
+                    Sentry.captureException(e, {
+                        tags: { location: "useEliminationMask" },
+                    });
                 } finally {
                     clearTimeout(slowTimer);
                     if (!cancelled) setIsComputingLayers(false);
@@ -390,8 +396,8 @@ async function computeTentaclesRegions(
             const pts = await fetchTentacleLocations(q.data as any);
             if (isCancelled()) return null;
             poiFeatures = pts.features as Feature<Point>[];
-        } catch {
-            // Network error — continue without POI dots
+        } catch (e) {
+            Sentry.captureException(e, { tags: { question_type: "tentacles" } });
             if (isCancelled()) return null;
         }
 
@@ -524,8 +530,8 @@ async function computeMatchingRegions(
                     pois: result.pois,
                     circles: result.circles,
                 });
-        } catch {
-            // Network error — skip silently
+        } catch (e) {
+            Sentry.captureException(e, { tags: { question_type: "measuring" } });
         }
     }
 
@@ -571,8 +577,8 @@ async function computeMeasuringRegions(
                     pois: result.pois,
                     circles: result.circles,
                 });
-        } catch {
-            // Network error — skip silently
+        } catch (e) {
+            Sentry.captureException(e, { tags: { question_type: "matching" } });
         }
     }
 

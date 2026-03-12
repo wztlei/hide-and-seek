@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { Animated, View } from "react-native";
 
 import { colors } from "../../lib/colors";
 
@@ -41,51 +41,41 @@ export function UserLocationDot() {
     });
 
     return (
-        <View style={styles.dotContainer}>
+        <View className="w-4 h-4 items-center justify-center">
+            {/* Pulsing ring — must use style for Animated transform/opacity */}
             <Animated.View
                 style={[
-                    styles.ring,
+                    {
+                        position: "absolute",
+                        width: RING_SIZE,
+                        height: RING_SIZE,
+                        borderRadius: RING_SIZE / 2,
+                        backgroundColor: colors.PRIMARY,
+                    },
                     { transform: [{ scale: ringScale }], opacity: ringOpacity },
                 ]}
             />
-            <View style={styles.dotBorder}>
-                <View style={styles.dot} />
+            {/* White border circle — shadow props have no NW equivalent */}
+            <View
+                className="w-4 h-4 rounded-full bg-white items-center justify-center"
+                style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 2,
+                    elevation: 3,
+                }}
+            >
+                <View
+                    className="rounded-full"
+                    style={{
+                        width: DOT_SIZE - 4,
+                        height: DOT_SIZE - 4,
+                        borderRadius: (DOT_SIZE - 4) / 2,
+                        backgroundColor: colors.PRIMARY,
+                    }}
+                />
             </View>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    dotContainer: {
-        width: DOT_SIZE,
-        height: DOT_SIZE,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    ring: {
-        position: "absolute",
-        width: RING_SIZE,
-        height: RING_SIZE,
-        borderRadius: RING_SIZE / 2,
-        backgroundColor: colors.PRIMARY,
-    },
-    dotBorder: {
-        width: DOT_SIZE,
-        height: DOT_SIZE,
-        borderRadius: DOT_SIZE / 2,
-        backgroundColor: "white",
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 3,
-    },
-    dot: {
-        width: DOT_SIZE - 4,
-        height: DOT_SIZE - 4,
-        borderRadius: (DOT_SIZE - 4) / 2,
-        backgroundColor: colors.PRIMARY,
-    },
-});
