@@ -136,8 +136,6 @@ export function AppMapView() {
     const [pendingCoord, setPendingCoord] = useState<[number, number] | null>(
         null,
     );
-    // True once the BottomSheet close animation has finished and map taps are safe.
-    const pickReadyRef = useRef(false);
 
     // ── Derived ─────────────────────────────────────────────────────────────
 
@@ -176,22 +174,14 @@ export function AppMapView() {
     /** Opens pick-mode: closes the panel and waits for a map tap. */
     const handlePickLocationOnMap = useCallback(
         (key: number, field?: "A" | "B") => {
-            pickReadyRef.current = false;
             setPickingLocationForKey(key);
             setPickingLocationField(field ?? null);
             setPendingCoord(null);
             setQuestionsVisible(false);
             setEditingQuestionKey(null);
-            // pickReadyRef is set true by onSheetClosed once the BottomSheet
-            // close animation actually completes — see QuestionsPanel prop below.
         },
         [],
     );
-
-    /** Called by QuestionsPanel once its BottomSheet animation fully completes. */
-    const handleSheetClosed = useCallback(() => {
-        pickReadyRef.current = true;
-    }, []);
 
     const handleQuestionsClose = useCallback(() => {
         setQuestionsVisible(false);
@@ -300,7 +290,7 @@ export function AppMapView() {
                 logoEnabled={false}
                 attributionEnabled={false}
                 onPress={(feature) => {
-                    if (pickingLocationForKey === null || !pickReadyRef.current)
+                    if (pickingLocationForKey === null)
                         return;
                     if (feature.geometry.type !== "Point") return;
                     const [lng, lat] = feature.geometry.coordinates as [
@@ -378,7 +368,6 @@ export function AppMapView() {
             <QuestionsPanel
                 visible={questionsVisible}
                 onClose={handleQuestionsClose}
-                onSheetClosed={handleSheetClosed}
                 getMapCenter={getMapCenter}
                 userCoord={userCoord}
                 initialEditKey={editingQuestionKey}

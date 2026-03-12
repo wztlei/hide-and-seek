@@ -294,8 +294,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 interface Props {
     visible: boolean;
     onClose: () => void;
-    /** Fired once the BottomSheet close animation fully completes. */
-    onSheetClosed?: () => void;
     getMapCenter: () => [number, number] | null;
     userCoord?: [number, number] | null;
     initialEditKey?: number | null;
@@ -305,7 +303,6 @@ interface Props {
 export const QuestionsPanel = memo(function QuestionsPanel({
     visible,
     onClose,
-    onSheetClosed,
     getMapCenter,
     userCoord,
     initialEditKey,
@@ -365,10 +362,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                     draftQuestion.set(null);
                 }
                 onClose();
-                onSheetClosed?.();
             }
         },
-        [onClose, onSheetClosed],
+        [onClose],
     );
 
     const renderBackdrop = useCallback(
