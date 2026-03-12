@@ -128,105 +128,113 @@ export function useEliminationMask() {
         let cancelled = false;
         const isCancelled = () => cancelled;
 
-        // Show a warning snackbar if rendering takes longer than 10 s.
-        const slowTimer = setTimeout(() => {
-            if (!cancelled) toast.warn("Map rendering is taking a while…");
-        }, 10000);
+        // Debounce: wait 300 ms after the last change before starting heavy
+        // computation. Prevents thrashing while the user is editing a question
+        // (e.g. dragging a radius slider or typing coordinates).
+        const debounceTimer = setTimeout(() => {
+            if (cancelled) return; // guard against cleanup racing the timer
 
-        // Yields the JS thread for one macrotask, allowing touch events (e.g.
-        // opening the location-type dropdown) to be processed between heavy steps.
-        const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+            // Show a warning snackbar if rendering takes longer than 10 s.
+            const slowTimer = setTimeout(() => {
+                if (!cancelled) toast.warn("Map rendering is taking a while…");
+            }, 10000);
 
-        const run = async () => {
-            setIsComputingLayers(true);
-            try {
-                const features = $mapGeoJSON.features as Feature<
-                    Polygon | MultiPolygon
-                >[];
-                const world: Feature<Polygon> = {
-                    type: "Feature",
-                    properties: {},
-                    geometry: {
-                        type: "Polygon",
-                        coordinates: [
-                            [
-                                [-180, -90],
-                                [180, -90],
-                                [180, 90],
-                                [-180, 90],
-                                [-180, -90],
+            // Yields the JS thread for one macrotask, allowing touch events (e.g.
+            // opening the location-type dropdown) to be processed between heavy steps.
+            const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+            const run = async () => {
+                setIsComputingLayers(true);
+                try {
+                    const features = $mapGeoJSON.features as Feature<
+                        Polygon | MultiPolygon
+                    >[];
+                    const world: Feature<Polygon> = {
+                        type: "Feature",
+                        properties: {},
+                        geometry: {
+                            type: "Polygon",
+                            coordinates: [
+                                [
+                                    [-180, -90],
+                                    [180, -90],
+                                    [180, 90],
+                                    [-180, 90],
+                                    [-180, -90],
+                                ],
                             ],
-                        ],
-                    },
-                };
+                        },
+                    };
 
-                // turf.union requires ≥2 features; use single feature directly.
-                const zoneRaw: Feature<Polygon | MultiPolygon> | null =
-                    features.length === 1
-                        ? features[0]
-                        : turf.union(turf.featureCollection(features));
-                if (!zoneRaw) return;
-                const zoneOrNull = trunc(zoneRaw);
+                    // turf.union requires ≥2 features; use single feature directly.
+                    const zoneRaw: Feature<Polygon | MultiPolygon> | null =
+                        features.length === 1
+                            ? features[0]
+                            : turf.union(turf.featureCollection(features));
+                    if (!zoneRaw) return;
+                    const zoneOrNull = trunc(zoneRaw);
 
-                setZoneBoundary(zoneOrNull);
-                const mask = turf.difference(
-                    turf.featureCollection([world, zoneOrNull]),
-                );
-                setEliminationMask(mask ? trunc(mask) : null);
+                    setZoneBoundary(zoneOrNull);
+                    const mask = turf.difference(
+                        turf.featureCollection([world, zoneOrNull]),
+                    );
+                    setEliminationMask(mask ? trunc(mask) : null);
 
-                await tick();
-                if (isCancelled()) return;
-                setRadiusRegions(
-                    computeRadiusRegions(mapQuestions, zoneOrNull),
-                );
+                    await tick();
+                    if (isCancelled()) return;
+                    setRadiusRegions(
+                        computeRadiusRegions(mapQuestions, zoneOrNull),
+                    );
 
-                await tick();
-                if (isCancelled()) return;
-                setThermometerRegions(
-                    computeThermometerRegions(mapQuestions, zoneOrNull),
-                );
+                    await tick();
+                    if (isCancelled()) return;
+                    setThermometerRegions(
+                        computeThermometerRegions(mapQuestions, zoneOrNull),
+                    );
 
-                if (mapQuestions.some((q) => q.id === "tentacles"))
-                    toast.loading("Computing tentacles regions…");
-                const tentacles = await computeTentaclesRegions(
-                    mapQuestions,
-                    zoneOrNull,
-                    isCancelled,
-                );
-                if (tentacles === null) return;
-                setTentaclesRegions(tentacles);
+                    if (mapQuestions.some((q) => q.id === "tentacles"))
+                        toast.loading("Computing tentacles regions…");
+                    const tentacles = await computeTentaclesRegions(
+                        mapQuestions,
+                        zoneOrNull,
+                        isCancelled,
+                    );
+                    if (tentacles === null) return;
+                    setTentaclesRegions(tentacles);
 
-                if (mapQuestions.some((q) => q.id === "matching"))
-                    toast.loading("Computing matching regions…");
-                const matching = await computeMatchingRegions(
-                    mapQuestions,
-                    zoneOrNull,
-                    isCancelled,
-                );
-                if (matching === null) return;
-                setMatchingRegions(matching);
+                    if (mapQuestions.some((q) => q.id === "matching"))
+                        toast.loading("Computing matching regions…");
+                    const matching = await computeMatchingRegions(
+                        mapQuestions,
+                        zoneOrNull,
+                        isCancelled,
+                    );
+                    if (matching === null) return;
+                    setMatchingRegions(matching);
 
-                if (mapQuestions.some((q) => q.id === "measuring"))
-                    toast.loading("Computing measuring regions…");
-                const measuring = await computeMeasuringRegions(
-                    mapQuestions,
-                    zoneOrNull,
-                    isCancelled,
-                );
-                if (measuring === null) return;
-                setMeasuringRegions(measuring);
-            } catch (e) {
-                console.error("Failed to compute zone mask:", e);
-            } finally {
-                clearTimeout(slowTimer);
-                if (!cancelled) setIsComputingLayers(false);
-            }
-        };
+                    if (mapQuestions.some((q) => q.id === "measuring"))
+                        toast.loading("Computing measuring regions…");
+                    const measuring = await computeMeasuringRegions(
+                        mapQuestions,
+                        zoneOrNull,
+                        isCancelled,
+                    );
+                    if (measuring === null) return;
+                    setMeasuringRegions(measuring);
+                } catch (e) {
+                    console.error("Failed to compute zone mask:", e);
+                } finally {
+                    clearTimeout(slowTimer);
+                    if (!cancelled) setIsComputingLayers(false);
+                }
+            };
 
-        run();
+            run();
+        }, 300); // end debounce
+
         return () => {
             cancelled = true;
-            clearTimeout(slowTimer);
+            clearTimeout(debounceTimer);
         };
     }, [$mapGeoJSON, mapQuestions]);
 
