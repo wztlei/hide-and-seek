@@ -762,13 +762,10 @@ async function resolveMeasuringBuffer(
 
     switch (type) {
         case "coastline": {
-            const t0 = Date.now();
             const coastline = await fetchCoastline();
-            console.log(`[coastline] fetchCoastline: ${Date.now() - t0} ms  (${coastline.features.length} features)`);
 
             // Pre-filter to candidates within ±5° (~555 km) before the expensive
             // nearestPointOnLine loop, reducing 1400+ global features to ~10.
-            const t1 = Date.now();
             const ROUGH_PAD = 5;
             const candidates = coastline.features.filter((f) => {
                 const [w, s, e, n] = turf.bbox(f);
@@ -779,13 +776,11 @@ async function resolveMeasuringBuffer(
                     n >= lat - ROUGH_PAD
                 );
             });
-            console.log(`[coastline] roughFilter: ${Date.now() - t1} ms  (${candidates.length} candidates)`);
             if (!candidates.length) return null;
 
             // Find the nearest point across all candidates, recording the feature
             // and its `location` (distance along the line in km) so we can slice
             // out just the relevant strip before buffering.
-            const t2 = Date.now();
             const target = turf.point([lng, lat]);
             let bestDist = Infinity;
             let bestFeature: Feature<LineString> | null = null;
@@ -807,13 +802,11 @@ async function resolveMeasuringBuffer(
                     // skip degenerate segments
                 }
             }
-            console.log(`[coastline] nearestPointOnLine: ${Date.now() - t2} ms  distanceKm=${bestDist.toFixed(2)}`);
             if (!bestFeature || !isFinite(bestDist)) return null;
 
             // Slice just the relevant strip of the coastline (±2× buffer distance
             // around the nearest point) so we buffer ~10–120 km instead of the
-            // entire global feature, which was taking 1500–3500 ms.
-            const t3 = Date.now();
+            // entire global feature.
             let segment: Feature<LineString> = bestFeature;
             try {
                 segment = turf.lineSliceAlong(
@@ -825,23 +818,17 @@ async function resolveMeasuringBuffer(
             } catch {
                 // fallback to full feature if slice fails
             }
-            console.log(`[coastline] lineSliceAlong: ${Date.now() - t3} ms  (${turf.length(segment, { units: "kilometers" }).toFixed(1)} km)`);
 
-            const t4 = Date.now();
             const simplified = turf.simplify(segment, {
                 tolerance: 0.01,
                 highQuality: false,
             });
-            console.log(`[coastline] simplify: ${Date.now() - t4} ms`);
 
-            const t5 = Date.now();
             const buffered = turf.buffer(simplified, bestDist, {
                 units: "kilometers",
             });
-            console.log(`[coastline] buffer: ${Date.now() - t5} ms`);
             if (!buffered) return null;
 
-            console.log(`[coastline] TOTAL: ${Date.now() - t0} ms`);
             return {
                 buffer: trunc(buffered as Feature<Polygon | MultiPolygon>),
                 pois: [],
