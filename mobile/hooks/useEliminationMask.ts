@@ -104,8 +104,12 @@ export function useEliminationMask() {
     const [tentaclesRegions, setTentaclesRegions] = useState<TentaclesRegion[]>(
         [],
     );
-    const [matchingRegions, setMatchingRegions] = useState<MatchingRegion[]>([]);
-    const [measuringRegions, setMeasuringRegions] = useState<MeasuringRegion[]>([]);
+    const [matchingRegions, setMatchingRegions] = useState<MatchingRegion[]>(
+        [],
+    );
+    const [measuringRegions, setMeasuringRegions] = useState<MeasuringRegion[]>(
+        [],
+    );
     const [isComputingLayers, setIsComputingLayers] = useState(false);
 
     useEffect(() => {
@@ -157,38 +161,58 @@ export function useEliminationMask() {
                 };
 
                 // turf.union requires ≥2 features; use single feature directly.
-                const zoneOrNull: Feature<Polygon | MultiPolygon> | null =
+                const zoneRaw: Feature<Polygon | MultiPolygon> | null =
                     features.length === 1
                         ? features[0]
                         : turf.union(turf.featureCollection(features));
-                if (!zoneOrNull) return;
+                if (!zoneRaw) return;
+                const zoneOrNull = trunc(zoneRaw);
 
                 setZoneBoundary(zoneOrNull);
-                setEliminationMask(
-                    turf.difference(turf.featureCollection([world, zoneOrNull])),
+                const mask = turf.difference(
+                    turf.featureCollection([world, zoneOrNull]),
+                );
+                setEliminationMask(mask ? trunc(mask) : null);
+
+                await tick();
+                if (isCancelled()) return;
+                setRadiusRegions(
+                    computeRadiusRegions(mapQuestions, zoneOrNull),
                 );
 
-                await tick(); if (isCancelled()) return;
-                setRadiusRegions(computeRadiusRegions(mapQuestions, zoneOrNull));
-
-                await tick(); if (isCancelled()) return;
-                setThermometerRegions(computeThermometerRegions(mapQuestions, zoneOrNull));
+                await tick();
+                if (isCancelled()) return;
+                setThermometerRegions(
+                    computeThermometerRegions(mapQuestions, zoneOrNull),
+                );
 
                 if (mapQuestions.some((q) => q.id === "tentacles"))
                     toast.loading("Computing tentacles regions…");
-                const tentacles = await computeTentaclesRegions(mapQuestions, zoneOrNull, isCancelled);
+                const tentacles = await computeTentaclesRegions(
+                    mapQuestions,
+                    zoneOrNull,
+                    isCancelled,
+                );
                 if (tentacles === null) return;
                 setTentaclesRegions(tentacles);
 
                 if (mapQuestions.some((q) => q.id === "matching"))
                     toast.loading("Computing matching regions…");
-                const matching = await computeMatchingRegions(mapQuestions, zoneOrNull, isCancelled);
+                const matching = await computeMatchingRegions(
+                    mapQuestions,
+                    zoneOrNull,
+                    isCancelled,
+                );
                 if (matching === null) return;
                 setMatchingRegions(matching);
 
                 if (mapQuestions.some((q) => q.id === "measuring"))
                     toast.loading("Computing measuring regions…");
-                const measuring = await computeMeasuringRegions(mapQuestions, zoneOrNull, isCancelled);
+                const measuring = await computeMeasuringRegions(
+                    mapQuestions,
+                    zoneOrNull,
+                    isCancelled,
+                );
                 if (measuring === null) return;
                 setMeasuringRegions(measuring);
             } catch (e) {
@@ -206,7 +230,25 @@ export function useEliminationMask() {
         };
     }, [$mapGeoJSON, mapQuestions]);
 
-    return { eliminationMask, zoneBoundary, radiusRegions, thermometerRegions, tentaclesRegions, matchingRegions, measuringRegions, isComputingLayers };
+    return {
+        eliminationMask,
+        zoneBoundary,
+        radiusRegions,
+        thermometerRegions,
+        tentaclesRegions,
+        matchingRegions,
+        measuringRegions,
+        isComputingLayers,
+    };
+}
+
+// ── Coordinate precision helper ───────────────────────────────────────────────
+//
+// Turf outputs 15-17 decimal places by default. 6 dp ≈ 11 cm, which is far
+// more than sufficient for any game-board zoom level and reduces GeoJSON size
+// by ~50%, speeding up serialisation and MapLibre vertex upload.
+function trunc<T extends Feature>(f: T): T {
+    return turf.truncate(f, { precision: 6, mutate: true }) as T;
 }
 
 // ── Per-question region computers ────────────────────────────────────────────
@@ -222,13 +264,16 @@ function computeRadiusRegions(
     for (const q of $questions) {
         if (q.id !== "radius") continue;
         const { lat, lng, radius, unit, within } = q.data;
-        const circle = turf.circle([lng, lat], radius, { units: unit, steps: 64 });
+        const circle = turf.circle([lng, lat], radius, {
+            units: unit,
+            steps: 64,
+        });
         const eliminated = within
-            // within=true: valid area is inside circle → eliminate the ring outside
-            ? turf.difference(turf.featureCollection([zone, circle]))
-            // within=false: valid area is outside circle → eliminate the circle
-            : turf.intersect(turf.featureCollection([zone, circle]));
-        if (eliminated) regions.push({ key: q.key, region: eliminated });
+            ? // within=true: valid area is inside circle → eliminate the ring outside
+              turf.difference(turf.featureCollection([zone, circle]))
+            : // within=false: valid area is outside circle → eliminate the circle
+              turf.intersect(turf.featureCollection([zone, circle]));
+        if (eliminated) regions.push({ key: q.key, region: trunc(eliminated) });
     }
     return regions;
 }
@@ -255,15 +300,17 @@ function computeThermometerRegions(
         const bisectorCoords: [number, number][] = [];
         for (let d = reach; d >= step; d -= step) {
             bisectorCoords.push(
-                turf.destination(mid, d, abBearing - 90, { units: "kilometers" })
-                    .geometry.coordinates as [number, number],
+                turf.destination(mid, d, abBearing - 90, {
+                    units: "kilometers",
+                }).geometry.coordinates as [number, number],
             );
         }
         bisectorCoords.push(mid.geometry.coordinates as [number, number]);
         for (let d = step; d <= reach; d += step) {
             bisectorCoords.push(
-                turf.destination(mid, d, abBearing + 90, { units: "kilometers" })
-                    .geometry.coordinates as [number, number],
+                turf.destination(mid, d, abBearing + 90, {
+                    units: "kilometers",
+                }).geometry.coordinates as [number, number],
             );
         }
 
@@ -285,15 +332,14 @@ function computeThermometerRegions(
             { units: "kilometers" },
         ).geometry.coordinates as [number, number];
 
-        const halfPlane = turf.polygon([[
-            ...bisectorCoords,
-            farRight,
-            farLeft,
-            bisectorCoords[0],
-        ]]);
+        const halfPlane = turf.polygon([
+            [...bisectorCoords, farRight, farLeft, bisectorCoords[0]],
+        ]);
 
-        const clipped = turf.intersect(turf.featureCollection([zone, halfPlane]));
-        if (clipped) regions.push({ key: q.key, region: clipped });
+        const clipped = turf.intersect(
+            turf.featureCollection([zone, halfPlane]),
+        );
+        if (clipped) regions.push({ key: q.key, region: trunc(clipped) });
     }
     return regions;
 }
@@ -313,11 +359,10 @@ async function computeTentaclesRegions(
         if (q.id !== "tentacles") continue;
         if (q.data.locationType === "custom") continue;
 
-        const circle = turf.circle(
-            [q.data.lng, q.data.lat],
-            q.data.radius,
-            { units: q.data.unit, steps: 64 },
-        );
+        const circle = turf.circle([q.data.lng, q.data.lat], q.data.radius, {
+            units: q.data.unit,
+            steps: 64,
+        });
 
         // Always fetch POIs so dots are visible in all modes.
         let poiFeatures: Feature<Point>[] = [];
@@ -332,22 +377,37 @@ async function computeTentaclesRegions(
 
         // Yield after the fetch so touch events can be processed before the
         // synchronous Voronoi / turf work below runs.
-        await tick(); if (isCancelled()) return null;
+        await tick();
+        if (isCancelled()) return null;
 
         if (!q.data.within) {
             // Outside mode: hider is NOT in the circle → shade the circle.
-            const eliminated = turf.intersect(turf.featureCollection([zone, circle]));
+            const eliminated = turf.intersect(
+                turf.featureCollection([zone, circle]),
+            );
             if (eliminated) {
-                regions.push({ key: q.key, region: eliminated, location: null, pois: poiFeatures });
+                regions.push({
+                    key: q.key,
+                    region: trunc(eliminated),
+                    location: null,
+                    pois: poiFeatures,
+                });
             }
             continue;
         }
 
         if (q.data.location === false) {
             // Inside mode, no POI selected → shade outside the circle.
-            const eliminated = turf.difference(turf.featureCollection([zone, circle]));
+            const eliminated = turf.difference(
+                turf.featureCollection([zone, circle]),
+            );
             if (eliminated) {
-                regions.push({ key: q.key, region: eliminated, location: null, pois: poiFeatures });
+                regions.push({
+                    key: q.key,
+                    region: trunc(eliminated),
+                    location: null,
+                    pois: poiFeatures,
+                });
             }
             continue;
         }
@@ -357,13 +417,19 @@ async function computeTentaclesRegions(
         if (poiFeatures.length === 0) continue;
         try {
             const circleBbox = turf.bbox(
-                turf.circle([q.data.lng, q.data.lat], q.data.radius * 3, { units: q.data.unit }),
+                turf.circle([q.data.lng, q.data.lat], q.data.radius * 3, {
+                    units: q.data.unit,
+                }),
             ) as [number, number, number, number];
-            const voronoi = turf.voronoi(turf.featureCollection(poiFeatures), { bbox: circleBbox });
+            const voronoi = turf.voronoi(turf.featureCollection(poiFeatures), {
+                bbox: circleBbox,
+            });
             if (!voronoi) continue;
 
             const selectedName = (q.data.location as any).properties.name;
-            const selectedPt = poiFeatures.find((f: any) => f.properties.name === selectedName);
+            const selectedPt = poiFeatures.find(
+                (f: any) => f.properties.name === selectedName,
+            );
             if (!selectedPt) continue;
 
             const cell = voronoi.features.find(
@@ -372,15 +438,19 @@ async function computeTentaclesRegions(
             if (!cell) continue;
 
             // Valid area = selected Voronoi cell ∩ circle (clipped to zone).
-            const validArea = turf.intersect(turf.featureCollection([zone, cell, circle]));
+            const validArea = turf.intersect(
+                turf.featureCollection([zone, cell, circle]),
+            );
             if (!validArea) continue;
 
             // Eliminated = zone minus valid area.
-            const eliminated = turf.difference(turf.featureCollection([zone, validArea]));
+            const eliminated = turf.difference(
+                turf.featureCollection([zone, validArea]),
+            );
             if (eliminated) {
                 regions.push({
                     key: q.key,
-                    region: eliminated,
+                    region: trunc(eliminated),
                     location: q.data.location as unknown as Feature<Point>,
                     pois: poiFeatures,
                 });
@@ -414,15 +484,26 @@ async function computeMatchingRegions(
             if (isCancelled()) return null;
             if (!result.boundary) continue;
 
-            await tick(); if (isCancelled()) return null;
+            await tick();
+            if (isCancelled()) return null;
 
             // same=true: valid zone is the matching boundary → eliminate what's outside
             // same=false: valid zone excludes the matching boundary → eliminate what's inside
             const eliminated = q.data.same
-                ? turf.difference(turf.featureCollection([zone, result.boundary]))
-                : turf.intersect(turf.featureCollection([zone, result.boundary]));
+                ? turf.difference(
+                      turf.featureCollection([zone, result.boundary]),
+                  )
+                : turf.intersect(
+                      turf.featureCollection([zone, result.boundary]),
+                  );
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, circles: result.circles });
+            if (eliminated)
+                regions.push({
+                    key: q.key,
+                    region: trunc(eliminated),
+                    pois: result.pois,
+                    circles: result.circles,
+                });
         } catch {
             // Network error — skip silently
         }
@@ -452,7 +533,8 @@ async function computeMeasuringRegions(
             if (isCancelled()) return null;
             if (!result) continue;
 
-            await tick(); if (isCancelled()) return null;
+            await tick();
+            if (isCancelled()) return null;
 
             const { buffer } = result;
 
@@ -462,7 +544,13 @@ async function computeMeasuringRegions(
                 ? turf.difference(turf.featureCollection([zone, buffer]))
                 : turf.intersect(turf.featureCollection([zone, buffer]));
 
-            if (eliminated) regions.push({ key: q.key, region: eliminated, pois: result.pois, circles: result.circles });
+            if (eliminated)
+                regions.push({
+                    key: q.key,
+                    region: trunc(eliminated),
+                    pois: result.pois,
+                    circles: result.circles,
+                });
         } catch {
             // Network error — skip silently
         }
@@ -508,8 +596,11 @@ function filterPoisByZone(
     zone: Feature<Polygon | MultiPolygon>,
 ): Feature<Point>[] {
     return pois.filter((f) => {
-        try { return turf.booleanPointInPolygon(f, zone); }
-        catch { return false; }
+        try {
+            return turf.booleanPointInPolygon(f, zone);
+        } catch {
+            return false;
+        }
     });
 }
 
@@ -518,7 +609,10 @@ function filterPoisByZone(
 async function resolveMatchingBoundary(
     q: Extract<Question, { id: "matching" }>,
     zoneOrNull: Feature<Polygon | MultiPolygon>,
-): Promise<{ boundary: Feature<Polygon | MultiPolygon> | null; pois: Feature<Point>[] }> {
+): Promise<{
+    boundary: Feature<Polygon | MultiPolygon> | null;
+    pois: Feature<Point>[];
+}> {
     const type = q.data.type;
     switch (type) {
         case "zone": {
@@ -531,11 +625,17 @@ async function resolveMatchingBoundary(
         }
         case "airport": {
             const pts = await fetchAirports();
-            return { boundary: findVoronoiCell(q.data.lng, q.data.lat, pts), pois: [] };
+            return {
+                boundary: findVoronoiCell(q.data.lng, q.data.lat, pts),
+                pois: [],
+            };
         }
         case "major-city": {
             const pts = await fetchMajorCities();
-            return { boundary: findVoronoiCell(q.data.lng, q.data.lat, pts), pois: [] };
+            return {
+                boundary: findVoronoiCell(q.data.lng, q.data.lat, pts),
+                pois: [],
+            };
         }
         case "aquarium":
         case "zoo":
@@ -548,11 +648,23 @@ async function resolveMatchingBoundary(
         case "golf_course":
         case "consulate":
         case "park": {
-            const bbox = poiBbox(q.data.lng, q.data.lat, (q.data as any).poiSearchRadius, zoneOrNull);
+            const bbox = poiBbox(
+                q.data.lng,
+                q.data.lat,
+                (q.data as any).poiSearchRadius,
+                zoneOrNull,
+            );
             const pts = await fetchMatchingPOIs(type, bbox);
-            const inZone = filterPoisByZone(pts.features as Feature<Point>[], zoneOrNull);
+            const inZone = filterPoisByZone(
+                pts.features as Feature<Point>[],
+                zoneOrNull,
+            );
             return {
-                boundary: findVoronoiCell(q.data.lng, q.data.lat, turf.featureCollection(inZone)),
+                boundary: findVoronoiCell(
+                    q.data.lng,
+                    q.data.lat,
+                    turf.featureCollection(inZone),
+                ),
                 pois: inZone,
             };
         }
@@ -580,13 +692,19 @@ function buildPOIUnionBuffer(
     lat: number,
     pois: Feature<Point>[],
     label: string,
-): { union: Feature<Polygon | MultiPolygon>; circles: Feature<Polygon>[] } | null {
+): {
+    union: Feature<Polygon | MultiPolygon>;
+    circles: Feature<Polygon>[];
+} | null {
     if (pois.length === 0) return null;
 
     const seekerPt = turf.point([lng, lat]);
 
     const selected = pois
-        .map((poi) => ({ poi, seekerDist: turf.distance(seekerPt, poi, { units: "kilometers" }) }))
+        .map((poi) => ({
+            poi,
+            seekerDist: turf.distance(seekerPt, poi, { units: "kilometers" }),
+        }))
         .sort((a, b) => a.seekerDist - b.seekerDist)
         .slice(0, MAX_UNION_POIS);
     if (selected.length === 0) return null;
@@ -597,19 +715,28 @@ function buildPOIUnionBuffer(
 
     const t0 = Date.now();
     const circles = selected.map(({ poi }) =>
-        turf.circle(
-            poi.geometry.coordinates as [number, number],
-            radiusKm,
-            { units: "kilometers", steps: 16 },
+        trunc(
+            turf.circle(
+                poi.geometry.coordinates as [number, number],
+                radiusKm,
+                {
+                    units: "kilometers",
+                    steps: 16,
+                },
+            ),
         ),
     );
-    console.log(`[buildPOIUnionBuffer/${label}] ${selected.length} circles @ ${radiusKm.toFixed(1)} km: ${Date.now() - t0}ms`);
+    console.log(
+        `[buildPOIUnionBuffer/${label}] ${selected.length} circles @ ${radiusKm.toFixed(1)} km: ${Date.now() - t0}ms`,
+    );
     if (circles.length === 1) return { union: circles[0], circles };
     const t1 = Date.now();
     const union = turf.union(turf.featureCollection(circles));
-    console.log(`[buildPOIUnionBuffer/${label}] turf.union: ${Date.now() - t1}ms`);
+    console.log(
+        `[buildPOIUnionBuffer/${label}] turf.union: ${Date.now() - t1}ms`,
+    );
     if (!union) return null;
-    return { union, circles };
+    return { union: trunc(union), circles };
 }
 
 async function resolveMeasuringBuffer(
@@ -621,35 +748,60 @@ async function resolveMeasuringBuffer(
     circles: Feature<Polygon>[];
 } | null> {
     const { lat, lng, type } = q.data;
-    const searchRadius = (q.data as any).poiSearchRadius as number | null | undefined;
+    const searchRadius = (q.data as any).poiSearchRadius as
+        | number
+        | null
+        | undefined;
     // Search center — falls back to seeker when not explicitly set.
-    const searchLat = (q.data as any).poiSearchLat as number | undefined ?? lat;
-    const searchLng = (q.data as any).poiSearchLng as number | undefined ?? lng;
+    const searchLat =
+        ((q.data as any).poiSearchLat as number | undefined) ?? lat;
+    const searchLng =
+        ((q.data as any).poiSearchLng as number | undefined) ?? lng;
 
     switch (type) {
         case "coastline": {
             const coastline = await fetchCoastline();
             const nearest = nearestPointOnCoastline(lng, lat, coastline);
             if (!nearest) return null;
-            const simplified = turf.simplify(turf.featureCollection(coastline.features), {
-                tolerance: 0.01,
-                highQuality: false,
+            const simplified = turf.simplify(
+                turf.featureCollection(coastline.features),
+                {
+                    tolerance: 0.01,
+                    highQuality: false,
+                },
+            );
+            const bufferFC = turf.buffer(simplified, nearest.distanceKm, {
+                units: "kilometers",
             });
-            const bufferFC = turf.buffer(simplified, nearest.distanceKm, { units: "kilometers" });
-            const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer, pois: [], circles: [] } : null;
+            const buffer = bufferFC?.features[0] as
+                | Feature<Polygon | MultiPolygon>
+                | undefined;
+            return buffer
+                ? { buffer: trunc(buffer), pois: [], circles: [] }
+                : null;
         }
 
         case "airport": {
-            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
-            const pts = (await fetchMeasuringAirports(bbox)).features as Feature<Point>[];
+            const bbox = poiBbox(
+                searchLng,
+                searchLat,
+                searchRadius,
+                zoneOrNull,
+            );
+            const pts = (await fetchMeasuringAirports(bbox))
+                .features as Feature<Point>[];
             const result = buildPOIUnionBuffer(lng, lat, pts, "airport");
             if (!result) return null;
             return { buffer: result.union, circles: result.circles, pois: pts };
         }
 
         case "city": {
-            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
+            const bbox = poiBbox(
+                searchLng,
+                searchLat,
+                searchRadius,
+                zoneOrNull,
+            );
             const pts = (await fetchCities(bbox)).features as Feature<Point>[];
             const result = buildPOIUnionBuffer(lng, lat, pts, "city");
             if (!result) return null;
@@ -660,9 +812,15 @@ async function resolveMeasuringBuffer(
             const lines = await fetchHighSpeedRail();
             const nearest = nearestPointOnLines(lng, lat, lines);
             if (!nearest) return null;
-            const bufferFC = turf.buffer(lines, nearest.distanceKm, { units: "kilometers" });
-            const buffer = bufferFC?.features[0] as Feature<Polygon | MultiPolygon> | undefined;
-            return buffer ? { buffer, pois: [], circles: [] } : null;
+            const bufferFC = turf.buffer(lines, nearest.distanceKm, {
+                units: "kilometers",
+            });
+            const buffer = bufferFC?.features[0] as
+                | Feature<Polygon | MultiPolygon>
+                | undefined;
+            return buffer
+                ? { buffer: trunc(buffer), pois: [], circles: [] }
+                : null;
         }
 
         case "aquarium":
@@ -687,9 +845,15 @@ async function resolveMeasuringBuffer(
         case "golf_course-full":
         case "consulate-full":
         case "park-full": {
-            const bbox = poiBbox(searchLng, searchLat, searchRadius, zoneOrNull);
+            const bbox = poiBbox(
+                searchLng,
+                searchLat,
+                searchRadius,
+                zoneOrNull,
+            );
             const pts = filterPoisByZone(
-                (await fetchMeasuringPOIs(type, bbox)).features as Feature<Point>[],
+                (await fetchMeasuringPOIs(type, bbox))
+                    .features as Feature<Point>[],
                 zoneOrNull,
             );
             const result = buildPOIUnionBuffer(lng, lat, pts, type);

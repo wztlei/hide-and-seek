@@ -1,6 +1,10 @@
 import * as turf from "@turf/turf";
 import type { Feature, LineString, Polygon } from "geojson";
 
+function trunc<T extends Feature>(f: T): T {
+    return turf.truncate(f, { precision: 6, mutate: true }) as T;
+}
+
 import type { Questions } from "../../src/maps/schema";
 
 type RadiusQuestion = Extract<Questions[number], { id: "radius" }>;
@@ -12,10 +16,12 @@ type TentaclesQuestion = Extract<Questions[number], { id: "tentacles" }>;
  * 64 steps gives a smooth circle at any zoom level.
  */
 export function radiusCircle(q: RadiusQuestion): Feature<Polygon> {
-    return turf.circle([q.data.lng, q.data.lat], q.data.radius, {
-        units: q.data.unit,
-        steps: 64,
-    });
+    return trunc(
+        turf.circle([q.data.lng, q.data.lat], q.data.radius, {
+            units: q.data.unit,
+            steps: 64,
+        }),
+    );
 }
 
 /**
@@ -25,13 +31,15 @@ export function radiusCircle(q: RadiusQuestion): Feature<Polygon> {
  * geodesically accurate line rather than a Mercator-distorted straight segment.
  * Extends 2000 km either side of the midpoint to span any viewport.
  */
-export function thermometerBisector(q: ThermometerQuestion): Feature<LineString> {
+export function thermometerBisector(
+    q: ThermometerQuestion,
+): Feature<LineString> {
     const ptA = turf.point([q.data.lngA, q.data.latA]);
     const ptB = turf.point([q.data.lngB, q.data.latB]);
     const mid = turf.midpoint(ptA, ptB);
     const bearing = turf.bearing(ptA, ptB);
 
-    const step = 20;  // km between samples — ~8 m max sagitta
+    const step = 20; // km between samples — ~8 m max sagitta
     const reach = 2000; // km each side of midpoint
     const coords: [number, number][] = [];
 
@@ -49,7 +57,7 @@ export function thermometerBisector(q: ThermometerQuestion): Feature<LineString>
         );
     }
 
-    return turf.lineString(coords);
+    return trunc(turf.lineString(coords));
 }
 
 /**
@@ -57,8 +65,10 @@ export function thermometerBisector(q: ThermometerQuestion): Feature<LineString>
  * 64 steps gives a smooth circle at any zoom level.
  */
 export function tentaclesCircle(q: TentaclesQuestion): Feature<Polygon> {
-    return turf.circle([q.data.lng, q.data.lat], q.data.radius, {
-        units: q.data.unit,
-        steps: 64,
-    });
+    return trunc(
+        turf.circle([q.data.lng, q.data.lat], q.data.radius, {
+            units: q.data.unit,
+            steps: 64,
+        }),
+    );
 }
