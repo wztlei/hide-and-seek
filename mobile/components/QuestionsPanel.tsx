@@ -21,7 +21,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../lib/colors";
 import { addQuestion, questions, questionModified } from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
-import { questionSchema, type Question, type Questions } from "../../src/maps/schema";
+import {
+    questionSchema,
+    type Question,
+    type Questions,
+} from "../../src/maps/schema";
 
 import { MatchingEditor } from "./questions/MatchingEditor";
 import { MeasuringEditor } from "./questions/MeasuringEditor";
@@ -141,23 +145,35 @@ function labelForType(type: Question["id"]): string {
 
 function colorForType(type: Question["id"]): string {
     switch (type) {
-        case "radius":      return colors.RADIUS;
-        case "thermometer": return colors.THERMOMETER;
-        case "tentacles":   return colors.TENTACLES;
-        case "matching":    return colors.MATCHING;
-        case "measuring":   return colors.MEASURING;
-        default:            return colors.PRIMARY;
+        case "radius":
+            return colors.RADIUS;
+        case "thermometer":
+            return colors.THERMOMETER;
+        case "tentacles":
+            return colors.TENTACLES;
+        case "matching":
+            return colors.MATCHING;
+        case "measuring":
+            return colors.MEASURING;
+        default:
+            return colors.PRIMARY;
     }
 }
 
 function bgColorForType(type: Question["id"]): string {
     switch (type) {
-        case "radius":      return "#fee2e2";
-        case "thermometer": return "#f3e8ff";
-        case "tentacles":   return "#dcfce7";
-        case "matching":    return "#fef3c7";
-        case "measuring":   return "#cffafe";
-        default:            return "#e0e7ff";
+        case "radius":
+            return "#fee2e2";
+        case "thermometer":
+            return "#f3e8ff";
+        case "tentacles":
+            return "#dcfce7";
+        case "matching":
+            return "#fef3c7";
+        case "measuring":
+            return "#cffafe";
+        default:
+            return "#e0e7ff";
     }
 }
 
@@ -179,10 +195,11 @@ function subtitleForQuestion(q: Question): string | null {
     }
     if (q.id === "tentacles") {
         if (!q.data.within) return "Outside";
-        const label = LOCATION_TYPE_LABELS[q.data.locationType] ?? q.data.locationType;
+        const label =
+            LOCATION_TYPE_LABELS[q.data.locationType] ?? q.data.locationType;
         const loc =
             q.data.location !== false
-                ? (q.data.location as any).properties?.name ?? "Selected"
+                ? ((q.data.location as any).properties?.name ?? "Selected")
                 : "None selected";
         return `Inside · ${label} · ${loc}`;
     }
@@ -312,7 +329,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         return $questions.find((q) => q.key === editingKey) ?? null;
     }, [editingKey, $questions, $draftQuestion]);
 
-    const isAddMode = $draftQuestion !== null && $draftQuestion.key === editingKey;
+    const isAddMode =
+        $draftQuestion !== null && $draftQuestion.key === editingKey;
 
     // Sync panel open/close; restore edit screen when returning from map-pick mode
     useEffect(() => {
@@ -448,7 +466,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 hitSlop={8}
                                 className="px-2 py-1 active:opacity-60"
                             >
-                                <Text className="text-base text-red-500">Clear all</Text>
+                                <Text className="text-base text-red-500">
+                                    Clear all
+                                </Text>
                             </Pressable>
                         )}
                         <Pressable
@@ -508,9 +528,12 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                         style: "destructive",
                                                         onPress: () => {
                                                             questions.set(
-                                                                (questions.get() as Questions).filter(
+                                                                (
+                                                                    questions.get() as Questions
+                                                                ).filter(
                                                                     (x) =>
-                                                                        x.key !== q.key,
+                                                                        x.key !==
+                                                                        q.key,
                                                                 ),
                                                             );
                                                             questionModified();
@@ -596,7 +619,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             >
                                 <View
                                     className="w-11 h-11 rounded-xl items-center justify-center"
-                                    style={{ backgroundColor: bgColorForType(id) }}
+                                    style={{
+                                        backgroundColor: bgColorForType(id),
+                                    }}
                                 >
                                     <Ionicons
                                         name={icon}
@@ -646,6 +671,47 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                         <Text className="flex-1 text-xl font-semibold text-gray-800">
                             {isAddMode ? "Add Question" : "Edit Question"}
                         </Text>
+                        {!isAddMode && editData && (
+                            <Pressable
+                                onPress={() => {
+                                    Alert.alert(
+                                        "Delete Question",
+                                        `Remove this ${labelForType(editData.id)} question?`,
+                                        [
+                                            {
+                                                text: "Cancel",
+                                                style: "cancel",
+                                            },
+                                            {
+                                                text: "Delete",
+                                                style: "destructive",
+                                                onPress: () => {
+                                                    questions.set(
+                                                        (
+                                                            questions.get() as Questions
+                                                        ).filter(
+                                                            (x) =>
+                                                                x.key !==
+                                                                editingKey,
+                                                        ),
+                                                    );
+                                                    questionModified();
+                                                    goBackToList();
+                                                },
+                                            },
+                                        ],
+                                    );
+                                }}
+                                hitSlop={8}
+                                className="p-1 mr-2 active:opacity-60"
+                            >
+                                <Ionicons
+                                    name="trash-outline"
+                                    size={22}
+                                    color="#9ca3af"
+                                />
+                            </Pressable>
+                        )}
                         <Pressable
                             onPress={() => {
                                 discardDraft();
