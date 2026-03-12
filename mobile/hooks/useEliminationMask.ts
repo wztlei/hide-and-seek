@@ -766,49 +766,66 @@ async function resolveMeasuringBuffer(
             const coastline = await fetchCoastline();
             console.log(`[coastline] fetchCoastline: ${Date.now() - t0} ms  (${coastline.features.length} features)`);
 
+            // Pre-filter to features within a rough ±5° bbox (~555 km) before
+            // the expensive nearestPointOnLine loop, reducing 1400+ → ~10 features.
             const t1 = Date.now();
-            const nearest = nearestPointOnCoastline(lng, lat, coastline);
-            console.log(`[coastline] nearestPointOnCoastline: ${Date.now() - t1} ms  distanceKm=${nearest?.distanceKm.toFixed(2)}`);
+            const ROUGH_PAD = 5;
+            const candidates = coastline.features.filter((f) => {
+                const [w, s, e, n] = turf.bbox(f);
+                return (
+                    w <= lng + ROUGH_PAD &&
+                    e >= lng - ROUGH_PAD &&
+                    s <= lat + ROUGH_PAD &&
+                    n >= lat - ROUGH_PAD
+                );
+            });
+            console.log(`[coastline] roughFilter: ${Date.now() - t1} ms  (${candidates.length} candidates)`);
+
+            const t2 = Date.now();
+            const nearest = nearestPointOnCoastline(
+                lng,
+                lat,
+                turf.featureCollection(candidates) as typeof coastline,
+            );
+            console.log(`[coastline] nearestPointOnCoastline: ${Date.now() - t2} ms  distanceKm=${nearest?.distanceKm.toFixed(2)}`);
             if (!nearest) return null;
 
-            // Clip each LineString individually to a bbox padded by the buffer
-            // distance, so we only process segments near the seeker rather than
-            // the entire global coastline dataset.
-            const padDeg = (nearest.distanceKm / 111) * 1.2;
-            const clipBbox: [number, number, number, number] = [
-                lng - padDeg,
-                lat - padDeg,
-                lng + padDeg,
-                lat + padDeg,
-            ];
-            const t2 = Date.now();
-            const clippedFeatures = coastline.features.flatMap((f) => {
-                try {
-                    const c = turf.bboxClip(f, clipBbox);
-                    return c.geometry.coordinates.length > 0 ? [c] : [];
-                } catch {
-                    return [];
-                }
-            });
-            console.log(`[coastline] bboxClip: ${Date.now() - t2} ms  (${clippedFeatures.length} features kept, padDeg=${padDeg.toFixed(3)})`);
-            if (!clippedFeatures.length) return null;
-
+            // Keep features whose bbox overlaps the padded clip region.
+            // bboxClip is avoided here: at 1:50m resolution, coastline LineStrings
+            // span hundreds of km so both endpoints often fall outside a tight bbox
+            // even when the segment crosses it, causing bboxClip to return empty.
+            // A bbox-overlap filter is sufficient — turf.buffer naturally constrains
+            // the output to the area around the seeker.
             const t3 = Date.now();
-            const simplified = turf.simplify(
-                turf.featureCollection(clippedFeatures),
-                { tolerance: 0.01, highQuality: false },
-            );
-            console.log(`[coastline] simplify: ${Date.now() - t3} ms  (${simplified.features.length} features)`);
-            if (!simplified.features.length) return null;
+            const padDeg = (nearest.distanceKm / 111) * 2.0;
+            const nearby = candidates.filter((f) => {
+                const [w, s, e, n] = turf.bbox(f);
+                return (
+                    w <= lng + padDeg &&
+                    e >= lng - padDeg &&
+                    s <= lat + padDeg &&
+                    n >= lat - padDeg
+                );
+            });
+            console.log(`[coastline] nearbyFilter: ${Date.now() - t3} ms  (${nearby.length} features, padDeg=${padDeg.toFixed(3)})`);
+            if (!nearby.length) return null;
 
             const t4 = Date.now();
+            const simplified = turf.simplify(
+                turf.featureCollection(nearby),
+                { tolerance: 0.01, highQuality: false },
+            );
+            console.log(`[coastline] simplify: ${Date.now() - t4} ms  (${simplified.features.length} features)`);
+            if (!simplified.features.length) return null;
+
+            const t5 = Date.now();
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, {
                 units: "kilometers",
             });
-            console.log(`[coastline] buffer: ${Date.now() - t4} ms  (${bufferFC?.features.length ?? 0} polygons)`);
+            console.log(`[coastline] buffer: ${Date.now() - t5} ms  (${bufferFC?.features.length ?? 0} polygons)`);
             if (!bufferFC?.features.length) return null;
 
-            const t5 = Date.now();
+            const t6 = Date.now();
             // Union all per-segment buffer polygons into one shape.
             const buffer =
                 bufferFC.features.length === 1
@@ -816,8 +833,8 @@ async function resolveMeasuringBuffer(
                     : (turf.union(
                           turf.featureCollection(bufferFC.features),
                       ) as Feature<Polygon | MultiPolygon> | null);
-            console.log(`[coastline] union: ${Date.now() - t5} ms`);
-            console.log(`[coastline] total: ${Date.now() - t0} ms`);
+            console.log(`[coastline] union: ${Date.now() - t6} ms`);
+            console.log(`[coastline] TOTAL: ${Date.now() - t0} ms`);
             return buffer
                 ? { buffer: trunc(buffer), pois: [], circles: [] }
                 : null;
