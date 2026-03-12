@@ -136,6 +136,13 @@ export function AppMapView() {
     const [pendingCoord, setPendingCoord] = useState<[number, number] | null>(
         null,
     );
+    // Guards map taps until the bottom sheet close animation fully completes.
+    // The sheet's gesture recognizer stays active during the animation and
+    // consumes touches — we use a fixed timeout rather than onChange since
+    // the Reanimated animation runs on the UI thread but onChange fires on
+    // the JS thread with an unpredictable delay.
+    const pickReadyRef = useRef(false);
+    const pickReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Derived ─────────────────────────────────────────────────────────────
 
@@ -175,11 +182,19 @@ export function AppMapView() {
     const handlePickLocationOnMap = useCallback(
         (key: number, field?: "A" | "B") => {
             console.log("[pickMode] entering pick mode — key:", key, "field:", field);
+            pickReadyRef.current = false;
+            if (pickReadyTimerRef.current) clearTimeout(pickReadyTimerRef.current);
             setPickingLocationForKey(key);
             setPickingLocationField(field ?? null);
             setPendingCoord(null);
             setQuestionsVisible(false);
             setEditingQuestionKey(null);
+            // Allow taps after the sheet close animation has had time to finish.
+            // 550 ms comfortably exceeds the default spring animation duration.
+            pickReadyTimerRef.current = setTimeout(() => {
+                pickReadyRef.current = true;
+                console.log("[pickMode] pickReady = true");
+            }, 550);
         },
         [],
     );
@@ -292,8 +307,8 @@ export function AppMapView() {
                 attributionEnabled={false}
                 onPress={(feature) => {
                     console.log("[mapPress] fired — pickingLocationForKey:", pickingLocationForKey, "geomType:", feature.geometry.type);
-                    if (pickingLocationForKey === null) {
-                        console.log("[mapPress] ignored — not in pick mode");
+                    if (pickingLocationForKey === null || !pickReadyRef.current) {
+                        console.log("[mapPress] ignored — pickingLocationForKey:", pickingLocationForKey, "pickReady:", pickReadyRef.current);
                         return;
                     }
                     if (feature.geometry.type !== "Point") {
