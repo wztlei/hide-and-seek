@@ -7,7 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import Constants from "expo-constants";
 import { useCallback, useRef, useEffect } from "react";
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { thunderforestApiKey } from "../lib/context";
@@ -136,15 +137,33 @@ export function SettingsSheet({ visible, onClose }: Props) {
                     <Text className="text-sm text-gray-500">
                         Optional. Enables transport-style map tiles from Thunderforest.
                     </Text>
-                    <TextInput
-                        value={$thunderforestApiKey}
-                        onChangeText={(text) => thunderforestApiKey.set(text.trim())}
-                        placeholder="Paste your API key here"
-                        placeholderTextColor="#9ca3af"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        style={styles.apiKeyInput}
-                    />
+                    <View className="flex-row items-center mt-2 gap-2">
+                        <View style={styles.apiKeyDisplay} className="flex-1">
+                            <Text
+                                style={styles.apiKeyText}
+                                numberOfLines={1}
+                            >
+                                {$thunderforestApiKey || "No API key set"}
+                            </Text>
+                        </View>
+                        <Pressable
+                            onPress={async () => {
+                                const text = await Clipboard.getStringAsync();
+                                if (text) thunderforestApiKey.set(text.trim());
+                            }}
+                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50"
+                        >
+                            <Text className="text-base font-medium" style={{ color: colors.PRIMARY }}>Paste</Text>
+                        </Pressable>
+                        {!!$thunderforestApiKey && (
+                            <Pressable
+                                onPress={() => thunderforestApiKey.set("")}
+                                className="active:opacity-60 px-3 py-2 rounded-lg bg-red-50"
+                            >
+                                <Text className="text-base font-medium text-red-600">Clear</Text>
+                            </Pressable>
+                        )}
+                    </View>
                 </View>
 
                 <View style={styles.divider} className="mb-4 mt-1" />
@@ -194,17 +213,17 @@ const styles = StyleSheet.create({
     sectionTracking: {
         letterSpacing: 0.8,
     },
-    // TextInput does not support className in NativeWind v4 — use style
-    apiKeyInput: {
-        marginTop: 8,
+    apiKeyDisplay: {
         borderWidth: 1,
         borderColor: "#e5e7eb",
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        fontSize: 14,
-        color: "#111827",
         backgroundColor: "#f9fafb",
+    },
+    apiKeyText: {
+        fontSize: 14,
+        color: "#6b7280",
         fontFamily: "monospace",
     },
 });
