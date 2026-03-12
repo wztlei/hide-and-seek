@@ -2,7 +2,7 @@ import "../global.css";
 
 import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
-import { usePostHog, PostHogProvider } from "posthog-react-native";
+import { PostHogProvider } from "posthog-react-native";
 import { useEffect, useState } from "react";
 import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -13,27 +13,12 @@ import { storageReady } from "../lib/storage";
 
 Sentry.init({
     dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    // TEST: force-enabled in dev so test events reach the dashboard.
-    // Change back to `!__DEV__` after verifying.
-    enabled: true,
+    enabled: !__DEV__,
 });
 
 // Suppress deprecation warning emitted by expo-router's own internal code
 LogBox.ignoreLogs(["SafeAreaView has been deprecated"]);
 
-// TEST — remove after verifying both dashboards show the events.
-function AnalyticsTest() {
-    const posthog = usePostHog();
-    useEffect(() => {
-        // Sentry: sends a test message + a caught exception.
-        Sentry.captureMessage("Sentry test message");
-        try { throw new Error("Sentry test exception"); } catch (e) { Sentry.captureException(e); }
-
-        // PostHog: sends a test event.
-        posthog?.capture("posthog_test_event", { source: "_layout mount" });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-    return null;
-}
 
 function RootLayout() {
     const [ready, setReady] = useState(false);
