@@ -15,7 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wztlei.jetlaghideandseek",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.wztlei.jetlaghideandseek",
@@ -34,7 +37,6 @@
     "plugins": [
       "expo-router",
       "@maplibre/maplibre-react-native",
-      "@sentry/react-native",
       [
         "@sentry/react-native/expo",
         {
@@ -43,6 +45,12 @@
           "organization": "wztlei"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "89a3b888-bd5c-4518-90b6-bf2a3ce519ef"
+      }
+    }
   }
 }
