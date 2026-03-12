@@ -734,15 +734,9 @@ function buildPOIUnionBuffer(
             ),
         ),
     );
-    console.log(
-        `[buildPOIUnionBuffer/${label}] ${selected.length} circles @ ${radiusKm.toFixed(1)} km: ${Date.now() - t0}ms`,
-    );
     if (circles.length === 1) return { union: circles[0], circles };
     const t1 = Date.now();
     const union = turf.union(turf.featureCollection(circles));
-    console.log(
-        `[buildPOIUnionBuffer/${label}] turf.union: ${Date.now() - t1}ms`,
-    );
     if (!union) return null;
     return { union: trunc(union), circles };
 }
@@ -771,19 +765,40 @@ async function resolveMeasuringBuffer(
             const coastline = await fetchCoastline();
             const nearest = nearestPointOnCoastline(lng, lat, coastline);
             if (!nearest) return null;
-            const simplified = turf.simplify(
-                turf.featureCollection(coastline.features),
-                {
-                    tolerance: 0.01,
-                    highQuality: false,
-                },
+
+            // Clip to a bbox padded by the buffer distance so we only process
+            // coastline segments that could actually fall inside the buffer,
+            // rather than buffering the entire global dataset.
+            const padDeg = (nearest.distanceKm / 111) * 1.2;
+            const clipBbox: [number, number, number, number] = [
+                lng - padDeg,
+                lat - padDeg,
+                lng + padDeg,
+                lat + padDeg,
+            ];
+            const clipped = turf.bboxClip(
+                turf.featureCollection(coastline.features) as any,
+                clipBbox,
             );
+
+            const simplified = turf.simplify(clipped, {
+                tolerance: 0.01,
+                highQuality: false,
+            });
+            if (!simplified.features.length) return null;
+
             const bufferFC = turf.buffer(simplified, nearest.distanceKm, {
                 units: "kilometers",
             });
-            const buffer = bufferFC?.features[0] as
-                | Feature<Polygon | MultiPolygon>
-                | undefined;
+            if (!bufferFC?.features.length) return null;
+
+            // Union all per-segment buffer polygons into one shape.
+            const buffer =
+                bufferFC.features.length === 1
+                    ? (bufferFC.features[0] as Feature<Polygon | MultiPolygon>)
+                    : (turf.union(
+                          turf.featureCollection(bufferFC.features),
+                      ) as Feature<Polygon | MultiPolygon> | null);
             return buffer
                 ? { buffer: trunc(buffer), pois: [], circles: [] }
                 : null;
