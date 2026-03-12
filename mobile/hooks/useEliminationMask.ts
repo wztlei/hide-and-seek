@@ -180,17 +180,21 @@ export function useEliminationMask() {
                     );
                     setEliminationMask(mask ? trunc(mask) : null);
 
-                    await tick();
-                    if (isCancelled()) return;
-                    setRadiusRegions(
-                        computeRadiusRegions(mapQuestions, zoneOrNull),
+                    const radius = await computeRadiusRegions(
+                        mapQuestions,
+                        zoneOrNull,
+                        isCancelled,
                     );
+                    if (radius === null) return;
+                    setRadiusRegions(radius);
 
-                    await tick();
-                    if (isCancelled()) return;
-                    setThermometerRegions(
-                        computeThermometerRegions(mapQuestions, zoneOrNull),
+                    const thermometer = await computeThermometerRegions(
+                        mapQuestions,
+                        zoneOrNull,
+                        isCancelled,
                     );
+                    if (thermometer === null) return;
+                    setThermometerRegions(thermometer);
 
                     if (mapQuestions.some((q) => q.id === "tentacles"))
                         toast.loading("Computing tentacles regions…");
@@ -264,13 +268,17 @@ function trunc<T extends Feature>(f: T): T {
 // Sync helpers return the regions array directly.
 // Async helpers return null if cancelled (caller must return early on null).
 
-function computeRadiusRegions(
+async function computeRadiusRegions(
     $questions: Questions,
     zone: Feature<Polygon | MultiPolygon>,
-): RadiusRegion[] {
+    isCancelled: () => boolean,
+): Promise<RadiusRegion[] | null> {
     const regions: RadiusRegion[] = [];
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
     for (const q of $questions) {
         if (q.id !== "radius") continue;
+        await tick();
+        if (isCancelled()) return null;
         const { lat, lng, radius, unit, within } = q.data;
         const circle = turf.circle([lng, lat], radius, {
             units: unit,
@@ -286,13 +294,17 @@ function computeRadiusRegions(
     return regions;
 }
 
-function computeThermometerRegions(
+async function computeThermometerRegions(
     $questions: Questions,
     zone: Feature<Polygon | MultiPolygon>,
-): ThermometerRegion[] {
+    isCancelled: () => boolean,
+): Promise<ThermometerRegion[] | null> {
     const regions: ThermometerRegion[] = [];
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
     for (const q of $questions) {
         if (q.id !== "thermometer") continue;
+        await tick();
+        if (isCancelled()) return null;
         const { latA, lngA, latB, lngB, warmer } = q.data;
 
         const ptA = turf.point([lngA, latA]);
