@@ -1,13 +1,14 @@
 import { persistentAtom } from "@nanostores/persistent";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import type { Map } from "leaflet";
-import { atom, computed } from "nanostores";
+import { atom, computed, onSet } from "nanostores";
 
 import type {
     AdditionalMapGeoLocations,
     CustomStation,
     OpenStreetMap,
 } from "@/maps/api";
+import { extractStationLabel } from "@/maps/geo-utils";
 import {
     type DeepPartial,
     type Question,
@@ -79,14 +80,6 @@ export const questionModified = (..._: any[]) => {
 export const leafletMapContext = atom<Map | null>(null);
 
 export const defaultUnit = persistentAtom<Units>("defaultUnit", "miles");
-export const highlightTrainLines = persistentAtom<boolean>(
-    "highlightTrainLines",
-    false,
-    {
-        encode: JSON.stringify,
-        decode: JSON.parse,
-    },
-);
 export const hiderMode = persistentAtom<
     | false
     | {
@@ -115,7 +108,16 @@ export const displayHidingZonesOptions = persistentAtom<string[]>(
     },
 );
 export const questionFinishedMapData = atom<any>(null);
+
 export const trainStations = atom<any[]>([]);
+onSet(trainStations, ({ newValue }) => {
+    newValue.sort((a, b) => {
+        const aName = (extractStationLabel(a.properties) || "") as string;
+        const bName = (extractStationLabel(b.properties) || "") as string;
+        return aName.localeCompare(bName);
+    });
+});
+
 export const useCustomStations = persistentAtom<boolean>(
     "useCustomStations",
     false,
@@ -206,6 +208,9 @@ export const customPresets = persistentAtom<CustomPreset[]>(
         decode: JSON.parse,
     },
 );
+onSet(customPresets, ({ newValue }) => {
+    newValue.sort((a, b) => a.name.localeCompare(b.name));
+});
 
 export const saveCustomPreset = (
     preset: Omit<CustomPreset, "id" | "createdAt">,
@@ -317,6 +322,9 @@ export const autoZoom = persistentAtom<boolean>("autoZoom", true, {
 
 export const isLoading = atom<boolean>(false);
 
+export const baseTileLayer = persistentAtom<
+    "voyager" | "light" | "dark" | "transport" | "neighbourhood" | "osmcarto"
+>("baseTileLayer", "voyager");
 export const thunderforestApiKey = persistentAtom<string>(
     "thunderforestApiKey",
     "",
