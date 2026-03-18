@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.wztlei.hideandseek",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Your location is shown on the map so you can see where you are relative to the game zones while playing Jet Lag: The Game Hide and Seek. Location is never stored or shared."
       }
     },
     "android": {
