@@ -340,11 +340,11 @@ async function computeThermometerRegions(
             );
         }
 
-        // Close the half-plane on the valid side by adding two far
-        // corners behind the valid point, then closing to the start.
-        // warmer=true → valid side is B (abBearing direction from mid)
-        // warmer=false → valid side is A (abBearing+180 direction)
-        const validBearing = warmer ? abBearing : abBearing + 180;
+        // Close the half-plane on the eliminated side by adding two far
+        // corners behind the eliminated point, then closing to the start.
+        // warmer=true → eliminated side is A (abBearing+180 direction from mid)
+        // warmer=false → eliminated side is B (abBearing direction)
+        const validBearing = warmer ? abBearing + 180 : abBearing;
         const farRight = turf.destination(
             turf.point(bisectorCoords[bisectorCoords.length - 1]),
             reach,
