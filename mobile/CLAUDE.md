@@ -222,7 +222,7 @@ Initialized in `app/_layout.tsx` at module level. Enabled in **production only**
 | `lib/measuringApi.ts` | Non-OK HTTP responses from Overpass/GitHub Pages (coastline, airports, cities, high-speed rail, POIs); breadcrumb for coastline and rail fetch |
 | `lib/tentacleApi.ts` | Non-OK HTTP responses from Overpass for tentacles POI queries |
 | `hooks/useEliminationMask.ts` | Top-level computation error (`captureException`); slow render >10 s (`captureMessage "warning"`); per-question-type errors for tentacles, matching, and measuring |
-| `components/PlacePicker.tsx` | Photon geocoder network/HTTP errors in `searchLocations` |
+| `components/MapConfigPanel.tsx` | Photon geocoder network/HTTP errors in `searchLocations` |
 
 ### PostHog (analytics)
 
@@ -232,10 +232,10 @@ Initialized in `app/_layout.tsx` via `<PostHogProvider>`. Disabled when `EXPO_PU
 
 | Event | Where | Properties |
 | ----- | ----- | ---------- |
-| `zone_added` | `PlacePicker` → `handleSelectResult` | `zone_name`, `osm_id` |
-| `zone_removed` | `PlacePicker` → `handleRemove` | `was_base` |
-| `zone_toggled` | `PlacePicker` → `handleToggleAdded` | `added` (new state) |
-| `zone_cleared` | `PlacePicker` → `handleClearZone` confirm | — |
+| `zone_added` | `MapConfigPanel` → `handleSelectResult` | `zone_name`, `osm_id` |
+| `zone_removed` | `MapConfigPanel` → `handleRemove` | `was_base` |
+| `zone_toggled` | `MapConfigPanel` → `handleToggleAdded` | `added` (new state) |
+| `zone_cleared` | `MapConfigPanel` → `handleClearZone` confirm | — |
 | `question_add_started` | `QuestionsPanel` → `handleAddQuestion` | `question_type` |
 | `question_saved_new` | `QuestionsPanel` → Save button (new draft) | `question_type` |
 | `question_saved_edit` | `QuestionsPanel` → Save button (edit existing) | `question_type` |

@@ -41,7 +41,7 @@ mobile/
 | ----------------------- | -------------------- | ------------------------------------------------------------------------ |
 | `editingQuestionKey`    | `number \| null`     | Which question the edit panel (Screen 3) is showing                      |
 | `questionsVisible`      | `boolean`            | Whether the QuestionsPanel bottom sheet is open                          |
-| `zoneModalVisible`      | `boolean`            | Whether the PlacePicker modal is open                                    |
+| `zoneModalVisible`      | `boolean`            | Whether the MapConfigPanel modal is open                                    |
 | `pickingLocationForKey` | `number \| null`     | Non-null while pick-mode is active; identifies the question being edited |
 | `pickingLocationField`  | `"A" \| "B" \| null` | For thermometer questions, which point is being placed; null for radius  |
 | `pendingCoord`          | `[lng, lat] \| null` | The coord the user tapped; null until a tap registers                    |
@@ -154,7 +154,7 @@ Three circular FABs stacked on the right side, positioned above the safe-area bo
 | Offset from bottom inset | Icon          | Action                           |
 | ------------------------ | ------------- | -------------------------------- |
 | +159 px                  | chatbox       | Open QuestionsPanel              |
-| +87 px                   | map / spinner | Open PlacePicker (zone selector) |
+| +87 px                   | map / spinner | Open MapConfigPanel (zone selector) |
 | +15 px                   | locate        | Fly camera to GPS position       |
 
 The zone button shows an `ActivityIndicator` while `isLoadingZone` is true.
