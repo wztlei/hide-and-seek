@@ -48,13 +48,13 @@ export function MapActionButtons({
                     <View
                         style={{
                             position: "absolute",
-                            top: 6,
-                            right: 6,
-                            width: 10,
-                            height: 10,
-                            borderRadius: 5,
+                            top: 4,
+                            right: 4,
+                            width: 14,
+                            height: 14,
+                            borderRadius: 7,
                             backgroundColor: "#ef4444",
-                            borderWidth: 1.5,
+                            borderWidth: 2,
                             borderColor: "white",
                         }}
                     />

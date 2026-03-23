@@ -9,7 +9,7 @@ interface UpdateInfo {
 }
 
 const VERSION_URL =
-    "https://raw.githubusercontent.com/wztlei/hide-and-seek/master/public/version.json";
+    "https://raw.githubusercontent.com/wztlei/hide-and-seek/refs/heads/master/public/version.json";
 
 export function useUpdateCheck(): UpdateInfo {
     const [info, setInfo] = useState<UpdateInfo>({
@@ -22,7 +22,12 @@ export function useUpdateCheck(): UpdateInfo {
         fetch(VERSION_URL)
             .then((r) => r.json())
             .then((data) => {
-                const current = Constants.expoConfig?.version ?? "0.0.0";
+                const current =
+                    Constants.expoConfig?.version ??
+                    // @ts-ignore — manifest2 exists in Expo Go (SDK 44+) but is not in the type definitions
+                    (Constants.manifest2?.extra?.expoClient?.version as string | undefined) ??
+                    Constants.manifest?.version ??
+                    "0.0.0";
                 const hasUpdate = data.version !== current;
                 const storeUrl =
                     Platform.OS === "ios" ? data.ios_url : data.android_url;

@@ -24,8 +24,11 @@ interface Props {
 }
 
 const APP_VERSION =
-    Constants.expoConfig?.version ?? Constants.manifest?.version ?? "1.0.0";
-
+    Constants.expoConfig?.version ??
+    // @ts-ignore — manifest2 exists in Expo Go (SDK 44+) but is not in the type definitions
+    (Constants.manifest2?.extra?.expoClient?.version as string | undefined) ??
+    Constants.manifest?.version ??
+    "1.0.0";
 const GITHUB_ISSUES_URL = "https://github.com/wztlei/hide-and-seek/issues";
 const FEEDBACK_FORM_URL = "https://forms.gle/bGJ1FWvdKPHFnjp56";
 
@@ -107,6 +110,26 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                     { paddingBottom: insets.bottom + 16 },
                 ]}
             >
+                {/* Update banner */}
+                {hasUpdate && storeUrl && (
+                    <Pressable
+                        onPress={() => Linking.openURL(storeUrl)}
+                        style={styles.updateBanner}
+                        className="active:opacity-70"
+                    >
+                        <Ionicons name="sparkles" size={18} color="#92400e" />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={styles.updateBannerTitle}>
+                                Update available — v{latestVersion}
+                            </Text>
+                            <Text style={styles.updateBannerSubtitle}>
+                                Tap to open the app store
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#92400e" />
+                    </Pressable>
+                )}
+
                 {/* Header */}
                 <View className="flex-row items-baseline justify-between mb-3">
                     <Text className="text-xl font-bold text-gray-900">
@@ -123,28 +146,6 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                     Add questions, track zone eliminations, and narrow down
                     where the hider could be hiding on the map.
                 </Text>
-
-                {/* Update row */}
-                {hasUpdate && storeUrl && (
-                    <>
-                        <Pressable
-                            onPress={() => Linking.openURL(storeUrl)}
-                            className="flex-row items-center py-3.5 px-1 active:opacity-60"
-                            style={styles.updateRow}
-                        >
-                            <Ionicons name="sparkles" size={20} color={colors.PRIMARY} />
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text className="text-base font-semibold text-gray-900">
-                                    Update available — v{latestVersion}
-                                </Text>
-                                <Text className="text-sm text-gray-500 mt-px">
-                                    Tap to open the app store
-                                </Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
-                        </Pressable>
-                    </>
-                )}
 
                 {/* Divider */}
                 <View style={styles.divider} className="mb-4" />
@@ -298,12 +299,25 @@ const styles = StyleSheet.create({
     actionButton: {
         width: 64,
     },
-    updateRow: {
-        backgroundColor: "white",
-        borderLeftWidth: 4,
-        borderLeftColor: colors.PRIMARY,
-        paddingHorizontal: 12,
-        borderRadius: 4,
-        marginBottom: 4,
+    updateBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#fef3c7",
+        borderWidth: 1,
+        borderColor: "#fcd34d",
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginBottom: 16,
+    },
+    updateBannerTitle: {
+        fontSize: 15,
+        fontWeight: "600",
+        color: "#92400e",
+    },
+    updateBannerSubtitle: {
+        fontSize: 13,
+        color: "#b45309",
+        marginTop: 1,
     },
 });
