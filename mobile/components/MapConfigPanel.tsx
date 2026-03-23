@@ -129,9 +129,10 @@ interface Props {
     visible: boolean;
     onClose: () => void;
     onCustomLocation: () => void;
+    onStartDrawPolygon: () => void;
 }
 
-export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLocation }: Props) {
+export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLocation, onStartDrawPolygon }: Props) {
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheet>(null);
@@ -147,6 +148,7 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
 
     const $mapGeoLocation = useStore(mapGeoLocation);
     const $additionalMapGeoLocations = useStore(additionalMapGeoLocations);
+    const $polyGeoJSON = useStore(polyGeoJSON);
     const $displayHidingZones = useStore(displayHidingZones);
     const $displayHidingZonesOptions = useStore(displayHidingZonesOptions);
     const $hidingRadius = useStore(hidingRadius);
@@ -272,6 +274,11 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
             zone_name: feature.properties.name,
             osm_id: feature.properties.osm_id,
         });
+    }
+
+    function handleDrawPolygon() {
+        onStartDrawPolygon();
+        onClose();
     }
 
     function handleClearZone() {
@@ -406,6 +413,57 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                     </View>
                 ))}
 
+                {/* Drawn polygon rows */}
+                {$polyGeoJSON?.features.map((f, i) => {
+                    const isAdded = f.properties?.added !== false;
+                    return (
+                        <View
+                            key={`poly-${i}`}
+                            className={`flex-row items-center px-4 py-2${!isAdded ? " bg-[#e3e4e6]" : ""}`}
+                        >
+                            <Ionicons name="shapes-outline" size={20} color={colors.PRIMARY} />
+                            <Text
+                                className="flex-1 text-lg ml-2"
+                                style={{ color: isAdded ? "#1f2937" : "#888888" }}
+                            >
+                                Custom polygon {i + 1}
+                            </Text>
+                            <View className="flex-row items-center gap-2">
+                                <TouchableOpacity
+                                    hitSlop={8}
+                                    activeOpacity={0.6}
+                                    onPress={() => {
+                                        const features = $polyGeoJSON.features.map((g, j) =>
+                                            j === i
+                                                ? { ...g, properties: { ...g.properties, added: !isAdded } }
+                                                : g,
+                                        );
+                                        polyGeoJSON.set({ type: "FeatureCollection", features });
+                                        mapGeoJSON.set(null);
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={isAdded ? "ban-outline" : "add-outline"}
+                                        size={24}
+                                        color={colors.PRIMARY}
+                                    />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    hitSlop={8}
+                                    activeOpacity={0.6}
+                                    onPress={() => {
+                                        const remaining = $polyGeoJSON.features.filter((_, j) => j !== i);
+                                        polyGeoJSON.set(remaining.length === 0 ? null : { type: "FeatureCollection", features: remaining });
+                                        mapGeoJSON.set(null);
+                                    }}
+                                >
+                                    <Ionicons name="trash-outline" size={24} color="#6b7280" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    );
+                })}
+
                 {/* Separator */}
                 <View className="h-px bg-gray-200 mx-4 my-2" />
 
@@ -500,6 +558,19 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
 
                 {/* Footer buttons */}
                 <View className="px-4 pt-2 pb-4 border-t border-gray-100 mt-2 gap-2">
+                    <Pressable
+                        onPress={handleDrawPolygon}
+                        style={footerButtonStyle}
+                    >
+                        <Ionicons
+                            name="pencil-outline"
+                            size={18}
+                            color={colors.PRIMARY}
+                        />
+                        <Text className="ml-2 text-base font-medium" style={{ color: colors.PRIMARY }}>
+                            Draw custom polygon
+                        </Text>
+                    </Pressable>
                     <Pressable
                         onPress={handleClearZone}
                         style={footerButtonStyle}

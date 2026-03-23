@@ -5,6 +5,7 @@ import {
     additionalMapGeoLocations,
     mapGeoJSON,
     mapGeoLocation,
+    polyGeoJSON,
 } from "../lib/context";
 import { fetchAllZoneBoundaries } from "../lib/fetchZoneBoundary";
 import { toast } from "../lib/notifications";
@@ -24,6 +25,7 @@ const BOUNDARY_CACHE_KEY = "cachedMapGeoJSON";
 export function useZoneBoundary() {
     const $mapGeoLocation = useStore(mapGeoLocation);
     const $additionalMapGeoLocations = useStore(additionalMapGeoLocations);
+    const $polyGeoJSON = useStore(polyGeoJSON);
     const [isLoadingZone, setIsLoadingZone] = useState(false);
 
     // Seed from cache on mount. storageReady has already resolved by the time
@@ -39,7 +41,7 @@ export function useZoneBoundary() {
         }
     }, []);
 
-    // Re-fetch whenever the selected location(s) change.
+    // Re-fetch whenever the selected location(s) or drawn polygon change.
     useEffect(() => {
         let cancelled = false;
         setIsLoadingZone(true);
@@ -67,6 +69,7 @@ export function useZoneBoundary() {
             cancelled = true;
         };
     }, [
+        $polyGeoJSON,
         $mapGeoLocation.properties.osm_id,
         $additionalMapGeoLocations.length,
         // eslint-disable-next-line react-hooks/exhaustive-deps

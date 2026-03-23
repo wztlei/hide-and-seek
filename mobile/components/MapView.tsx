@@ -11,12 +11,14 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import type { Questions } from "../../src/maps/schema";
 import {
     hidingRadius,
     hidingRadiusUnits,
     mapGeoJSON,
     mapGeoLocation,
+    polyGeoJSON,
     questionModified,
     questions,
     thunderforestApiKey,
@@ -27,6 +29,7 @@ import { useHidingZones } from "../hooks/useHidingZones";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
+import { DrawPolygonBanner } from "./map/DrawPolygonBanner";
 import { HidingZonePoiPrompt } from "./map/HidingZonePoiPrompt";
 import { MapLayers } from "./map/MapLayers";
 import { MapLoadingOverlay } from "./map/MapLoadingOverlay";
@@ -136,6 +139,10 @@ export function AppMapView() {
     const [questionsVisible, setQuestionsVisible] = useState(false);
     const [zoneModalVisible, setZoneModalVisible] = useState(false);
     const [settingsVisible, setSettingsVisible] = useState(false);
+
+    // ── Polygon drawing state ────────────────────────────────────────────────
+    const [drawingPolygon, setDrawingPolygon] = useState(false);
+    const [polygonVertices, setPolygonVertices] = useState<[number, number][]>([]);
 
     // ── Pick-location-on-map state ──────────────────────────────────────────
     // pickingLocationForKey: which question is being edited (non-null = active)
@@ -323,6 +330,35 @@ export function AppMapView() {
         setPendingHidingZonePoi(coord);
     }, []);
 
+    const handleCompletePolygon = useCallback((vertices: [number, number][]) => {
+        if (vertices.length < 3) return;
+        const ring = [...vertices, vertices[0]];
+        const polygon: Feature<Polygon> = {
+            type: "Feature",
+            geometry: { type: "Polygon", coordinates: [ring] },
+            properties: { added: true },
+        };
+        const existing = polyGeoJSON.get();
+        const fc: FeatureCollection<Polygon | MultiPolygon> = {
+            type: "FeatureCollection",
+            features: existing ? [...existing.features, polygon] : [polygon],
+        };
+        polyGeoJSON.set(fc);
+        mapGeoJSON.set(null); // trigger useZoneBoundary refetch with new polygon list
+        setDrawingPolygon(false);
+        setPolygonVertices([]);
+    }, []);
+
+    const handleCancelDrawPolygon = useCallback(() => {
+        setDrawingPolygon(false);
+        setPolygonVertices([]);
+    }, []);
+
+    const handleStartDrawPolygon = useCallback(() => {
+        setDrawingPolygon(true);
+        setPolygonVertices([]);
+    }, []);
+
     const handleConfirmHidingZone = useCallback(() => {
         if (!pendingHidingZonePoi) return;
         const [lng, lat] = pendingHidingZonePoi;
@@ -362,6 +398,24 @@ export function AppMapView() {
                     // handleHidingZonePoiPress after the event batch completes.
                     if (poiJustTappedRef.current) return;
 
+                    if (feature.geometry.type !== "Point") return;
+                    const [lng, lat] = feature.geometry.coordinates as [number, number];
+
+                    // Drawing mode: collect vertices; close polygon if near first vertex.
+                    if (drawingPolygon) {
+                        if (polygonVertices.length >= 3) {
+                            const [fx, fy] = polygonVertices[0];
+                            const dLng = lng - fx;
+                            const dLat = lat - fy;
+                            if (Math.sqrt(dLng * dLng + dLat * dLat) < 0.001) {
+                                handleCompletePolygon(polygonVertices);
+                                return;
+                            }
+                        }
+                        setPolygonVertices((prev) => [...prev, [lng, lat] as [number, number]]);
+                        return;
+                    }
+
                     // Dismiss the POI prompt on any tap elsewhere.
                     if (pendingHidingZonePoi !== null) {
                         setPendingHidingZonePoi(null);
@@ -369,8 +423,6 @@ export function AppMapView() {
                     }
 
                     if (pickingLocationForKey === null || !pickReadyRef.current) return;
-                    if (feature.geometry.type !== "Point") return;
-                    const [lng, lat] = feature.geometry.coordinates as [number, number];
                     setPendingCoord([lng, lat]);
                 }}
             >
@@ -407,6 +459,8 @@ export function AppMapView() {
                     hidingZonePois={hidingZonePois}
                     onHidingZonePoiPress={handleHidingZonePoiPress}
                     selectedHidingZonePoi={pendingHidingZonePoi}
+                    drawingPolygon={drawingPolygon}
+                    polygonVertices={polygonVertices}
                 />
             </MLMapView>
 
@@ -445,22 +499,33 @@ export function AppMapView() {
                 />
             )}
 
-            <MapActionButtons
-                bottomInset={insets.bottom}
-                isLoadingZone={isLoadingZone}
-                onQuestionsPress={() => setQuestionsVisible(true)}
-                onZonePress={() => setZoneModalVisible(true)}
-                onLocatePress={zoomToUserLocation}
-                onSettingsPress={() => setSettingsVisible(true)}
-            />
+            {drawingPolygon && pickingLocationForKey === null && (
+                <DrawPolygonBanner
+                    topInset={insets.top}
+                    vertexCount={polygonVertices.length}
+                    onFinish={() => handleCompletePolygon(polygonVertices)}
+                    onCancel={handleCancelDrawPolygon}
+                />
+            )}
+
+            <View pointerEvents={drawingPolygon ? "none" : "auto"}>
+                <MapActionButtons
+                    bottomInset={insets.bottom}
+                    isLoadingZone={isLoadingZone}
+                    onQuestionsPress={() => setQuestionsVisible(true)}
+                    onZonePress={() => setZoneModalVisible(true)}
+                    onLocatePress={zoomToUserLocation}
+                    onSettingsPress={() => setSettingsVisible(true)}
+                />
+            </View>
 
             <MapConfigPanel
                 visible={zoneModalVisible}
                 onClose={() => setZoneModalVisible(false)}
                 onCustomLocation={() => {
                     setZoneModalVisible(false);
-                    // TODO: open custom location flow
                 }}
+                onStartDrawPolygon={handleStartDrawPolygon}
             />
 
             <QuestionsPanel

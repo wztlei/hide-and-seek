@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type {
     Feature,
     FeatureCollection,
+    LineString,
     MultiPolygon,
     Point,
     Polygon,
@@ -18,7 +19,7 @@ import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
-import { showHidingZoneCircles } from "../../lib/context";
+import { polyGeoJSON, showHidingZoneCircles } from "../../lib/context";
 import { colors } from "../../lib/colors";
 import {
     radiusCircle,
@@ -65,6 +66,10 @@ interface Props {
     onHidingZonePoiPress: (coord: [number, number]) => void;
     /** The currently-tapped POI coord — rendered larger to show selection. */
     selectedHidingZonePoi: [number, number] | null;
+    /** Whether the user is actively drawing a polygon. */
+    drawingPolygon: boolean;
+    /** Vertices collected so far during polygon drawing. */
+    polygonVertices: [number, number][];
 }
 
 /**
@@ -97,8 +102,11 @@ export function MapLayers({
     hidingZonePois,
     onHidingZonePoiPress,
     selectedHidingZonePoi,
+    drawingPolygon,
+    polygonVertices,
 }: Props) {
     const $showHidingZoneCircles = useStore(showHidingZoneCircles);
+    const $polyGeoJSON = useStore(polyGeoJSON);
 
     // ── Consolidated FeatureCollections (one per question type) ──────────────
     // Each replaces N per-question ShapeSources with a single source, reducing
@@ -181,6 +189,48 @@ export function MapLayers({
         }),
         [questions],
     );
+
+    // ── Polygon drawing geometry ─────────────────────────────────────────────
+
+    const drawEdges = useMemo<FeatureCollection<LineString>>(() => {
+        if (!drawingPolygon || polygonVertices.length < 2) {
+            return { type: "FeatureCollection", features: [] };
+        }
+        const coords = [...polygonVertices];
+        return {
+            type: "FeatureCollection",
+            features: [
+                {
+                    type: "Feature",
+                    geometry: { type: "LineString", coordinates: coords },
+                    properties: {},
+                },
+            ],
+        };
+    }, [drawingPolygon, polygonVertices]);
+
+    const drawVertices = useMemo<FeatureCollection<Point>>(() => {
+        if (!drawingPolygon || polygonVertices.length === 0) {
+            return { type: "FeatureCollection", features: [] };
+        }
+        return {
+            type: "FeatureCollection",
+            features: polygonVertices.map((coord) => ({
+                type: "Feature" as const,
+                geometry: { type: "Point" as const, coordinates: coord },
+                properties: {},
+            })),
+        };
+    }, [drawingPolygon, polygonVertices]);
+
+    const drawFirstVertex = useMemo<Feature<Point> | null>(() => {
+        if (!drawingPolygon || polygonVertices.length < 3) return null;
+        return {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: polygonVertices[0] },
+            properties: {},
+        };
+    }, [drawingPolygon, polygonVertices]);
 
     // ── Merged POI dots ──────────────────────────────────────────────────────
     // Single CircleLayer across all question types — one GPU draw call.
@@ -350,6 +400,65 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
+            {/* Drawn polygon outlines — always mounted to avoid MapLibre source-removal crash */}
+            <ShapeSource
+                id="poly-geojson-outline"
+                shape={$polyGeoJSON ?? { type: "FeatureCollection", features: [] }}
+            >
+                <LineLayer
+                    id="poly-geojson-outline-line"
+                    style={{
+                        lineColor: colors.PRIMARY,
+                        lineWidth: 2,
+                        lineOpacity: 0.5,
+                    }}
+                />
+            </ShapeSource>
+
+            {/* ── Polygon drawing layers — always mounted to avoid MapLibre source-removal crash */}
+
+            {/* Edge lines — dashed blue outline of the polygon being drawn */}
+            <ShapeSource id="polygon-draw-lines" shape={drawEdges}>
+                <LineLayer
+                    id="polygon-draw-lines-layer"
+                    style={{
+                        lineColor: "#3b82f6",
+                        lineWidth: 2,
+                        lineDasharray: [4, 3],
+                    }}
+                />
+            </ShapeSource>
+
+            {/* Vertex dots */}
+            <ShapeSource id="polygon-draw-vertices" shape={drawVertices}>
+                <CircleLayer
+                    id="polygon-draw-vertices-layer"
+                    style={{
+                        circleRadius: 5,
+                        circleColor: "white",
+                        circleStrokeWidth: 2,
+                        circleStrokeColor: "#3b82f6",
+                    }}
+                />
+            </ShapeSource>
+
+            {/* First-vertex close-target — rendered larger when ≥ 3 vertices */}
+            <ShapeSource
+                id="polygon-draw-first"
+                shape={drawFirstVertex ?? { type: "FeatureCollection", features: [] }}
+            >
+                <CircleLayer
+                    id="polygon-draw-first-layer"
+                    style={{
+                        circleRadius: 9,
+                        circleColor: "#3b82f6",
+                        circleOpacity: 0.9,
+                        circleStrokeWidth: 2,
+                        circleStrokeColor: "white",
+                    }}
+                />
+            </ShapeSource>
+
             {/* Radius eliminated-area fills */}
             {radiusRegions.length > 0 && (
                 <ShapeSource id="radius-fills" shape={radiusFills}>
@@ -431,31 +540,28 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
-            {/* Hiding zone transit stop dots */}
-            {hidingZonePois.length > 0 && (
-                <ShapeSource
-                    id="hiding-zone-pois"
-                    shape={{
-                        type: "FeatureCollection",
-                        features: hidingZonePois,
+            {/* Hiding zone transit stop dots — always mounted to avoid MapLibre
+                "source in use, cannot remove" crash on conditional unmount. */}
+            <ShapeSource
+                id="hiding-zone-pois"
+                shape={{ type: "FeatureCollection", features: hidingZonePois }}
+                onPress={(e) => {
+                    if (drawingPolygon) return;
+                    const f = e.features[0];
+                    if (!f || f.geometry.type !== "Point") return;
+                    const [lng, lat] = f.geometry.coordinates as [number, number];
+                    onHidingZonePoiPress([lng, lat]);
+                }}
+            >
+                <CircleLayer
+                    id="hiding-zone-poi-dots"
+                    style={{
+                        circleRadius: 4,
+                        circleColor: colors.RADIUS,
+                        circleOpacity: 0.8,
                     }}
-                    onPress={(e) => {
-                        const f = e.features[0];
-                        if (!f || f.geometry.type !== "Point") return;
-                        const [lng, lat] = f.geometry.coordinates as [number, number];
-                        onHidingZonePoiPress([lng, lat]);
-                    }}
-                >
-                    <CircleLayer
-                        id="hiding-zone-poi-dots"
-                        style={{
-                            circleRadius: 4,
-                            circleColor: colors.RADIUS,
-                            circleOpacity: 0.8,
-                        }}
-                    />
-                </ShapeSource>
-            )}
+                />
+            </ShapeSource>
 
             {/* Selected hiding zone POI — rendered larger to show which stop was tapped.
                 Always mounted (never conditionally unmounted) to avoid a MapLibre crash

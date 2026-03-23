@@ -7,7 +7,7 @@ import type {
     Polygon,
 } from "geojson";
 
-import { mapGeoLocation, additionalMapGeoLocations } from "./context";
+import { mapGeoLocation, additionalMapGeoLocations, polyGeoJSON } from "./context";
 
 const OVERPASS_API = "https://overpass-api.de/api/interpreter";
 
@@ -94,6 +94,18 @@ export async function fetchAllZoneBoundaries(): Promise<
         .filter((x) => x.added)
         .flatMap((x) => x.data.features) as Feature<Polygon | MultiPolygon>[];
 
+    const poly = polyGeoJSON.get();
+    const polySubtracted: Feature<Polygon | MultiPolygon>[] = [];
+    if (poly) {
+        for (const f of poly.features as Feature<Polygon | MultiPolygon>[]) {
+            if (f.properties?.added === false) {
+                polySubtracted.push(f);
+            } else {
+                addedFeatures.push(f);
+            }
+        }
+    }
+
     let merged: Feature<Polygon | MultiPolygon> = safeUnion(addedFeatures);
 
     for (const subtracted of results.filter((x) => !x.added)) {
@@ -103,6 +115,11 @@ export async function fetchAllZoneBoundaries(): Promise<
         const diff = turf.difference(
             turf.featureCollection([merged, ...subFeatures]),
         );
+        if (diff) merged = diff;
+    }
+
+    for (const subFeature of polySubtracted) {
+        const diff = turf.difference(turf.featureCollection([merged, subFeature]));
         if (diff) merged = diff;
     }
 
