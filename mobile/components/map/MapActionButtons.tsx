@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 import { colors } from "../../lib/colors";
 
 interface Props {
     bottomInset: number;
     isLoadingZone: boolean;
+    hasUpdate?: boolean;
     onQuestionsPress: () => void;
     onZonePress: () => void;
     onLocatePress: () => void;
@@ -25,6 +26,7 @@ interface Props {
 export function MapActionButtons({
     bottomInset,
     isLoadingZone,
+    hasUpdate,
     onQuestionsPress,
     onZonePress,
     onLocatePress,
@@ -42,6 +44,21 @@ export function MapActionButtons({
                     size={24}
                     color={colors.PRIMARY}
                 />
+                {hasUpdate && (
+                    <View
+                        style={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            width: 10,
+                            height: 10,
+                            borderRadius: 5,
+                            backgroundColor: "#ef4444",
+                            borderWidth: 1.5,
+                            borderColor: "white",
+                        }}
+                    />
+                )}
             </Pressable>
 
             <Pressable

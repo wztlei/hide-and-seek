@@ -26,6 +26,7 @@ import {
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useHidingZones } from "../hooks/useHidingZones";
+import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
@@ -106,6 +107,7 @@ export function AppMapView() {
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
+    const { hasUpdate, latestVersion, storeUrl } = useUpdateCheck();
     const {
         eliminationMask,
         zoneBoundary,
@@ -512,6 +514,7 @@ export function AppMapView() {
                 <MapActionButtons
                     bottomInset={insets.bottom}
                     isLoadingZone={isLoadingZone}
+                    hasUpdate={hasUpdate}
                     onQuestionsPress={() => setQuestionsVisible(true)}
                     onZonePress={() => setZoneModalVisible(true)}
                     onLocatePress={zoomToUserLocation}
@@ -540,6 +543,9 @@ export function AppMapView() {
             <SettingsSheet
                 visible={settingsVisible}
                 onClose={() => setSettingsVisible(false)}
+                hasUpdate={hasUpdate}
+                latestVersion={latestVersion}
+                storeUrl={storeUrl}
             />
 
             {!$mapGeoJSON && <MapLoadingOverlay />}

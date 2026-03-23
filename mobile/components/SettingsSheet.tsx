@@ -18,6 +18,9 @@ import { colors } from "../lib/colors";
 interface Props {
     visible: boolean;
     onClose: () => void;
+    hasUpdate?: boolean;
+    latestVersion?: string | null;
+    storeUrl?: string | null;
 }
 
 const APP_VERSION =
@@ -55,7 +58,7 @@ function LinkRow({
     );
 }
 
-export function SettingsSheet({ visible, onClose }: Props) {
+export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl }: Props) {
     const sheetRef = useRef<BottomSheet>(null);
     const insets = useSafeAreaInsets();
     const $thunderforestApiKey = useStore(thunderforestApiKey);
@@ -120,6 +123,28 @@ export function SettingsSheet({ visible, onClose }: Props) {
                     Add questions, track zone eliminations, and narrow down
                     where the hider could be hiding on the map.
                 </Text>
+
+                {/* Update row */}
+                {hasUpdate && storeUrl && (
+                    <>
+                        <Pressable
+                            onPress={() => Linking.openURL(storeUrl)}
+                            className="flex-row items-center py-3.5 px-1 active:opacity-60"
+                            style={styles.updateRow}
+                        >
+                            <Ionicons name="sparkles" size={20} color={colors.PRIMARY} />
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text className="text-base font-semibold text-gray-900">
+                                    Update available — v{latestVersion}
+                                </Text>
+                                <Text className="text-sm text-gray-500 mt-px">
+                                    Tap to open the app store
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+                        </Pressable>
+                    </>
+                )}
 
                 {/* Divider */}
                 <View style={styles.divider} className="mb-4" />
@@ -272,5 +297,13 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         width: 64,
+    },
+    updateRow: {
+        backgroundColor: "white",
+        borderLeftWidth: 4,
+        borderLeftColor: colors.PRIMARY,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+        marginBottom: 4,
     },
 });
