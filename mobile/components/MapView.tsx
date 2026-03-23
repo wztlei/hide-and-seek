@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Questions } from "../../src/maps/schema";
 import {
+    hidingRadius,
+    hidingRadiusUnits,
     mapGeoJSON,
     mapGeoLocation,
     questionModified,
@@ -25,6 +27,7 @@ import { useHidingZones } from "../hooks/useHidingZones";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
+import { HidingZonePoiPrompt } from "./map/HidingZonePoiPrompt";
 import { MapLayers } from "./map/MapLayers";
 import { MapLoadingOverlay } from "./map/MapLoadingOverlay";
 import { PickLocationBanner } from "./map/PickLocationBanner";
@@ -154,6 +157,12 @@ export function AppMapView() {
     // the JS thread with an unpredictable delay.
     const pickReadyRef = useRef(false);
     const pickReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Hiding zone POI tap — coord of the tapped stop (null = prompt hidden)
+    const [pendingHidingZonePoi, setPendingHidingZonePoi] = useState<[number, number] | null>(null);
+    // Prevents the map's onPress from immediately dismissing the prompt that
+    // the ShapeSource onPress just set (both fire on the same tap).
+    const poiJustTappedRef = useRef(false);
 
     // ── Derived ─────────────────────────────────────────────────────────────
 
@@ -305,6 +314,37 @@ export function AppMapView() {
         setQuestionsVisible(true);
     }, []);
 
+    const handleHidingZonePoiPress = useCallback((coord: [number, number]) => {
+        // Set the guard flag before MapView.onPress can fire (or to absorb it
+        // if ShapeSource fires first). Clear it after the current event batch
+        // so it doesn't swallow a subsequent map tap to dismiss the prompt.
+        poiJustTappedRef.current = true;
+        setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+        setPendingHidingZonePoi(coord);
+    }, []);
+
+    const handleConfirmHidingZone = useCallback(() => {
+        if (!pendingHidingZonePoi) return;
+        const [lng, lat] = pendingHidingZonePoi;
+        const newQuestion = {
+            id: "radius" as const,
+            key: Date.now(),
+            data: {
+                lat,
+                lng,
+                radius: hidingRadius.get(),
+                unit: hidingRadiusUnits.get() as "miles" | "kilometers",
+                within: true,
+                drag: true,
+                color: "green" as const,
+                collapsed: false,
+            },
+        };
+        questions.set([...questions.get(), newQuestion]);
+        questionModified();
+        setPendingHidingZonePoi(null);
+    }, [pendingHidingZonePoi]);
+
     // ── Render ──────────────────────────────────────────────────────────────
 
     return (
@@ -317,20 +357,20 @@ export function AppMapView() {
                 logoEnabled={false}
                 attributionEnabled={false}
                 onPress={(feature) => {
-                    console.log("[mapPress] fired — pickingLocationForKey:", pickingLocationForKey, "geomType:", feature.geometry.type);
-                    if (pickingLocationForKey === null || !pickReadyRef.current) {
-                        console.log("[mapPress] ignored — pickingLocationForKey:", pickingLocationForKey, "pickReady:", pickReadyRef.current);
+                    // Absorb the MapView tap that fires on the same event as a
+                    // POI dot press. The flag is cleared via setTimeout(0) in
+                    // handleHidingZonePoiPress after the event batch completes.
+                    if (poiJustTappedRef.current) return;
+
+                    // Dismiss the POI prompt on any tap elsewhere.
+                    if (pendingHidingZonePoi !== null) {
+                        setPendingHidingZonePoi(null);
                         return;
                     }
-                    if (feature.geometry.type !== "Point") {
-                        console.log("[mapPress] ignored — geometry is not Point");
-                        return;
-                    }
-                    const [lng, lat] = feature.geometry.coordinates as [
-                        number,
-                        number,
-                    ];
-                    console.log("[mapPress] accepted — setting pendingCoord", lng, lat);
+
+                    if (pickingLocationForKey === null || !pickReadyRef.current) return;
+                    if (feature.geometry.type !== "Point") return;
+                    const [lng, lat] = feature.geometry.coordinates as [number, number];
                     setPendingCoord([lng, lat]);
                 }}
             >
@@ -365,6 +405,8 @@ export function AppMapView() {
                     hidingZoneCircles={hidingZoneCircles}
                     hidingZoneMask={hidingZoneMask}
                     hidingZonePois={hidingZonePois}
+                    onHidingZonePoiPress={handleHidingZonePoiPress}
+                    selectedHidingZonePoi={pendingHidingZonePoi}
                 />
             </MLMapView>
 
@@ -392,6 +434,14 @@ export function AppMapView() {
                     onCancel={() => finishPicking(pickingLocationForKey)}
                     onConfirm={handleConfirmPick}
                     onRetap={() => setPendingCoord(null)}
+                />
+            )}
+
+            {pendingHidingZonePoi !== null && pickingLocationForKey === null && (
+                <HidingZonePoiPrompt
+                    topInset={insets.top}
+                    onConfirm={handleConfirmHidingZone}
+                    onDismiss={() => setPendingHidingZonePoi(null)}
                 />
             )}
 

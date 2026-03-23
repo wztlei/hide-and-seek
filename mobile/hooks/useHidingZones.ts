@@ -23,7 +23,7 @@ import { deleteCached, getCached, setCached } from "../lib/storage";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const MAX_STATIONS = 500;
+const MAX_STATIONS = 1000;
 const HIDING_CACHE_MAX = 20;
 const HIDING_LRU_KEY = "hiding:__lru__";
 

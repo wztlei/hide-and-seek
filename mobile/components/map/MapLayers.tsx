@@ -61,6 +61,10 @@ interface Props {
     hidingZoneMask: Feature<Polygon | MultiPolygon> | null;
     /** Raw transit stop points for hiding zone dot layer. */
     hidingZonePois: Feature<Point>[];
+    /** Called when the user taps a hiding zone transit stop dot. */
+    onHidingZonePoiPress: (coord: [number, number]) => void;
+    /** The currently-tapped POI coord — rendered larger to show selection. */
+    selectedHidingZonePoi: [number, number] | null;
 }
 
 /**
@@ -91,6 +95,8 @@ export function MapLayers({
     hidingZoneCircles,
     hidingZoneMask,
     hidingZonePois,
+    onHidingZonePoiPress,
+    selectedHidingZonePoi,
 }: Props) {
     const $showHidingZoneCircles = useStore(showHidingZoneCircles);
 
@@ -433,6 +439,12 @@ export function MapLayers({
                         type: "FeatureCollection",
                         features: hidingZonePois,
                     }}
+                    onPress={(e) => {
+                        const f = e.features[0];
+                        if (!f || f.geometry.type !== "Point") return;
+                        const [lng, lat] = f.geometry.coordinates as [number, number];
+                        onHidingZonePoiPress([lng, lat]);
+                    }}
                 >
                     <CircleLayer
                         id="hiding-zone-poi-dots"
@@ -444,6 +456,33 @@ export function MapLayers({
                     />
                 </ShapeSource>
             )}
+
+            {/* Selected hiding zone POI — rendered larger to show which stop was tapped.
+                Always mounted (never conditionally unmounted) to avoid a MapLibre crash
+                when the source is torn down and immediately recreated on a second tap. */}
+            <ShapeSource
+                id="hiding-zone-poi-selected"
+                shape={
+                    selectedHidingZonePoi
+                        ? {
+                              type: "Feature" as const,
+                              geometry: { type: "Point" as const, coordinates: selectedHidingZonePoi },
+                              properties: {},
+                          }
+                        : { type: "FeatureCollection" as const, features: [] }
+                }
+            >
+                <CircleLayer
+                    id="hiding-zone-poi-selected-dot"
+                    style={{
+                        circleRadius: 7,
+                        circleColor: colors.RADIUS,
+                        circleOpacity: 1,
+                        circleStrokeWidth: 2,
+                        circleStrokeColor: "white",
+                    }}
+                />
+            </ShapeSource>
 
             {/* Radius center markers */}
             {questions

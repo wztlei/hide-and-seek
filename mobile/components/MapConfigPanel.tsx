@@ -349,9 +349,9 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                 contentContainerStyle={{ paddingBottom: 32 }}
             >
                 {/* Header */}
-                <View className="flex-row items-center px-4 pt-2 pb-3">
-                    <Text className="flex-1 text-xl font-semibold text-gray-800">
-                        Map Config
+                <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
+                    <Text className="flex-1 text-2xl font-semibold text-gray-800">
+                        Map Configuration
                     </Text>
                     <Pressable onPress={onClose} hitSlop={8}>
                         <Ionicons name="close" size={24} color="#555" />
