@@ -21,13 +21,14 @@ import {
 } from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
+import { useHidingZones } from "../hooks/useHidingZones";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
 import { MapLayers } from "./map/MapLayers";
 import { MapLoadingOverlay } from "./map/MapLoadingOverlay";
 import { PickLocationBanner } from "./map/PickLocationBanner";
-import { PlacePicker } from "./PlacePicker";
+import { MapConfigPanel } from "./MapConfigPanel";
 import { QuestionsPanel } from "./QuestionsPanel";
 import { SettingsSheet } from "./SettingsSheet";
 
@@ -116,6 +117,14 @@ export function AppMapView() {
         zoomToUserLocation,
         handleLocationUpdate,
     } = useUserLocation(cameraRef);
+    const {
+        hidingZoneCircles,
+        hidingZoneMask,
+        hidingZonePois,
+        isLoading: isLoadingHidingZones,
+    } = useHidingZones({
+        zoneBoundary,
+    });
 
     // ── UI state ────────────────────────────────────────────────────────────
     const [editingQuestionKey, setEditingQuestionKey] = useState<number | null>(
@@ -353,10 +362,13 @@ export function AppMapView() {
                     pendingCoord={pendingCoord}
                     onMarkerPress={handleMarkerPress}
                     isPickMode={pickingLocationForKey !== null}
+                    hidingZoneCircles={hidingZoneCircles}
+                    hidingZoneMask={hidingZoneMask}
+                    hidingZonePois={hidingZonePois}
                 />
             </MLMapView>
 
-            {isComputingLayers && (
+            {(isComputingLayers || isLoadingHidingZones) && (
                 <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
                     <View
                         className="bg-white rounded-[20px] p-2.5"
@@ -392,7 +404,7 @@ export function AppMapView() {
                 onSettingsPress={() => setSettingsVisible(true)}
             />
 
-            <PlacePicker
+            <MapConfigPanel
                 visible={zoneModalVisible}
                 onClose={() => setZoneModalVisible(false)}
                 onCustomLocation={() => {

@@ -8,7 +8,8 @@ import { useStore } from "@nanostores/react";
 import Constants from "expo-constants";
 import { useCallback, useRef, useEffect } from "react";
 import * as Clipboard from "expo-clipboard";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { thunderforestApiKey } from "../lib/context";
@@ -85,7 +86,7 @@ export function SettingsSheet({ visible, onClose }: Props) {
         <BottomSheet
             ref={sheetRef}
             index={-1}
-            snapPoints={["60%"]}
+            snapPoints={["65%"]}
             enableDynamicSizing={false}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
@@ -151,7 +152,8 @@ export function SettingsSheet({ visible, onClose }: Props) {
                                 const text = await Clipboard.getStringAsync();
                                 if (text) thunderforestApiKey.set(text.trim());
                             }}
-                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50"
+                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center"
+                            style={styles.actionButton}
                         >
                             <Text className="text-base font-medium" style={{ color: colors.PRIMARY }}>Paste</Text>
                         </Pressable>
@@ -164,6 +166,48 @@ export function SettingsSheet({ visible, onClose }: Props) {
                             </Pressable>
                         )}
                     </View>
+                </View>
+
+                <View style={styles.divider} className="mb-4 mt-1" />
+
+                {/* Cache */}
+                <Text
+                    className="text-xs font-semibold text-gray-400 uppercase mb-1"
+                    style={styles.sectionTracking}
+                >
+                    CACHE
+                </Text>
+                <View className="flex-row items-center py-3.5 px-1 gap-3" style={styles.linkRowBorder}>
+                    <View className="flex-1">
+                        <Text className="text-base font-medium text-gray-900">
+                            Clear local cache
+                        </Text>
+                        <Text className="text-sm text-gray-500 mt-px">
+                            Removes cached Overpass query results.
+                        </Text>
+                    </View>
+                    <Pressable
+                        onPress={() =>
+                            Alert.alert(
+                                "Clear cache?",
+                                "Cached map data will be deleted. The app will re-fetch from Overpass on next use.",
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Clear",
+                                        style: "destructive",
+                                        onPress: () => AsyncStorage.clear(),
+                                    },
+                                ],
+                            )
+                        }
+                        className="px-3 py-2 rounded-lg bg-red-50 active:opacity-60 items-center"
+                        style={styles.actionButton}
+                    >
+                        <Text className="text-base font-medium text-red-600">
+                            Clear
+                        </Text>
+                    </Pressable>
                 </View>
 
                 <View style={styles.divider} className="mb-4 mt-1" />
@@ -225,5 +269,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#6b7280",
         fontFamily: "monospace",
+    },
+    actionButton: {
+        width: 64,
     },
 });

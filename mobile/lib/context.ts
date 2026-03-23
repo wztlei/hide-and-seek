@@ -48,6 +48,7 @@ export {
     mapGeoJSON,
     mapGeoLocation,
     mergeDuplicates,
+    showHidingZoneCircles,
     pastebinApiKey,
     planningModeEnabled,
     polyGeoJSON,

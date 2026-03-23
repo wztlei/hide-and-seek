@@ -21,6 +21,7 @@ import {
     mergeDuplicates,
     polyGeoJSON,
     questions,
+    showHidingZoneCircles,
 } from "../lib/context";
 import { colors } from "../lib/colors";
 import {
@@ -130,7 +131,7 @@ interface Props {
     onCustomLocation: () => void;
 }
 
-export function PlacePicker({ visible, onClose, onCustomLocation: _onCustomLocation }: Props) {
+export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLocation }: Props) {
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheet>(null);
@@ -150,6 +151,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation: _onCustomLocat
     const $displayHidingZonesOptions = useStore(displayHidingZonesOptions);
     const $hidingRadius = useStore(hidingRadius);
     const $hidingRadiusUnits = useStore(hidingRadiusUnits);
+    const $showHidingZoneCircles = useStore(showHidingZoneCircles);
     const $mergeDuplicates = useStore(mergeDuplicates);
 
     // Sync text input with atom
@@ -349,7 +351,7 @@ export function PlacePicker({ visible, onClose, onCustomLocation: _onCustomLocat
                 {/* Header */}
                 <View className="flex-row items-center px-4 pt-2 pb-3">
                     <Text className="flex-1 text-xl font-semibold text-gray-800">
-                        Select zone
+                        Map Config
                     </Text>
                     <Pressable onPress={onClose} hitSlop={8}>
                         <Ionicons name="close" size={24} color="#555" />
@@ -538,6 +540,21 @@ export function PlacePicker({ visible, onClose, onCustomLocation: _onCustomLocat
 
                     {$displayHidingZones && (
                         <>
+                            {/* Show circles toggle */}
+                            <View className="flex-row items-center justify-between mb-3">
+                                <Text className="text-base text-gray-700">
+                                    Show circles
+                                </Text>
+                                <Switch
+                                    value={$showHidingZoneCircles}
+                                    onValueChange={(v) => showHidingZoneCircles.set(v)}
+                                    trackColor={{
+                                        false: "#d1d5db",
+                                        true: colors.RADIUS,
+                                    }}
+                                />
+                            </View>
+
                             {/* Transit type multi-select chips */}
                             <View className="flex-row flex-wrap gap-2 mb-4">
                                 {TRANSIT_OPTIONS.map((opt) => {

@@ -13,10 +13,12 @@ import type {
     Point,
     Polygon,
 } from "geojson";
+import { useStore } from "@nanostores/react";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
+import { showHidingZoneCircles } from "../../lib/context";
 import { colors } from "../../lib/colors";
 import {
     radiusCircle,
@@ -53,6 +55,12 @@ interface Props {
     onMarkerPress: (key: number) => void;
     /** When true (pick-mode active), marker Pressables are disabled so taps reach the map. */
     isPickMode: boolean;
+    /** Hiding zone circles (clipped to zone, optionally unioned) — used for outlines only. */
+    hidingZoneCircles: FeatureCollection<Polygon> | null;
+    /** Zone boundary minus the union of hiding circles — the shaded "outside" area. */
+    hidingZoneMask: Feature<Polygon | MultiPolygon> | null;
+    /** Raw transit stop points for hiding zone dot layer. */
+    hidingZonePois: Feature<Point>[];
 }
 
 /**
@@ -80,7 +88,12 @@ export function MapLayers({
     pendingCoord,
     onMarkerPress,
     isPickMode,
+    hidingZoneCircles,
+    hidingZoneMask,
+    hidingZonePois,
 }: Props) {
+    const $showHidingZoneCircles = useStore(showHidingZoneCircles);
+
     // ── Consolidated FeatureCollections (one per question type) ──────────────
     // Each replaces N per-question ShapeSources with a single source, reducing
     // native layer objects from ~60 to ~12 regardless of question count.
@@ -276,6 +289,34 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
+            {/* Hiding zone mask — area inside the zone but OUTSIDE all hiding circles.
+                Rendered below the elimination mask so the indigo overlay clips correctly. */}
+            {hidingZoneMask && (
+                <ShapeSource id="hiding-zone-mask" shape={hidingZoneMask}>
+                    <FillLayer
+                        id="hiding-zone-mask-fill"
+                        style={{
+                            fillColor: colors.RADIUS,
+                            fillOpacity: 0.12,
+                        }}
+                    />
+                </ShapeSource>
+            )}
+
+            {/* Hiding zone circle outlines */}
+            {$showHidingZoneCircles && hidingZoneCircles && hidingZoneCircles.features.length > 0 && (
+                <ShapeSource id="hiding-zone-circles" shape={hidingZoneCircles}>
+                    <LineLayer
+                        id="hiding-zone-line"
+                        style={{
+                            lineColor: colors.RADIUS,
+                            lineWidth: 1.5,
+                            lineOpacity: 0.7,
+                        }}
+                    />
+                </ShapeSource>
+            )}
+
             {/* Indigo overlay covering the eliminated (impossible) zone */}
             {eliminationMask && (
                 <ShapeSource id="zone-mask" shape={eliminationMask}>
@@ -379,6 +420,26 @@ export function MapLayers({
                             circleOpacity: 0.8,
                             circleStrokeWidth: 1.5,
                             circleStrokeColor: "white",
+                        }}
+                    />
+                </ShapeSource>
+            )}
+
+            {/* Hiding zone transit stop dots */}
+            {hidingZonePois.length > 0 && (
+                <ShapeSource
+                    id="hiding-zone-pois"
+                    shape={{
+                        type: "FeatureCollection",
+                        features: hidingZonePois,
+                    }}
+                >
+                    <CircleLayer
+                        id="hiding-zone-poi-dots"
+                        style={{
+                            circleRadius: 4,
+                            circleColor: colors.RADIUS,
+                            circleOpacity: 0.8,
                         }}
                     />
                 </ShapeSource>

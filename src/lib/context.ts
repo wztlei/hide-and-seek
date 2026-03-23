@@ -134,6 +134,14 @@ export const customStations = persistentAtom<CustomStation[]>(
         decode: JSON.parse,
     },
 );
+export const showHidingZoneCircles = persistentAtom<boolean>(
+    "showHidingZoneCircles",
+    true,
+    {
+        encode: JSON.stringify,
+        decode: JSON.parse,
+    },
+);
 export const mergeDuplicates = persistentAtom<boolean>(
     "removeDuplicates",
     false,

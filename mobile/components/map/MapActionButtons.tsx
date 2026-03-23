@@ -14,8 +14,9 @@ interface Props {
 
 /**
  * The three circular FABs stacked on the right side of the map:
+ *  - Settings (gear icon) — opens the SettingsSheet bottom sheet
  *  - Questions (chatbox icon) — opens the QuestionsPanel bottom sheet
- *  - Zone selector (map icon / spinner) — opens the PlacePicker modal
+ *  - Zone selector (map icon / spinner) — opens the MapConfigPanel modal
  *  - Locate (locate icon) — flies the camera to the user's GPS position
  *
  * Bottom positions are calculated from the safe-area inset so they clear
