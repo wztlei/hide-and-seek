@@ -349,6 +349,18 @@ export const thunderforestApiKey = persistentAtom<string>(
         decode: (value: string) => value,
     },
 );
+export const thunderforestEnabled = persistentAtom<boolean>(
+    "thunderforestEnabled",
+    true,
+    { encode: JSON.stringify, decode: JSON.parse },
+);
+export const thunderforestTileUsage = persistentAtom<{
+    count: number;
+    month: string;
+}>("thunderforestTileUsage", { count: 0, month: "" }, {
+    encode: JSON.stringify,
+    decode: JSON.parse,
+});
 export const followMe = persistentAtom<boolean>("followMe", false, {
     encode: JSON.stringify,
     decode: JSON.parse,

@@ -22,10 +22,12 @@ import {
     questionModified,
     questions,
     thunderforestApiKey,
+    thunderforestEnabled,
 } from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useHidingZones } from "../hooks/useHidingZones";
+import { useThunderforestBudget } from "../hooks/useThunderforestBudget";
 import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
@@ -101,12 +103,15 @@ export function AppMapView() {
     const $mapGeoJSON = useStore(mapGeoJSON);
     const $questions = useStore(questions) as Questions;
     const $thunderforestApiKey = useStore(thunderforestApiKey);
+    const $thunderforestEnabled = useStore(thunderforestEnabled);
 
     const cameraRef = useRef<CameraRef>(null);
     const mapRef = useRef<MapViewRef>(null);
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
+    const { overLimit, usingBuiltinKey, effectiveCount, handleRegionDidChange } =
+        useThunderforestBudget();
     const { hasUpdate, latestVersion, storeUrl } = useUpdateCheck();
     const {
         eliminationMask,
@@ -186,8 +191,12 @@ export function AppMapView() {
     );
 
     const styleJSON = useMemo(
-        () => buildStyleJSON(!!$thunderforestApiKey, $thunderforestApiKey),
-        [$thunderforestApiKey],
+        () =>
+            buildStyleJSON(
+                $thunderforestEnabled && !!$thunderforestApiKey && !overLimit,
+                $thunderforestApiKey,
+            ),
+        [$thunderforestEnabled, $thunderforestApiKey, overLimit],
     );
 
     // ── Callbacks ───────────────────────────────────────────────────────────
@@ -394,6 +403,7 @@ export function AppMapView() {
                 compassEnabled
                 logoEnabled={false}
                 attributionEnabled={false}
+                onRegionDidChange={handleRegionDidChange}
                 onPress={(feature) => {
                     // Absorb the MapView tap that fires on the same event as a
                     // POI dot press. The flag is cleared via setTimeout(0) in
@@ -546,6 +556,8 @@ export function AppMapView() {
                 hasUpdate={hasUpdate}
                 latestVersion={latestVersion}
                 storeUrl={storeUrl}
+                usingBuiltinKey={usingBuiltinKey}
+                tileUsageCount={effectiveCount}
             />
 
             {!$mapGeoJSON && <MapLoadingOverlay />}

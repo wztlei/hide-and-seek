@@ -59,6 +59,8 @@ export {
     saveCustomPreset,
     showTutorial,
     thunderforestApiKey,
+    thunderforestEnabled,
+    thunderforestTileUsage,
     trainStations,
     triggerLocalRefresh,
     tutorialStep,

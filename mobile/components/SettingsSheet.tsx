@@ -8,11 +8,11 @@ import { useStore } from "@nanostores/react";
 import Constants from "expo-constants";
 import { useCallback, useRef, useEffect } from "react";
 import * as Clipboard from "expo-clipboard";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { thunderforestApiKey } from "../lib/context";
+import { thunderforestApiKey, thunderforestEnabled } from "../lib/context";
 import { colors } from "../lib/colors";
 
 interface Props {
@@ -21,6 +21,8 @@ interface Props {
     hasUpdate?: boolean;
     latestVersion?: string | null;
     storeUrl?: string | null;
+    usingBuiltinKey?: boolean;
+    tileUsageCount?: number;
 }
 
 const APP_VERSION =
@@ -61,10 +63,13 @@ function LinkRow({
     );
 }
 
-export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl }: Props) {
+const TILE_LIMIT = 150;
+
+export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl, usingBuiltinKey, tileUsageCount = 0 }: Props) {
     const sheetRef = useRef<BottomSheet>(null);
     const insets = useSafeAreaInsets();
     const $thunderforestApiKey = useStore(thunderforestApiKey);
+    const $thunderforestEnabled = useStore(thunderforestEnabled);
     const isProgrammaticCloseRef = useRef(false);
 
     useEffect(() => {
@@ -157,12 +162,28 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                 >
                     MAP TILES
                 </Text>
+                <View className="flex-row items-center justify-between py-3.5 px-1" style={styles.linkRowBorder}>
+                    <View className="flex-1 pr-4">
+                        <Text className="text-base font-medium text-gray-900">
+                            Transport map tiles
+                        </Text>
+                        <Text className="text-sm text-gray-500 mt-px">
+                            Use the Thunderforest transport-style map.
+                        </Text>
+                    </View>
+                    <Switch
+                        value={$thunderforestEnabled}
+                        onValueChange={(v) => thunderforestEnabled.set(v)}
+                        trackColor={{ false: "#d1d5db", true: colors.PRIMARY }}
+                    />
+                </View>
                 <View className="py-3.5 px-1 gap-1" style={styles.linkRowBorder}>
                     <Text className="text-base font-medium text-gray-900">
-                        Thunderforest API key
+                        Your Thunderforest API key
                     </Text>
                     <Text className="text-sm text-gray-500">
-                        Optional. Enables transport-style map tiles from Thunderforest.
+                        Limited usage of the transport-layer map is included.
+                        Paste your own key to use your personal quota instead.
                     </Text>
                     <View className="flex-row items-center mt-2 gap-2">
                         <View style={styles.apiKeyDisplay} className="flex-1">
@@ -170,7 +191,7 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                                 style={styles.apiKeyText}
                                 numberOfLines={1}
                             >
-                                {$thunderforestApiKey || "No API key set"}
+                                {usingBuiltinKey ? "Using shared key" : ($thunderforestApiKey || "No key set")}
                             </Text>
                         </View>
                         <Pressable
@@ -183,7 +204,7 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                         >
                             <Text className="text-base font-medium" style={{ color: colors.PRIMARY }}>Paste</Text>
                         </Pressable>
-                        {!!$thunderforestApiKey && (
+                        {!usingBuiltinKey && !!$thunderforestApiKey && (
                             <Pressable
                                 onPress={() => thunderforestApiKey.set("")}
                                 className="active:opacity-60 px-3 py-2 rounded-lg bg-red-50"
@@ -193,6 +214,50 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                         )}
                     </View>
                 </View>
+                {usingBuiltinKey && (
+                    <View className="py-3 px-1 gap-1.5" style={styles.linkRowBorder}>
+                        <View className="flex-row items-center justify-between">
+                            <Text className="text-sm text-gray-500">
+                                Shared tile budget this month
+                            </Text>
+                            <Text
+                                className="text-sm font-medium"
+                                style={{
+                                    color:
+                                        tileUsageCount >= TILE_LIMIT
+                                            ? "#ef4444"
+                                            : tileUsageCount >= TILE_LIMIT * 0.8
+                                              ? "#f59e0b"
+                                              : "#6b7280",
+                                }}
+                            >
+                                {tileUsageCount} / {TILE_LIMIT}
+                            </Text>
+                        </View>
+                        <View style={styles.usageTrack}>
+                            <View
+                                style={[
+                                    styles.usageFill,
+                                    {
+                                        width: `${Math.min(100, (tileUsageCount / TILE_LIMIT) * 100)}%`,
+                                        backgroundColor:
+                                            tileUsageCount >= TILE_LIMIT
+                                                ? "#ef4444"
+                                                : tileUsageCount >= TILE_LIMIT * 0.8
+                                                  ? "#f59e0b"
+                                                  : colors.PRIMARY,
+                                    },
+                                ]}
+                            />
+                        </View>
+                        {tileUsageCount >= TILE_LIMIT && (
+                            <Text className="text-sm text-red-500">
+                                Limit reached — map has switched to a free tile style.
+                                Paste your own API key above to restore transport maps.
+                            </Text>
+                        )}
+                    </View>
+                )}
 
                 <View style={styles.divider} className="mb-4 mt-1" />
 
@@ -298,6 +363,16 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         width: 64,
+    },
+    usageTrack: {
+        height: 4,
+        backgroundColor: "#e5e7eb",
+        borderRadius: 2,
+        overflow: "hidden",
+    },
+    usageFill: {
+        height: 4,
+        borderRadius: 2,
     },
     updateBanner: {
         flexDirection: "row",
