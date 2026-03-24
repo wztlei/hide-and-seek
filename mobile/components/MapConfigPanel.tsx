@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import * as Sentry from "@sentry/react-native";
 import BottomSheet, {
     BottomSheetBackdrop,
@@ -34,6 +35,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import type { OpenStreetMap } from "../../src/maps/api/types";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -304,6 +306,48 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
         );
     }
 
+    async function handleCopyZone() {
+        const payload = JSON.stringify({
+            v: 1,
+            base: mapGeoLocation.get(),
+            additional: additionalMapGeoLocations.get(),
+            polygons: polyGeoJSON.get(),
+        });
+        await Clipboard.setStringAsync(payload);
+        Toast.show({ type: "success", text1: "Zone copied to clipboard" });
+    }
+
+    async function handlePasteZone() {
+        const text = await Clipboard.getStringAsync();
+        let parsed: any;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            Alert.alert("Invalid zone config", "Clipboard doesn't contain a valid zone.");
+            return;
+        }
+        if (parsed?.v !== 1 || !parsed.base?.properties?.osm_id) {
+            Alert.alert("Invalid zone config", "Clipboard doesn't contain a valid zone.");
+            return;
+        }
+        Alert.alert(
+            "Import zone?",
+            `Replace current zone with "${parsed.base.properties.name}"?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Import",
+                    onPress: () => {
+                        mapGeoLocation.set(parsed.base);
+                        additionalMapGeoLocations.set(parsed.additional ?? []);
+                        polyGeoJSON.set(parsed.polygons ?? null);
+                        mapGeoJSON.set(null);
+                    },
+                },
+            ],
+        );
+    }
+
     // ── Hiding zone helpers ──────────────────────────────────────────────────
 
     function toggleTransitType(tag: string) {
@@ -557,31 +601,29 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                       : null}
 
                 {/* Footer buttons */}
-                <View className="px-4 pt-2 pb-4 border-t border-gray-100 mt-2 gap-2">
-                    <Pressable
-                        onPress={handleDrawPolygon}
-                        style={footerButtonStyle}
-                    >
-                        <Ionicons
-                            name="pencil-outline"
-                            size={18}
-                            color={colors.PRIMARY}
-                        />
-                        <Text className="ml-2 text-base font-medium" style={{ color: colors.PRIMARY }}>
-                            Draw custom polygon
+                <View className="px-4 pt-2 pb-4 border-t border-gray-100 mt-2 flex-row gap-2">
+                    <Pressable onPress={handleCopyZone} style={footerButtonStyle} className="flex-1">
+                        <Ionicons name="copy-outline" size={18} color={colors.PRIMARY} />
+                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
+                            Copy
                         </Text>
                     </Pressable>
-                    <Pressable
-                        onPress={handleClearZone}
-                        style={footerButtonStyle}
-                    >
-                        <Ionicons
-                            name="trash-outline"
-                            size={18}
-                            color="#ef4444"
-                        />
-                        <Text className="ml-2 text-base font-medium text-red-500">
-                            Clear zone
+                    <Pressable onPress={handlePasteZone} style={footerButtonStyle} className="flex-1">
+                        <Ionicons name="clipboard-outline" size={18} color={colors.PRIMARY} />
+                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
+                            Paste
+                        </Text>
+                    </Pressable>
+                    <Pressable onPress={handleDrawPolygon} style={footerButtonStyle} className="flex-1">
+                        <Ionicons name="pencil-outline" size={18} color={colors.PRIMARY} />
+                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
+                            Draw
+                        </Text>
+                    </Pressable>
+                    <Pressable onPress={handleClearZone} style={footerButtonStyle} className="flex-1">
+                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                        <Text className="ml-1.5 text-sm font-medium text-red-500">
+                            Clear
                         </Text>
                     </Pressable>
                 </View>
