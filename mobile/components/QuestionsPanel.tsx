@@ -14,13 +14,14 @@ import {
     Dimensions,
     Pressable,
     StyleSheet,
+    Switch,
     Text,
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors } from "../lib/colors";
-import { addQuestion, questions, questionModified } from "../lib/context";
+import { addQuestion, questions, questionModified, uniformQuestionColor } from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import {
     questionSchema,
@@ -312,6 +313,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const $questions = useStore(questions) as Questions;
+    const $uniformQuestionColor = useStore(uniformQuestionColor);
 
     const sheetRef = useRef<BottomSheet>(null);
     const slideX = useRef(new Animated.Value(0)).current;
@@ -483,6 +485,17 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                         </Pressable>
                     </View>
 
+                    <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
+                        <Text className="text-base text-gray-700">
+                            Use single color
+                        </Text>
+                        <Switch
+                            value={$uniformQuestionColor}
+                            onValueChange={(v) => uniformQuestionColor.set(v)}
+                            trackColor={{ false: "#d1d5db", true: colors.PRIMARY }}
+                        />
+                    </View>
+
                     <BottomSheetScrollView
                         className="flex-1"
                         contentContainerStyle={{ paddingVertical: 8 }}
@@ -501,7 +514,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                     <Ionicons
                                         name={iconForType(q.id)}
                                         size={22}
-                                        color={colorForType(q.id)}
+                                        color={$uniformQuestionColor ? colors.PRIMARY : colorForType(q.id)}
                                     />
                                     <View className="flex-1 gap-0.5">
                                         <Text className="text-lg font-medium text-gray-800">

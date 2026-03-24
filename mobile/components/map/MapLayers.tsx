@@ -19,7 +19,7 @@ import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
-import { polyGeoJSON, showHidingZoneCircles } from "../../lib/context";
+import { polyGeoJSON, showHidingZoneCircles, uniformQuestionColor } from "../../lib/context";
 import { colors } from "../../lib/colors";
 import {
     radiusCircle,
@@ -107,6 +107,8 @@ export function MapLayers({
 }: Props) {
     const $showHidingZoneCircles = useStore(showHidingZoneCircles);
     const $polyGeoJSON = useStore(polyGeoJSON);
+    const $uniformQuestionColor = useStore(uniformQuestionColor);
+    const qc = (typeColor: string) => $uniformQuestionColor ? colors.PRIMARY : typeColor;
 
     // ── Consolidated FeatureCollections (one per question type) ──────────────
     // Each replaces N per-question ShapeSources with a single source, reducing
@@ -288,7 +290,7 @@ export function MapLayers({
                     <FillLayer
                         id="tent-fill"
                         style={{
-                            fillColor: colors.TENTACLES,
+                            fillColor: qc(colors.TENTACLES),
                             fillOpacity: 0.2,
                         }}
                     />
@@ -301,7 +303,7 @@ export function MapLayers({
                     <FillLayer
                         id="therm-fill"
                         style={{
-                            fillColor: colors.THERMOMETER,
+                            fillColor: qc(colors.THERMOMETER),
                             fillOpacity: 0.15,
                         }}
                     />
@@ -313,7 +315,7 @@ export function MapLayers({
                 <ShapeSource id="match-fills" shape={matchingFills}>
                     <FillLayer
                         id="match-fill"
-                        style={{ fillColor: colors.MATCHING, fillOpacity: 0.2 }}
+                        style={{ fillColor: qc(colors.MATCHING), fillOpacity: 0.2 }}
                     />
                 </ShapeSource>
             )}
@@ -324,7 +326,7 @@ export function MapLayers({
                     <FillLayer
                         id="meas-fill"
                         style={{
-                            fillColor: colors.MEASURING,
+                            fillColor: qc(colors.MEASURING),
                             fillOpacity: 0.2,
                         }}
                     />
@@ -337,7 +339,7 @@ export function MapLayers({
                     <LineLayer
                         id="meas-circles-line"
                         style={{
-                            lineColor: colors.MEASURING,
+                            lineColor: qc(colors.MEASURING),
                             lineWidth: 2,
                             lineOpacity: 0.8,
                         }}
@@ -464,7 +466,7 @@ export function MapLayers({
                 <ShapeSource id="radius-fills" shape={radiusFills}>
                     <FillLayer
                         id="radius-fill"
-                        style={{ fillColor: colors.RADIUS, fillOpacity: 0.2 }}
+                        style={{ fillColor: qc(colors.RADIUS), fillOpacity: 0.2 }}
                     />
                 </ShapeSource>
             )}
@@ -475,7 +477,7 @@ export function MapLayers({
                     <LineLayer
                         id="radius-circles-line"
                         style={{
-                            lineColor: colors.RADIUS,
+                            lineColor: qc(colors.RADIUS),
                             lineWidth: 2,
                             lineOpacity: 0.8,
                         }}
@@ -489,7 +491,7 @@ export function MapLayers({
                     <LineLayer
                         id="tent-circles-line"
                         style={{
-                            lineColor: colors.TENTACLES,
+                            lineColor: qc(colors.TENTACLES),
                             lineWidth: 2,
                             lineOpacity: 0.8,
                         }}
@@ -504,7 +506,7 @@ export function MapLayers({
                     <LineLayer
                         id="therm-lines-line"
                         style={{
-                            lineColor: colors.THERMOMETER,
+                            lineColor: qc(colors.THERMOMETER),
                             lineWidth: 2,
                             lineDasharray: [4, 3],
                             lineOpacity: 0.8,
@@ -521,17 +523,19 @@ export function MapLayers({
                         id="poi-dots-layer"
                         style={{
                             circleRadius: 7,
-                            circleColor: [
-                                "match",
-                                ["get", "_qt"],
-                                "tentacles",
-                                colors.TENTACLES,
-                                "matching",
-                                colors.MATCHING,
-                                "measuring",
-                                colors.MEASURING,
-                                "#999999",
-                            ],
+                            circleColor: $uniformQuestionColor
+                                ? colors.PRIMARY
+                                : [
+                                      "match",
+                                      ["get", "_qt"],
+                                      "tentacles",
+                                      colors.TENTACLES,
+                                      "matching",
+                                      colors.MATCHING,
+                                      "measuring",
+                                      colors.MEASURING,
+                                      "#999999",
+                                  ],
                             circleOpacity: 0.8,
                             circleStrokeWidth: 1.5,
                             circleStrokeColor: "white",
@@ -605,7 +609,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.RADIUS }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.RADIUS) }, markerShadow]}
                             >
                                 <Ionicons
                                     name="disc-outline"
@@ -632,7 +636,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.THERMOMETER_A }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.THERMOMETER_A) }, markerShadow]}
                             >
                                 <Text className="text-white text-sm font-bold">A</Text>
                             </View>
@@ -649,7 +653,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.THERMOMETER_B }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.THERMOMETER_B) }, markerShadow]}
                             >
                                 <Text className="text-white text-sm font-bold">B</Text>
                             </View>
@@ -672,7 +676,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.TENTACLES }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.TENTACLES) }, markerShadow]}
                             >
                                 <Ionicons
                                     name="pie-chart-outline"
@@ -704,7 +708,7 @@ export function MapLayers({
                               >
                                   <View
                                   className="w-[26px] h-[26px] rounded-full items-center justify-center"
-                                  style={[{ backgroundColor: colors.TENTACLES }, markerShadow]}
+                                  style={[{ backgroundColor: qc(colors.TENTACLES) }, markerShadow]}
                               >
                                       <Ionicons
                                           name="location"
@@ -733,7 +737,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.MATCHING }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.MATCHING) }, markerShadow]}
                             >
                                 <Ionicons
                                     name="reorder-two-outline"
@@ -760,7 +764,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: colors.MEASURING }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.MEASURING) }, markerShadow]}
                             >
                                 <Ionicons
                                     name="resize-outline"
@@ -794,7 +798,7 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[26px] h-[26px] rounded-full border-2 border-white items-center justify-center opacity-[0.85]"
-                                style={[{ backgroundColor: colors.MEASURING }, markerShadow]}
+                                style={[{ backgroundColor: qc(colors.MEASURING) }, markerShadow]}
                             >
                                 <Ionicons
                                     name="search-outline"

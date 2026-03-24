@@ -150,6 +150,14 @@ export const mergeDuplicates = persistentAtom<boolean>(
         decode: JSON.parse,
     },
 );
+export const uniformQuestionColor = persistentAtom<boolean>(
+    "uniformQuestionColor",
+    false,
+    {
+        encode: JSON.stringify,
+        decode: JSON.parse,
+    },
+);
 export const includeDefaultStations = persistentAtom<boolean>(
     "includeDefaultStations",
     false,

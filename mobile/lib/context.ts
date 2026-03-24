@@ -62,6 +62,7 @@ export {
     trainStations,
     triggerLocalRefresh,
     tutorialStep,
+    uniformQuestionColor,
     updateCustomPreset,
     useCustomStations,
 } from "../../src/lib/context";
