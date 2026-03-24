@@ -2,7 +2,7 @@ import { useStore } from "@nanostores/react";
 import { useCallback } from "react";
 import Toast from "react-native-toast-message";
 
-import { thunderforestApiKey, thunderforestTileUsage } from "../lib/context";
+import { thunderforestApiKey, thunderforestEnabled, thunderforestTileUsage } from "../lib/context";
 
 /** Tiles per month we allow users of the built-in shared key to consume. */
 const TILE_LIMIT = 150;
@@ -29,16 +29,18 @@ function getMonth(): string {
 export function useThunderforestBudget() {
     const $key = useStore(thunderforestApiKey);
     const $usage = useStore(thunderforestTileUsage);
+    const $enabled = useStore(thunderforestEnabled);
 
     const usingBuiltinKey = !!BUILTIN_KEY && $key === BUILTIN_KEY;
     const month = getMonth();
     const effectiveCount = $usage.month === month ? $usage.count : 0;
     const overLimit = usingBuiltinKey && effectiveCount >= TILE_LIMIT;
 
-    // Tracks whether a gesture was in-progress on the previous camera event so
-    // we fire increment exactly once at the end of each user interaction.
+    // Only count tiles when the Thunderforest layer is actually being rendered.
+    const thunderforestActive = $enabled && usingBuiltinKey && !overLimit;
+
     const increment = useCallback(() => {
-        if (!usingBuiltinKey) return;
+        if (!thunderforestActive) return;
         const m = getMonth();
         const current = thunderforestTileUsage.get();
         const prevCount = current.month === m ? current.count : 0;
@@ -54,7 +56,7 @@ export function useThunderforestBudget() {
                 visibilityTime: 7000,
             });
         }
-    }, [usingBuiltinKey]);
+    }, [thunderforestActive]);
 
     /**
      * Pass to MLMapView's `onRegionDidChange`. Fires once after each camera
@@ -64,10 +66,5 @@ export function useThunderforestBudget() {
         increment();
     }, [increment]);
 
-    return {
-        overLimit,
-        usingBuiltinKey,
-        effectiveCount,
-        handleRegionDidChange,
-    };
+    return { overLimit, handleRegionDidChange };
 }

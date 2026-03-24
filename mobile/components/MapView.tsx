@@ -110,8 +110,7 @@ export function AppMapView() {
     const insets = useSafeAreaInsets();
 
     // ── Custom hooks ────────────────────────────────────────────────────────
-    const { overLimit, usingBuiltinKey, effectiveCount, handleRegionDidChange } =
-        useThunderforestBudget();
+    const { overLimit, handleRegionDidChange } = useThunderforestBudget();
     const { hasUpdate, latestVersion, storeUrl } = useUpdateCheck();
     const {
         eliminationMask,
@@ -556,8 +555,6 @@ export function AppMapView() {
                 hasUpdate={hasUpdate}
                 latestVersion={latestVersion}
                 storeUrl={storeUrl}
-                usingBuiltinKey={usingBuiltinKey}
-                tileUsageCount={effectiveCount}
             />
 
             {!$mapGeoJSON && <MapLoadingOverlay />}

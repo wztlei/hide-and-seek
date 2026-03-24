@@ -12,7 +12,7 @@ import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from "react
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { thunderforestApiKey, thunderforestEnabled } from "../lib/context";
+import { thunderforestApiKey, thunderforestEnabled, thunderforestTileUsage } from "../lib/context";
 import { colors } from "../lib/colors";
 
 interface Props {
@@ -21,8 +21,6 @@ interface Props {
     hasUpdate?: boolean;
     latestVersion?: string | null;
     storeUrl?: string | null;
-    usingBuiltinKey?: boolean;
-    tileUsageCount?: number;
 }
 
 const APP_VERSION =
@@ -64,12 +62,18 @@ function LinkRow({
 }
 
 const TILE_LIMIT = 150;
+const BUILTIN_KEY = process.env.EXPO_PUBLIC_THUNDERFOREST_API_KEY ?? "";
 
-export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl, usingBuiltinKey, tileUsageCount = 0 }: Props) {
+export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl }: Props) {
     const sheetRef = useRef<BottomSheet>(null);
     const insets = useSafeAreaInsets();
     const $thunderforestApiKey = useStore(thunderforestApiKey);
     const $thunderforestEnabled = useStore(thunderforestEnabled);
+    const $tileUsage = useStore(thunderforestTileUsage);
+
+    const usingBuiltinKey = !!BUILTIN_KEY && $thunderforestApiKey === BUILTIN_KEY;
+    const month = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+    const tileUsageCount = $tileUsage.month === month ? $tileUsage.count : 0;
     const isProgrammaticCloseRef = useRef(false);
 
     useEffect(() => {
@@ -206,7 +210,7 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                         </Pressable>
                         {!usingBuiltinKey && !!$thunderforestApiKey && (
                             <Pressable
-                                onPress={() => thunderforestApiKey.set("")}
+                                onPress={() => thunderforestApiKey.set(BUILTIN_KEY)}
                                 className="active:opacity-60 px-3 py-2 rounded-lg bg-red-50"
                             >
                                 <Text className="text-base font-medium text-red-600">Clear</Text>
