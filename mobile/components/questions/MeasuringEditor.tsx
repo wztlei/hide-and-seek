@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,10 +9,11 @@ import * as Location from "expo-location";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { mapGeoJSON, questionModified } from "../../lib/context";
+import { additionalMapGeoLocations, mapGeoJSON, mapGeoLocation, polyGeoJSON, questionModified } from "../../lib/context";
+import { getCached, setCached } from "../../lib/storage";
 import {
+    fetchAdminBoundaries,
     fetchAirports,
-    fetchCities,
     fetchMeasuringPOIs,
 } from "../../lib/measuringApi";
 import { LocationButtons } from "./LocationButtons";
@@ -21,14 +22,25 @@ import { parseCoordinatesFromText } from "./utils";
 
 type MeasuringData = Extract<Questions[number], { id: "measuring" }>["data"];
 
+/** djb2 hash — produces a compact fixed-length numeric string from any input. */
+function djb2(s: string): string {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; // keep unsigned 32-bit
+    }
+    return h.toString(36);
+}
+
 type DropdownItem =
     | { isHeader: true; label: string; value: string }
     | { isHeader?: false; label: string; value: string };
 
+// "__admin-border" is a sentinel for the main dropdown — the actual stored type
+// is always a specific "admin-border-N" value set via the sub-dropdown.
 const DROPDOWN_DATA: DropdownItem[] = [
     { isHeader: true, label: "Geography", value: "__header_standard" },
     { label: "Coastline", value: "coastline" },
-    { label: "City", value: "city" },
+    // { label: "Administrative Border", value: "__admin-border" }, // WIP — see mobile/CLAUDE.md
     // { label: "High-speed rail", value: "highspeed-measure-shinkansen" },
     { isHeader: true, label: "Points of Interest", value: "__header_poi" },
     { label: "Airport", value: "airport" },
@@ -47,6 +59,20 @@ const DROPDOWN_DATA: DropdownItem[] = [
 
 const SELECTABLE_DATA = DROPDOWN_DATA.filter((d) => !d.isHeader);
 
+// All possible admin border levels for the sub-dropdown.
+const ADMIN_BORDER_LEVELS: { label: string; value: string }[] = [
+    { label: "International Border (Level 2)", value: "admin-border-2" },
+    { label: "Regional Border (Level 3)", value: "admin-border-3" },
+    { label: "State/Province Border (Level 4)", value: "admin-border-4" },
+    { label: "District Border (Level 5)", value: "admin-border-5" },
+    { label: "County/Department Border (Level 6)", value: "admin-border-6" },
+    { label: "Municipality Border (Level 7)", value: "admin-border-7" },
+    { label: "City/Town Border (Level 8)", value: "admin-border-8" },
+    { label: "Sub-municipality Border (Level 9)", value: "admin-border-9" },
+    { label: "Suburb Border (Level 10)", value: "admin-border-10" },
+    { label: "Neighborhood Border (Level 11)", value: "admin-border-11" },
+];
+
 // Heights must match the rendered item styles below so getItemLayout is accurate.
 const DROPDOWN_ITEM_HEIGHT = 44; // paddingVertical 12 * 2 + ~20 text
 const DROPDOWN_HEADER_HEIGHT = 28; // paddingTop 10 + paddingBottom 4 + ~14 text
@@ -55,9 +81,7 @@ const DROPDOWN_HEADER_HEIGHT = 28; // paddingTop 10 + paddingBottom 4 + ~14 text
 const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<
     { length: number; offset: number }[]
 >((acc, item, i) => {
-    const length = item.isHeader
-        ? DROPDOWN_HEADER_HEIGHT
-        : DROPDOWN_ITEM_HEIGHT;
+    const length = item.isHeader ? DROPDOWN_HEADER_HEIGHT : DROPDOWN_ITEM_HEIGHT;
     const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
     acc.push({ length, offset });
     return acc;
@@ -104,7 +128,6 @@ const MEASURING_POI_TYPES = new Set([
 // Types that support a configurable search area + search center (all Overpass-backed types).
 const MEASURING_SEARCH_TYPES = new Set([
     "airport",
-    "city",
     ...MEASURING_POI_TYPES,
 ]);
 
@@ -132,10 +155,14 @@ export function MeasuringEditor({
         number | null
     >(null);
     const [loadingPOIs, setLoadingPOIs] = useState(false);
+    // null = loading/no zone; Set = resolved (levels with data in this zone)
+    const [availableAdminLevels, setAvailableAdminLevels] = useState<Set<number> | null>(null);
     const $mapGeoJSON = useStore(mapGeoJSON);
+
+    const isAdminBorder = data.type?.startsWith("admin-border-") ?? false;
     const isPOIType = MEASURING_POI_TYPES.has(data.type);
     const isSearchType = MEASURING_SEARCH_TYPES.has(data.type);
-    // poiSearchLat/Lng are undefined when the user has not explicitly set an
+    // poiSearchLat/Lng are undefined when the user has not explicitly set a
     // custom search region — in that case the seeker location is used.
     const hasCustomSearch = (data as any).poiSearchLat != null;
     const customSearchLat = (data as any).poiSearchLat as number | undefined;
@@ -143,6 +170,82 @@ export function MeasuringEditor({
     // Effective search center (falls back to seeker for bbox computation).
     const searchLat = customSearchLat ?? data.lat;
     const searchLng = customSearchLng ?? data.lng;
+
+    // Check which admin border levels have data in the current zone.
+    // The result is persisted under a zone hash (primary + additional OSM IDs)
+    // so subsequent opens skip the 10 parallel Overpass probes entirely.
+    useEffect(() => {
+        if (!$mapGeoJSON) {
+            setAvailableAdminLevels(null);
+            return;
+        }
+
+        // Compute a stable hash from the current zone identity (not from $mapGeoJSON
+        // which is derived). Reading atoms via .get() inside the effect is safe —
+        // by the time $mapGeoJSON updates, the zone atoms already reflect the new zone.
+        const loc = mapGeoLocation.get();
+        const additional = additionalMapGeoLocations.get();
+        const poly = polyGeoJSON.get();
+        const parts = [String(loc.properties.osm_id)];
+        for (const a of [...additional].sort(
+            (x, y) => x.location.properties.osm_id - y.location.properties.osm_id,
+        )) {
+            parts.push(`${a.location.properties.osm_id}:${a.added}`);
+        }
+        // Include a hash of additive poly features — subtractions don't affect which
+        // admin levels exist, but additions can extend the zone into new regions.
+        if (poly) {
+            const addedCoords = poly.features
+                .filter((f) => f.properties?.added !== false)
+                .flatMap((f) => turf.coordAll(f))
+                .map(([lng, lat]) => `${lng.toFixed(3)},${lat.toFixed(3)}`)
+                .join(";");
+            if (addedCoords) parts.push(`poly:${djb2(addedCoords)}`);
+        }
+        const zoneHash = parts.join(",");
+
+        const persistedRaw = getCached(`admin-levels:${zoneHash}`);
+        if (persistedRaw) {
+            try {
+                const levels = JSON.parse(persistedRaw) as number[];
+                setAvailableAdminLevels(new Set(levels));
+                return;
+            } catch {
+                // Corrupted — fall through to re-probe.
+            }
+        }
+
+        const zoneBbox = turf.bbox($mapGeoJSON) as [number, number, number, number];
+        let cancelled = false;
+        Promise.all(
+            [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(async (level) => {
+                try {
+                    const fc = await fetchAdminBoundaries(level, zoneBbox);
+                    return { level, hasData: fc.features.length > 0 };
+                } catch {
+                    return { level, hasData: false };
+                }
+            }),
+        ).then((results) => {
+            if (!cancelled) {
+                const available = results.filter((r) => r.hasData).map((r) => r.level);
+                setAvailableAdminLevels(new Set(available));
+                setCached(`admin-levels:${zoneHash}`, JSON.stringify(available));
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [$mapGeoJSON]);
+
+    // Sub-dropdown options — only the levels that exist in the current zone.
+    const visibleAdminLevels = useMemo(() => {
+        if (!availableAdminLevels) return [];
+        return ADMIN_BORDER_LEVELS.filter((item) => {
+            const level = parseInt(item.value.split("-")[2], 10);
+            return availableAdminLevels.has(level);
+        });
+    }, [availableAdminLevels]);
 
     useEffect(() => {
         if (!isSearchType || !$mapGeoJSON) {
@@ -180,9 +283,7 @@ export function MeasuringEditor({
         const fetchPromise =
             data.type === "airport"
                 ? fetchAirports(bbox)
-                : data.type === "city"
-                  ? fetchCities(bbox)
-                  : fetchMeasuringPOIs(data.type, bbox);
+                : fetchMeasuringPOIs(data.type, bbox);
         fetchPromise
             .then((fc) => {
                 if (cancelled) return;
@@ -222,6 +323,12 @@ export function MeasuringEditor({
         (data as any).poiSearchRadius,
     ]);
 
+    // The main dropdown shows "__admin-border" for any admin-border-* type so
+    // the sub-dropdown handles the specific level selection.
+    const mainDropdownValue = isAdminBorder
+        ? "__admin-border"
+        : (SELECTABLE_DATA.find((d) => d.value === data.type)?.value ?? null);
+
     return (
         <View className="gap-4 px-4">
             {/* Feature Type dropdown */}
@@ -233,12 +340,18 @@ export function MeasuringEditor({
                     data={DROPDOWN_DATA}
                     labelField="label"
                     valueField="value"
-                    value={
-                        SELECTABLE_DATA.find((d) => d.value === data.type)
-                            ?.value ?? null
-                    }
+                    value={mainDropdownValue}
                     onChange={(item) => {
                         if (item.isHeader) return;
+                        if (item.value === "__admin-border") {
+                            // If not already an admin border, default to level 2
+                            // until the user picks a specific level in the sub-dropdown.
+                            if (!isAdminBorder) {
+                                (data as any).type = "admin-border-2";
+                                questionModified();
+                            }
+                            return;
+                        }
                         (data as any).type = item.value;
                         questionModified();
                     }}
@@ -252,7 +365,10 @@ export function MeasuringEditor({
                                 </View>
                             );
                         }
-                        const selected = item.value === data.type;
+                        const selected =
+                            item.value === "__admin-border"
+                                ? isAdminBorder
+                                : item.value === data.type;
                         return (
                             <View
                                 style={[
@@ -281,7 +397,7 @@ export function MeasuringEditor({
                     autoScroll={false}
                     flatListProps={{
                         initialScrollIndex: dropdownInitialIndex(
-                            data.type ?? "",
+                            isAdminBorder ? "__admin-border" : (data.type ?? ""),
                         ),
                         getItemLayout: (_, index) => ({
                             length:
@@ -293,6 +409,69 @@ export function MeasuringEditor({
                     }}
                 />
             </View>
+
+            {/* Admin Border sub-dropdown — shown when Administrative Border is selected */}
+            {isAdminBorder && (
+                <View className="gap-2">
+                    <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                        Border Level
+                    </Text>
+                    {availableAdminLevels === null ? (
+                        <View className="flex-row items-center gap-3 px-1 py-2">
+                            <ActivityIndicator
+                                size="small"
+                                color={colors.MEASURING}
+                            />
+                            <Text className="text-base text-gray-400">
+                                Checking available border levels…
+                            </Text>
+                        </View>
+                    ) : visibleAdminLevels.length === 0 ? (
+                        <Text className="text-base text-gray-400 px-1">
+                            No admin borders found in this zone
+                        </Text>
+                    ) : (
+                        <Dropdown
+                            data={visibleAdminLevels}
+                            labelField="label"
+                            valueField="value"
+                            value={data.type}
+                            onChange={(item) => {
+                                (data as any).type = item.value;
+                                questionModified();
+                            }}
+                            renderItem={(item) => {
+                                const selected = item.value === data.type;
+                                return (
+                                    <View
+                                        style={[
+                                            dropdownItemStyle,
+                                            selected && { backgroundColor: "#ecfeff" },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                dropdownItemTextStyle,
+                                                selected && {
+                                                    color: "#164e63",
+                                                    fontWeight: "600",
+                                                },
+                                            ]}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                    </View>
+                                );
+                            }}
+                            style={dropdownStyle.container}
+                            selectedTextStyle={dropdownStyle.selectedText}
+                            activeColor="#ecfeff"
+                            autoScroll={false}
+                        />
+                    )}
+                </View>
+            )}
+
             {/* Search Area — for all Overpass-backed types */}
             {isSearchType && (
                 <View className="gap-2">

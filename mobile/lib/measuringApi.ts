@@ -284,6 +284,121 @@ export async function fetchMeasuringPOIs(
     }
 }
 
+// ── Admin boundaries ──────────────────────────────────────────────────────────
+
+const MEAS_LINE_CACHE_MAX = 20;
+const MEAS_LINE_LRU_KEY = "meas-line:__lru__";
+
+function measLineStoreKey(
+    level: number,
+    bbox: [number, number, number, number],
+): string {
+    // Append "x" for level-2 entries that use the ISO-filter variant of the query,
+    // so stale entries cached without the filter are never returned.
+    const variant = level === 2 ? "x" : "";
+    return `meas-line:${level}${variant}:${bbox.map((n) => n.toFixed(2)).join(",")}`;
+}
+
+function measLinePersistentGet(key: string): Feature<LineString>[] | null {
+    const raw = getCached(key);
+    if (!raw) return null;
+    const lru = JSON.parse(getCached(MEAS_LINE_LRU_KEY) ?? "[]") as string[];
+    const idx = lru.indexOf(key);
+    if (idx !== -1) lru.splice(idx, 1);
+    lru.push(key);
+    setCached(MEAS_LINE_LRU_KEY, JSON.stringify(lru));
+    return JSON.parse(raw) as Feature<LineString>[];
+}
+
+function measLinePersistentSet(key: string, features: Feature<LineString>[]): void {
+    setCached(key, JSON.stringify(features));
+    const lru = JSON.parse(getCached(MEAS_LINE_LRU_KEY) ?? "[]") as string[];
+    const idx = lru.indexOf(key);
+    if (idx !== -1) lru.splice(idx, 1);
+    lru.push(key);
+    while (lru.length > MEAS_LINE_CACHE_MAX) {
+        deleteCached(lru.shift()!);
+    }
+    setCached(MEAS_LINE_LRU_KEY, JSON.stringify(lru));
+}
+
+const measLineInFlight = new Map<string, Promise<Feature<LineString>[]>>();
+
+/**
+ * Fetches administrative boundary lines for the given admin_level from Overpass
+ * within the given bounding box. Returns a FeatureCollection of LineString features.
+ * Persistently cached per level+bbox.
+ */
+export async function fetchAdminBoundaries(
+    adminLevel: number,
+    bbox: [number, number, number, number],
+): Promise<FeatureCollection<LineString>> {
+    const storeKey = measLineStoreKey(adminLevel, bbox);
+
+    const persisted = measLinePersistentGet(storeKey);
+    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<LineString>;
+
+    const inflight = measLineInFlight.get(storeKey);
+    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<LineString>;
+
+    const promise = (async (): Promise<Feature<LineString>[]> => {
+        const [west, south, east, north] = bbox;
+        // Query member ways directly within the bbox — NOT the parent relation.
+        // "relation ... out geom" returns ALL member ways of matching relations
+        // (regardless of bbox), so a small bbox near SF still returns the entire
+        // US national boundary. Instead, we find matching relations then immediately
+        // recurse into only their ways that fall within the bbox.
+        //
+        // For level 2 (international borders) we also exclude national-boundary
+        // relations (tagged with ISO3166-1 / ISO3166-1:alpha2 — single-country codes).
+        // Those relations include coastal segments that would be nearest to any
+        // coastal city, drowning out the actual land border. Bilateral border
+        // relations (e.g. US-Mexico border) don't carry ISO3166-1 tags.
+        const isoFilter = adminLevel === 2
+            ? `[!"ISO3166-1"][!"ISO3166-1:alpha2"]`
+            : "";
+        const query = `[out:json][timeout:60];rel["boundary"="administrative"]["admin_level"="${adminLevel}"]${isoFilter}(${south},${west},${north},${east})->.rels;way(r.rels)(${south},${west},${north},${east});out geom;`;
+        const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
+
+        console.log(`[adminBoundaries] level=${adminLevel} bbox=[${bbox.map(n => n.toFixed(2)).join(",")}] — fetching…`);
+        const t0 = Date.now();
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Overpass admin boundaries level ${adminLevel} ${res.status}`);
+
+        const text = await res.text();
+        console.log(`[adminBoundaries] level=${adminLevel} — response ${(text.length / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
+
+        const data = JSON.parse(text) as { elements: any[] };
+        Sentry.addBreadcrumb({ category: "api", message: `Fetched admin level ${adminLevel} boundaries`, level: "info" });
+
+        const features: Feature<LineString>[] = [];
+        for (const el of data.elements) {
+            // New query returns way elements directly (not relation members).
+            if (el.type !== "way" || !el.geometry) continue;
+            const coords: [number, number][] = (el.geometry as { lat: number; lon: number }[]).map(
+                (node) => [node.lon, node.lat] as [number, number],
+            );
+            if (coords.length < 2) continue;
+            features.push(turf.lineString(coords));
+        }
+        console.log(`[adminBoundaries] level=${adminLevel} — ${features.length} segments in ${Date.now() - t0} ms`);
+
+        // Cap at 500 way-member segments to bound parse time and memory.
+        const capped = features.slice(0, 500);
+        measLinePersistentSet(storeKey, capped);
+        return capped;
+    })();
+
+    measLineInFlight.set(storeKey, promise);
+    try {
+        const features = await promise;
+        return turf.featureCollection(features) as FeatureCollection<LineString>;
+    } finally {
+        measLineInFlight.delete(storeKey);
+    }
+}
+
 // ── Distance helpers ──────────────────────────────────────────────────────────
 
 /**

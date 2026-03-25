@@ -11,6 +11,19 @@ interface UpdateInfo {
 const VERSION_URL =
     "https://raw.githubusercontent.com/wztlei/hide-and-seek/refs/heads/master/public/version.json";
 
+/** Returns true if `a` is strictly greater than `b` (semver, numeric segments). */
+function versionGt(a: string, b: string): boolean {
+    const pa = a.split(".").map(Number);
+    const pb = b.split(".").map(Number);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+        const na = pa[i] ?? 0;
+        const nb = pb[i] ?? 0;
+        if (na !== nb) return na > nb;
+    }
+    return false;
+}
+
 export function useUpdateCheck(): UpdateInfo {
     const [info, setInfo] = useState<UpdateInfo>({
         hasUpdate: false,
@@ -28,7 +41,7 @@ export function useUpdateCheck(): UpdateInfo {
                     (Constants.manifest2?.extra?.expoClient?.version as string | undefined) ??
                     Constants.manifest?.version ??
                     "0.0.0";
-                const hasUpdate = data.version !== current;
+                const hasUpdate = versionGt(data.version, current);
                 const storeUrl =
                     Platform.OS === "ios" ? data.ios_url : data.android_url;
                 setInfo({ hasUpdate, latestVersion: data.version, storeUrl });

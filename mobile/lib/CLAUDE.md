@@ -34,6 +34,14 @@ Two independent LRU namespaces:
 | Matching POIs                      | `poi:<type>:<bbox>`      | `poi:__lru__`      | 50  | `matchingApi.ts`  |
 | Measuring POIs / airports / cities | `meas-poi:<type>:<bbox>` | `meas-poi:__lru__` | 50  | `measuringApi.ts` |
 
+Simple non-LRU persistent entries (not evicted automatically — invalidated by cache clear):
+
+| Namespace               | Key format                       | Value            | Source                      |
+| ----------------------- | -------------------------------- | ---------------- | --------------------------- |
+| Available admin levels  | `admin-levels:{zoneHash}`        | `number[]` JSON  | `MeasuringEditor.tsx`       |
+
+`zoneHash` = `primaryOsmId[,additionalOsmId:added]...[,poly:lng,lat;...]` — OSM IDs sorted, plus coords of any additive custom polygon features (subtractive poly features are excluded since they can't introduce new admin levels).
+
 **Key format:** `<prefix>:<type>:<w.ww>,<s.ss>,<e.ee>,<n.nn>`
 Bbox coordinates are rounded to 2 decimal places (~1 km) so small zone adjustments hit the cache.
 

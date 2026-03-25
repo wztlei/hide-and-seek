@@ -351,7 +351,7 @@ export const thunderforestApiKey = persistentAtom<string>(
 );
 export const thunderforestEnabled = persistentAtom<boolean>(
     "thunderforestEnabled",
-    true,
+    false,
     { encode: JSON.stringify, decode: JSON.parse },
 );
 export const thunderforestTileUsage = persistentAtom<{

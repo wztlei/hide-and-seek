@@ -15,6 +15,7 @@ import {
     findVoronoiCell,
 } from "../lib/matchingApi";
 import {
+    fetchAdminBoundaries,
     fetchAirports as fetchMeasuringAirports,
     fetchCities,
     fetchCoastline,
@@ -171,17 +172,24 @@ export function useEliminationMask() {
                     };
 
                     // turf.union requires ≥2 features; use single feature directly.
+                    const tU = Date.now();
                     const zoneRaw: Feature<Polygon | MultiPolygon> | null =
                         features.length === 1
                             ? features[0]
                             : turf.union(turf.featureCollection(features));
                     if (!zoneRaw) return;
+                    console.log(`[eliminationMask] union: ${Date.now()-tU}ms coords=${turf.coordAll(zoneRaw).length}`);
+
+                    const tT = Date.now();
                     const zoneOrNull = trunc(zoneRaw);
+                    console.log(`[eliminationMask] trunc: ${Date.now()-tT}ms coords=${turf.coordAll(zoneOrNull).length}`);
 
                     setZoneBoundary(zoneOrNull);
+                    const tD = Date.now();
                     const mask = turf.difference(
                         turf.featureCollection([world, zoneOrNull]),
                     );
+                    console.log(`[eliminationMask] difference (world-zone): ${Date.now()-tD}ms`);
                     setEliminationMask(mask ? trunc(mask) : null);
 
                     const radius = await computeRadiusRegions(
@@ -888,6 +896,104 @@ async function resolveMeasuringBuffer(
             return buffer
                 ? { buffer: trunc(buffer), pois: [], circles: [] }
                 : null;
+        }
+
+        case "admin-border-2":
+        case "admin-border-3":
+        case "admin-border-4":
+        case "admin-border-5":
+        case "admin-border-6":
+        case "admin-border-7":
+        case "admin-border-8":
+        case "admin-border-9":
+        case "admin-border-10":
+        case "admin-border-11": {
+            const adminLevel = parseInt(type.split("-")[2], 10);
+            const tTotal = Date.now();
+
+            // 1. Fetch over the full game zone bbox so distant borders (e.g. US-Mexico
+            //    from SF) are included. Fall back to a 500 km radius if no zone.
+            const fetchBbox = zoneOrNull
+                ? (turf.bbox(zoneOrNull) as [number, number, number, number])
+                : poiBbox(lng, lat, 500, null);
+            console.log(`[adminMask] level=${adminLevel} fetchBbox=[${fetchBbox.map(n => n.toFixed(2)).join(",")}]`);
+            const t1 = Date.now();
+            const allLines = await fetchAdminBoundaries(adminLevel, fetchBbox);
+            console.log(`[adminMask] level=${adminLevel} fetch done: ${allLines.features.length} lines in ${Date.now() - t1} ms`);
+            if (!allLines.features.length) return null;
+
+            // 2. Find seeker's distance to the nearest border segment.
+            const t2 = Date.now();
+            const nearest = nearestPointOnLines(lng, lat, allLines);
+            if (!nearest) return null;
+            const D = nearest.distanceKm;
+            console.log(`[adminMask] level=${adminLevel} nearestPointOnLines: D=${D.toFixed(1)} km in ${Date.now() - t2} ms`);
+
+            // 3. Filter: keep only lines whose bbox overlaps the zone expanded by D.
+            //    Lines outside this padded zone can't contribute to the mask within the zone.
+            const [zw, zs, ze, zn] = turf.bbox(zoneOrNull);
+            const degLat = D / 111;
+            const degLng = D / (111 * Math.cos((lat * Math.PI) / 180));
+            const withinReach = allLines.features.filter((f) => {
+                const [w, s, e, n] = turf.bbox(f);
+                return (
+                    w <= ze + degLng &&
+                    e >= zw - degLng &&
+                    s <= zn + degLat &&
+                    n >= zs - degLat
+                );
+            });
+            console.log(`[adminMask] level=${adminLevel} zone filter: ${withinReach.length}/${allLines.features.length} lines kept`);
+            if (!withinReach.length) return null;
+
+            // 4. Sort by centroid distance to seeker, cap at MAX_ADMIN_LINES to bound
+            //    the buffer + union work for fine-grained levels (8–11).
+            const MAX_ADMIN_LINES = 100;
+            const toProcess = withinReach
+                .map((f) => ({
+                    f,
+                    d: turf.distance(
+                        [lng, lat],
+                        turf.centroid(f),
+                        { units: "kilometers" },
+                    ),
+                }))
+                .sort((a, b) => a.d - b.d)
+                .slice(0, MAX_ADMIN_LINES)
+                .map(({ f }) => f);
+            console.log(`[adminMask] level=${adminLevel} after sort+cap: ${toProcess.length} lines`);
+
+            // 5. Simplify to reduce vertex count before buffering.
+            const t5 = Date.now();
+            const simplified = turf.simplify(
+                turf.featureCollection(toProcess),
+                { tolerance: 0.01, highQuality: false },
+            );
+            console.log(`[adminMask] level=${adminLevel} simplify done in ${Date.now() - t5} ms`);
+
+            // 6. Buffer + union.
+            const t6 = Date.now();
+            const bufferFC = turf.buffer(simplified, D, { units: "kilometers" });
+            console.log(`[adminMask] level=${adminLevel} buffer done in ${Date.now() - t6} ms`);
+            if (!bufferFC?.features.length) return null;
+            const t7 = Date.now();
+            const buffer =
+                bufferFC.features.length === 1
+                    ? (bufferFC.features[0] as Feature<Polygon | MultiPolygon>)
+                    : (turf.union(
+                          turf.featureCollection(bufferFC.features),
+                      ) as Feature<Polygon | MultiPolygon> | null);
+            console.log(`[adminMask] level=${adminLevel} union(${bufferFC.features.length} polys) done in ${Date.now() - t7} ms`);
+            if (!buffer) return null;
+
+            // 7. Perimeter circle centred on the seeker at radius D — rendered on the
+            //    map as the reference distance ring (same as POI buffer circles).
+            const perimeterCircle = trunc(
+                turf.circle([lng, lat], D, { steps: 64, units: "kilometers" }),
+            );
+
+            console.log(`[adminMask] level=${adminLevel} total ${Date.now() - tTotal} ms`);
+            return { buffer: trunc(buffer), pois: [], circles: [perimeterCircle] };
         }
 
         case "aquarium":

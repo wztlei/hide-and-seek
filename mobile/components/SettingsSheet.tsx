@@ -291,7 +291,27 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                                     {
                                         text: "Clear",
                                         style: "destructive",
-                                        onPress: () => AsyncStorage.clear(),
+                                        onPress: async () => {
+                                            const CACHE_PREFIXES = [
+                                                "jlhs-map-generator-cache::",
+                                                "jlhs-map-generator-zone-cache::",
+                                                "jlhs-map-generator-permanent-cache::",
+                                                "meas-poi:",
+                                                "meas-line:",
+                                                "poi:",
+                                                "zone-geo:",
+                                                "tent:",
+                                                "hiding:",
+                                                "admin-levels:",
+                                            ];
+                                            const allKeys = await AsyncStorage.getAllKeys();
+                                            const toRemove = allKeys.filter((k) =>
+                                                CACHE_PREFIXES.some((p) => k.startsWith(p)),
+                                            );
+                                            if (toRemove.length > 0) {
+                                                await AsyncStorage.multiRemove(toRemove);
+                                            }
+                                        },
                                     },
                                 ],
                             )

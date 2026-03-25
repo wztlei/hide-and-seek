@@ -343,6 +343,16 @@ const ordinaryMeasuringQuestionSchema = baseMeasuringQuestionSchema.extend({
             z
                 .literal("highspeed-measure-shinkansen")
                 .describe("High-Speed Rail Question"),
+            z.literal("admin-border-2").describe("International Border Question"),
+            z.literal("admin-border-3").describe("Regional Border Question"),
+            z.literal("admin-border-4").describe("State/Province Border Question"),
+            z.literal("admin-border-5").describe("District Border Question"),
+            z.literal("admin-border-6").describe("County/Department Border Question"),
+            z.literal("admin-border-7").describe("Municipality Border Question"),
+            z.literal("admin-border-8").describe("City/Town Border Question"),
+            z.literal("admin-border-9").describe("Sub-municipality Border Question"),
+            z.literal("admin-border-10").describe("Suburb Border Question"),
+            z.literal("admin-border-11").describe("Neighborhood Border Question"),
             z
                 .literal("aquarium-full")
                 .describe("Aquarium Question (Small+Medium Games)"),

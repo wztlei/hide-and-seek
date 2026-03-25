@@ -8,12 +8,16 @@ import type {
 } from "geojson";
 
 import { mapGeoLocation, additionalMapGeoLocations, polyGeoJSON } from "./context";
+import { getCached, setCached } from "./storage";
 
 const OVERPASS_API = "https://overpass-api.de/api/interpreter";
 
-// Module-level cache: avoids re-fetching the same zone (e.g. the base location)
-// every time an additional location is added/removed in the same session.
+// Module-level cache: avoids re-fetching the same zone within a session.
 const geoJSONCache = new Map<number, FeatureCollection>();
+
+function zoneGeoKey(osmId: number): string {
+    return `zone-geo:${osmId}`;
+}
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
@@ -24,6 +28,19 @@ async function fetchGeoJSONForZone(
 ): Promise<FeatureCollection> {
     const cached = geoJSONCache.get(osmId);
     if (cached) return cached;
+
+    const persistedRaw = getCached(zoneGeoKey(osmId));
+    if (persistedRaw) {
+        try {
+            const t0 = Date.now();
+            const persisted = JSON.parse(persistedRaw) as FeatureCollection;
+            console.log(`[zone-geo] cache hit osm_id=${osmId}: parse=${Date.now()-t0}ms coords=${turf.coordAll(persisted).length}`);
+            geoJSONCache.set(osmId, persisted);
+            return persisted;
+        } catch {
+            // Corrupted entry — fall through to re-fetch.
+        }
+    }
 
     const typeMap = { W: "way", R: "relation", N: "node" } as const;
     // [timeout:60] tells Overpass to allow up to 60 s of server-side processing
@@ -48,7 +65,9 @@ async function fetchGeoJSONForZone(
                 `Overpass API error ${res.status} for osm_id ${osmId}`,
             );
         }
+        const t0 = Date.now();
         const data = await res.json();
+        const t1 = Date.now();
         const geo = osmtogeojson(data);
         const result: FeatureCollection = {
             ...geo,
@@ -56,7 +75,16 @@ async function fetchGeoJSONForZone(
                 (f: any) => f.geometry.type !== "Point",
             ),
         };
+        const t2 = Date.now();
+        // Simplify before caching to reduce storage size and speed up subsequent reads.
+        // Tolerance of 0.001° ≈ 111 m — negligible for game use.
+        const coordsBefore = turf.coordAll(result).length;
+        turf.simplify(result as any, { tolerance: 0.001, highQuality: false, mutate: true });
+        const coordsAfter = turf.coordAll(result).length;
+        const t3 = Date.now();
+        console.log(`[zone-geo] fetch osm_id=${osmId}: json=${t1-t0}ms osmtogeo=${t2-t1}ms simplify=${t3-t2}ms coords ${coordsBefore}→${coordsAfter}`);
         geoJSONCache.set(osmId, result);
+        setCached(zoneGeoKey(osmId), JSON.stringify(result));
         return result;
     }
     throw lastError ?? new Error(`Overpass API failed for osm_id ${osmId}`);
@@ -106,12 +134,20 @@ export async function fetchAllZoneBoundaries(): Promise<
         }
     }
 
-    let merged: Feature<Polygon | MultiPolygon> = safeUnion(addedFeatures);
+    // Pre-simplify (non-mutating — preserves the in-memory geoJSONCache entries)
+    // before boolean ops. 0.005° ≈ 550 m, adequate for game zone boundaries.
+    const simplifiedForOps = addedFeatures.map(
+        (f) => turf.simplify(f, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>,
+    );
+
+    const tA = Date.now();
+    let merged: Feature<Polygon | MultiPolygon> = safeUnion(simplifiedForOps);
+    console.log(`[zone-geo] safeUnion: ${Date.now()-tA}ms coords=${turf.coordAll(merged).length}`);
 
     for (const subtracted of results.filter((x) => !x.added)) {
-        const subFeatures = subtracted.data.features as Feature<
-            Polygon | MultiPolygon
-        >[];
+        const subFeatures = (subtracted.data.features as Feature<Polygon | MultiPolygon>[]).map(
+            (f) => turf.simplify(f, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>,
+        );
         const diff = turf.difference(
             turf.featureCollection([merged, ...subFeatures]),
         );
@@ -119,19 +155,27 @@ export async function fetchAllZoneBoundaries(): Promise<
     }
 
     for (const subFeature of polySubtracted) {
-        const diff = turf.difference(turf.featureCollection([merged, subFeature]));
+        const simplified = turf.simplify(subFeature, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>;
+        const diff = turf.difference(turf.featureCollection([merged, simplified]));
         if (diff) merged = diff;
     }
 
-    if (turf.coordAll(merged).length > 10000) {
+    const coordCount = turf.coordAll(merged).length;
+    console.log(`[zone-geo] merged coords before final simplify: ${coordCount}`);
+    if (coordCount > 500) {
+        const tS = Date.now();
         turf.simplify(merged, {
-            tolerance: 0.0005,
-            highQuality: true,
+            tolerance: 0.005,
+            highQuality: false,
             mutate: true,
         });
+        console.log(`[zone-geo] final simplify: ${Date.now()-tS}ms → ${turf.coordAll(merged).length} coords`);
     }
 
-    return turf.combine(
+    const tC = Date.now();
+    const combined = turf.combine(
         turf.featureCollection([merged]),
     ) as FeatureCollection<MultiPolygon>;
+    console.log(`[zone-geo] combine: ${Date.now()-tC}ms, final coords: ${turf.coordAll(combined).length}`);
+    return combined;
 }

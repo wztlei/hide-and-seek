@@ -1,5 +1,16 @@
 # Mobile App — Claude Guidance
 
+## WIP / Hidden Features
+
+### Administrative Border Measuring Questions (`admin-border-2` … `admin-border-11`)
+
+All schema types, API logic (`fetchAdminBoundaries` in `measuringApi.ts`), mask computation (`useEliminationMask.ts`), and available-level probing/caching (`MeasuringEditor.tsx`) are fully implemented but the dropdown entry is **commented out** in `MeasuringEditor.tsx` (`DROPDOWN_DATA`) pending resolution of:
+
+- **Coastline interference (level 2):** national-boundary relations (e.g. US relation 148838) include Pacific coast ways as members. The `ISO3166-1` / `ISO3166-1:alpha2` filter in the Overpass query excludes these for level 2, but needs broader testing across countries.
+- **End-to-end correctness:** US–Mexico border detection from SF / California zone untested after the zone-bbox fetch fix.
+
+To re-enable: uncomment the `{ label: "Administrative Border", value: "__admin-border" }` line in `DROPDOWN_DATA`.
+
 This is the Expo React Native app (`mobile/`). It shares business logic with the root web app via Metro's monorepo watch config (`metro.config.js`).
 
 ## Stack
