@@ -7,21 +7,32 @@ import { usePostHog } from "posthog-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import * as turf from "@turf/turf";
+import * as Clipboard from "expo-clipboard";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     Animated,
     Dimensions,
     Pressable,
+    ScrollView,
     StyleSheet,
     Switch,
     Text,
     View,
 } from "react-native";
+import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { Feature, Point } from "geojson";
 import { colors } from "../lib/colors";
-import { addQuestion, questions, questionModified, uniformQuestionColor } from "../lib/context";
+import {
+    addQuestion,
+    customPOIs,
+    excludedPOIs,
+    questions,
+    questionModified,
+    uniformQuestionColor,
+} from "../lib/context";
 import { draftQuestion } from "../lib/draftQuestion";
 import {
     questionSchema,
@@ -289,6 +300,22 @@ function defaultPayloadForType(
     }
 }
 
+// ── Custom POI constants ───────────────────────────────────────────────────────
+
+const CUSTOM_POI_TYPES: { label: string; value: string }[] = [
+    { label: "Aquarium", value: "aquarium" },
+    { label: "Zoo", value: "zoo" },
+    { label: "Theme park", value: "theme_park" },
+    { label: "Mountain", value: "peak" },
+    { label: "Museum", value: "museum" },
+    { label: "Hospital", value: "hospital" },
+    { label: "Cinema", value: "cinema" },
+    { label: "Library", value: "library" },
+    { label: "Golf course", value: "golf_course" },
+    { label: "Consulate", value: "consulate" },
+    { label: "Park", value: "park" },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -300,6 +327,14 @@ interface Props {
     userCoord?: [number, number] | null;
     initialEditKey?: number | null;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
+    /** Currently-selected POI type in custom POI mode (from MapView). */
+    customPOISelectedType?: string | null;
+    /** Updates the selected type in MapView (triggers Overpass fetch). */
+    onCustomPOISelectType?: (type: string) => void;
+    /** Number of Overpass-fetched POIs for the selected type. */
+    customPOIOverpassCount?: number;
+    /** Called when the user taps "Tap Map" — closes panel and enters map-tap mode. */
+    onEnterCustomPOITapMode?: () => void;
 }
 
 export const QuestionsPanel = memo(function QuestionsPanel({
@@ -309,11 +344,17 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     userCoord,
     initialEditKey,
     onPickLocationOnMap,
+    customPOISelectedType,
+    onCustomPOISelectType,
+    customPOIOverpassCount = 0,
+    onEnterCustomPOITapMode,
 }: Props) {
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const $questions = useStore(questions) as Questions;
     const $uniformQuestionColor = useStore(uniformQuestionColor);
+    const $customPOIs = useStore(customPOIs);
+    const $excludedPOIs = useStore(excludedPOIs);
 
     const sheetRef = useRef<BottomSheet>(null);
     const slideX = useRef(new Animated.Value(0)).current;
@@ -361,10 +402,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
 
     const handleSheetChange = useCallback(
         (index: number) => {
-            if (index === -1) {
-                if (!isProgrammaticCloseRef.current) {
-                    draftQuestion.set(null);
-                }
+            if (index === -1 && !isProgrammaticCloseRef.current) {
+                draftQuestion.set(null);
                 onClose();
             }
         },
@@ -409,6 +448,182 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
     }
 
+    function goToCustomPOIs() {
+        if (!customPOISelectedType) {
+            onCustomPOISelectType?.(CUSTOM_POI_TYPES[0].value);
+        }
+        Animated.spring(slideX, {
+            toValue: -SCREEN_WIDTH * 3,
+            useNativeDriver: true,
+            restDisplacementThreshold: 1,
+            restSpeedThreshold: 1,
+        }).start();
+    }
+
+    function goBackFromCustomPOIs() {
+        Animated.spring(slideX, {
+            toValue: 0,
+            useNativeDriver: true,
+            restDisplacementThreshold: 1,
+            restSpeedThreshold: 1,
+        }).start();
+    }
+
+    // ── Custom POI copy/paste handlers ───────────────────────────────────────
+
+    async function handleCopyCustomPOIType() {
+        if (!customPOISelectedType) return;
+        const label =
+            CUSTOM_POI_TYPES.find((t) => t.value === customPOISelectedType)
+                ?.label ?? customPOISelectedType;
+        const custom = ($customPOIs[customPOISelectedType] ?? []).map((f) => ({
+            lng: f.geometry.coordinates[0],
+            lat: f.geometry.coordinates[1],
+            id: (f as Feature<Point, { id: string }>).properties?.id,
+        }));
+        const excluded = $excludedPOIs[customPOISelectedType] ?? [];
+        await Clipboard.setStringAsync(
+            JSON.stringify({
+                v: 1,
+                scope: "type",
+                type: customPOISelectedType,
+                custom,
+                excluded,
+            }),
+        );
+        Alert.alert("Copied", `Copied ${label} POI data to clipboard.`);
+    }
+
+    async function handlePasteCustomPOIType() {
+        const text = await Clipboard.getStringAsync();
+        try {
+            const data = JSON.parse(text);
+            if (data?.v !== 1 || data?.scope !== "type") {
+                Alert.alert(
+                    "Invalid Data",
+                    "Clipboard does not contain valid POI data.",
+                );
+                return;
+            }
+            const type = data.type as string;
+            const incomingCustom: { lng: number; lat: number; id: string }[] =
+                data.custom ?? [];
+            const incomingExcluded: string[] = data.excluded ?? [];
+            const existingCustom = customPOIs.get()[type] ?? [];
+            const existingIds = new Set(
+                existingCustom.map(
+                    (f) => (f as Feature<Point, { id: string }>).properties?.id,
+                ),
+            );
+            const newFeatures = incomingCustom
+                .filter((p) => !existingIds.has(p.id))
+                .map(
+                    (p): Feature<Point> => ({
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+                        properties: { id: p.id, name: "Custom" },
+                    }),
+                );
+            customPOIs.set({
+                ...customPOIs.get(),
+                [type]: [...existingCustom, ...newFeatures],
+            });
+            const existingExcluded = excludedPOIs.get()[type] ?? [];
+            const existingExcludedSet = new Set(existingExcluded);
+            const newExcluded = incomingExcluded.filter(
+                (id) => !existingExcludedSet.has(id),
+            );
+            excludedPOIs.set({
+                ...excludedPOIs.get(),
+                [type]: [...existingExcluded, ...newExcluded],
+            });
+            Alert.alert(
+                "Imported",
+                `Added ${newFeatures.length} custom POIs and ${newExcluded.length} exclusions.`,
+            );
+        } catch {
+            Alert.alert("Error", "Could not parse clipboard data.");
+        }
+    }
+
+    async function handleCopyAllCustomPOIs() {
+        const custom: Record<
+            string,
+            { lng: number; lat: number; id: string }[]
+        > = {};
+        for (const [type, features] of Object.entries($customPOIs)) {
+            custom[type] = features.map((f) => ({
+                lng: f.geometry.coordinates[0],
+                lat: f.geometry.coordinates[1],
+                id: (f as Feature<Point, { id: string }>).properties?.id,
+            }));
+        }
+        await Clipboard.setStringAsync(
+            JSON.stringify({ v: 1, scope: "all", custom, excluded: $excludedPOIs }),
+        );
+        Alert.alert("Copied", "Copied all custom POI data to clipboard.");
+    }
+
+    async function handlePasteAllCustomPOIs() {
+        const text = await Clipboard.getStringAsync();
+        try {
+            const data = JSON.parse(text);
+            if (data?.v !== 1 || data?.scope !== "all") {
+                Alert.alert(
+                    "Invalid Data",
+                    "Clipboard does not contain valid POI data.",
+                );
+                return;
+            }
+            let totalNew = 0;
+            let totalExcluded = 0;
+            const nextCustom = { ...customPOIs.get() };
+            const nextExcluded = { ...excludedPOIs.get() };
+            for (const [type, features] of Object.entries<
+                { lng: number; lat: number; id: string }[]
+            >(data.custom ?? {})) {
+                const existing = nextCustom[type] ?? [];
+                const existingIds = new Set(
+                    existing.map(
+                        (f) =>
+                            (f as Feature<Point, { id: string }>).properties?.id,
+                    ),
+                );
+                const newFeatures = features
+                    .filter((p) => !existingIds.has(p.id))
+                    .map(
+                        (p): Feature<Point> => ({
+                            type: "Feature",
+                            geometry: {
+                                type: "Point",
+                                coordinates: [p.lng, p.lat],
+                            },
+                            properties: { id: p.id, name: "Custom" },
+                        }),
+                    );
+                nextCustom[type] = [...existing, ...newFeatures];
+                totalNew += newFeatures.length;
+            }
+            for (const [type, ids] of Object.entries<string[]>(
+                data.excluded ?? {},
+            )) {
+                const existing = nextExcluded[type] ?? [];
+                const existingSet = new Set(existing);
+                const newIds = ids.filter((id) => !existingSet.has(id));
+                nextExcluded[type] = [...existing, ...newIds];
+                totalExcluded += newIds.length;
+            }
+            customPOIs.set(nextCustom);
+            excludedPOIs.set(nextExcluded);
+            Alert.alert(
+                "Imported",
+                `Added ${totalNew} custom POIs and ${totalExcluded} exclusions.`,
+            );
+        } catch {
+            Alert.alert("Error", "Could not parse clipboard data.");
+        }
+    }
+
     function handleAddQuestion(id: QuestionId) {
         const center = userCoord ?? getMapCenter();
         const parsed = questionSchema.parse(defaultPayloadForType(id, center));
@@ -427,7 +642,6 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             enableDynamicSizing={false}
             topInset={insets.top}
             enablePanDownToClose
-            onClose={onClose}
             onChange={handleSheetChange}
             backdropComponent={renderBackdrop}
             handleIndicatorStyle={styles.handleIndicator}
@@ -436,7 +650,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             <Animated.View
                 className="flex-row flex-1 overflow-hidden"
                 style={[
-                    { width: SCREEN_WIDTH * 3 },
+                    { width: SCREEN_WIDTH * 4 },
                     { transform: [{ translateX: slideX }] },
                 ]}
             >
@@ -458,9 +672,12 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                 text: "Clear All",
                                                 style: "destructive",
                                                 onPress: () => {
-                                                    posthog?.capture("questions_cleared", {
-                                                        count: $questions.length,
-                                                    });
+                                                    posthog?.capture(
+                                                        "questions_cleared",
+                                                        {
+                                                            count: $questions.length,
+                                                        },
+                                                    );
                                                     questions.set([]);
                                                     questionModified();
                                                 },
@@ -486,15 +703,46 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                     </View>
 
                     <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
-                        <Text className="text-base text-gray-700">
-                            Use single color
-                        </Text>
+                        <View className="flex-row items-center gap-3">
+                            <Ionicons
+                                name="color-palette-outline"
+                                size={20}
+                                color={colors.PRIMARY}
+                            />
+                            <Text className="text-lg text-gray-700">
+                                Use single color
+                            </Text>
+                        </View>
                         <Switch
                             value={$uniformQuestionColor}
                             onValueChange={(v) => uniformQuestionColor.set(v)}
-                            trackColor={{ false: "#d1d5db", true: colors.PRIMARY }}
+                            trackColor={{
+                                false: "#d1d5db",
+                                true: colors.PRIMARY,
+                            }}
                         />
                     </View>
+
+                    <Pressable
+                        onPress={goToCustomPOIs}
+                        className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100 active:bg-gray-50"
+                    >
+                        <View className="flex-row items-center gap-3">
+                            <Ionicons
+                                name="location-outline"
+                                size={20}
+                                color={colors.PRIMARY}
+                            />
+                            <Text className="text-lg text-gray-700">
+                                Edit Custom POIs
+                            </Text>
+                        </View>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color="#d1d5db"
+                        />
+                    </Pressable>
 
                     <BottomSheetScrollView
                         className="flex-1"
@@ -514,7 +762,11 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                     <Ionicons
                                         name={iconForType(q.id)}
                                         size={22}
-                                        color={$uniformQuestionColor ? colors.PRIMARY : colorForType(q.id)}
+                                        color={
+                                            $uniformQuestionColor
+                                                ? colors.PRIMARY
+                                                : colorForType(q.id)
+                                        }
                                     />
                                     <View className="flex-1 gap-0.5">
                                         <Text className="text-lg font-medium text-gray-800">
@@ -543,7 +795,13 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                         text: "Delete",
                                                         style: "destructive",
                                                         onPress: () => {
-                                                            posthog?.capture("question_deleted", { question_type: q.id });
+                                                            posthog?.capture(
+                                                                "question_deleted",
+                                                                {
+                                                                    question_type:
+                                                                        q.id,
+                                                                },
+                                                            );
                                                             questions.set(
                                                                 (
                                                                     questions.get() as Questions
@@ -703,7 +961,13 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                                 text: "Delete",
                                                 style: "destructive",
                                                 onPress: () => {
-                                                    posthog?.capture("question_deleted", { question_type: editData.id });
+                                                    posthog?.capture(
+                                                        "question_deleted",
+                                                        {
+                                                            question_type:
+                                                                editData.id,
+                                                        },
+                                                    );
                                                     questions.set(
                                                         (
                                                             questions.get() as Questions
@@ -795,7 +1059,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                         const isNew = isAddMode;
                                         addQuestion(draft);
                                         posthog?.capture(
-                                            isNew ? "question_saved_new" : "question_saved_edit",
+                                            isNew
+                                                ? "question_saved_new"
+                                                : "question_saved_edit",
                                             { question_type: draft.id },
                                         );
                                     }
@@ -821,10 +1087,222 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                         </View>
                     )}
                 </View>
+
+                {/* ── Screen 4: Custom POI Locations ───────────────────────── */}
+                <View className="flex-1" style={{ width: SCREEN_WIDTH }}>
+                    <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
+                        <Pressable
+                            onPress={goBackFromCustomPOIs}
+                            hitSlop={8}
+                            className="p-1 mr-2 active:opacity-60"
+                        >
+                            <Ionicons
+                                name="chevron-back"
+                                size={24}
+                                color="#555"
+                            />
+                        </Pressable>
+                        <Text className="flex-1 text-xl font-semibold text-gray-800">
+                            Custom POI Locations
+                        </Text>
+                        <Pressable
+                            onPress={onClose}
+                            hitSlop={8}
+                            className="p-1 active:opacity-60"
+                        >
+                            <Ionicons name="close" size={24} color="#555" />
+                        </Pressable>
+                    </View>
+
+                    <ScrollView
+                        contentContainerStyle={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 16,
+                            paddingBottom: insets.bottom + 16,
+                        }}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <Text className="text-base leading-6 text-gray-700 mb-4">
+                            Add custom Points of Interest for measuring
+                            questions. Tap the map to add a location; tap an
+                            existing POI to remove or exclude it.
+                        </Text>
+
+                        {/* Type dropdown */}
+                        <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            POI Type
+                        </Text>
+                        <Dropdown
+                            data={CUSTOM_POI_TYPES}
+                            labelField="label"
+                            valueField="value"
+                            value={customPOISelectedType ?? null}
+                            onChange={(item) => onCustomPOISelectType?.(item.value)}
+                            placeholder="Select a type…"
+                            style={customPOIDropdownStyle}
+                            selectedTextStyle={customPOIDropdownTextStyle}
+                            activeColor="#ecfeff"
+                        />
+
+                        {/* Status + instruction (when type selected) */}
+                        {customPOISelectedType && (
+                            <>
+                                <View className="flex-row flex-wrap items-center mt-3 mb-2">
+                                    <Text className="text-base text-gray-700">
+                                        <Text
+                                            className="font-semibold"
+                                            style={{ color: colors.PRIMARY }}
+                                        >
+                                            {$customPOIs[customPOISelectedType]
+                                                ?.length ?? 0}{" "}
+                                            custom
+                                        </Text>
+                                        {"  ·  "}
+                                        <Text
+                                            className="font-semibold"
+                                            style={{ color: colors.PRIMARY }}
+                                        >
+                                            {customPOIOverpassCount} fetched
+                                        </Text>
+                                        {($excludedPOIs[customPOISelectedType]
+                                            ?.length ?? 0) > 0 && (
+                                            <Text className="text-gray-500">
+                                                {" "}
+                                                (
+                                                {$excludedPOIs[
+                                                    customPOISelectedType
+                                                ]?.length ?? 0}{" "}
+                                                excluded)
+                                            </Text>
+                                        )}
+                                    </Text>
+                                </View>
+
+                                {/* Per-type actions row: Edit on map / copy / paste */}
+                                <View className="flex-row gap-2 mb-2 mt-3">
+                                    <Pressable
+                                        onPress={onEnterCustomPOITapMode}
+                                        style={customPOIActionButtonStyle}
+                                        className="flex-1 active:opacity-70"
+                                    >
+                                        <Ionicons
+                                            name="map-outline"
+                                            size={18}
+                                            color={colors.PRIMARY}
+                                        />
+                                        <Text
+                                            className="ml-1.5 text-sm font-medium"
+                                            style={{ color: colors.PRIMARY }}
+                                            numberOfLines={1}
+                                        >
+                                            Edit
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={handleCopyCustomPOIType}
+                                        style={customPOIActionButtonStyle}
+                                        className="flex-1 active:opacity-70"
+                                    >
+                                        <Ionicons
+                                            name="copy-outline"
+                                            size={18}
+                                            color={colors.PRIMARY}
+                                        />
+                                        <Text
+                                            className="ml-1.5 text-sm font-medium"
+                                            style={{ color: colors.PRIMARY }}
+                                            numberOfLines={1}
+                                        >
+                                            Copy
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={handlePasteCustomPOIType}
+                                        style={customPOIActionButtonStyle}
+                                        className="flex-1 active:opacity-70"
+                                    >
+                                        <Ionicons
+                                            name="clipboard-outline"
+                                            size={18}
+                                            color={colors.PRIMARY}
+                                        />
+                                        <Text
+                                            className="ml-1.5 text-sm font-medium"
+                                            style={{ color: colors.PRIMARY }}
+                                            numberOfLines={1}
+                                        >
+                                            Paste
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </>
+                        )}
+
+                        {/* Divider */}
+                        <View className="h-px bg-gray-100 my-4" />
+
+                        {/* All custom POIs copy / paste */}
+                        <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                            All Custom POIs
+                        </Text>
+                        <View className="flex-row gap-2">
+                            <Pressable
+                                onPress={handleCopyAllCustomPOIs}
+                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
+                            >
+                                <Ionicons
+                                    name="copy-outline"
+                                    size={16}
+                                    color="#555"
+                                />
+                                <Text className="text-base text-gray-700">
+                                    Copy All
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={handlePasteAllCustomPOIs}
+                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
+                            >
+                                <Ionicons
+                                    name="clipboard-outline"
+                                    size={16}
+                                    color="#555"
+                                />
+                                <Text className="text-base text-gray-700">
+                                    Paste All
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </ScrollView>
+                </View>
             </Animated.View>
         </BottomSheet>
     );
 });
+
+const customPOIDropdownStyle = {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    backgroundColor: "#fff",
+    marginBottom: 0,
+} as const;
+
+const customPOIDropdownTextStyle = {
+    fontSize: 16,
+    color: "#111827",
+} as const;
+
+const customPOIActionButtonStyle = {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+    height: 48,
+} as const;
 
 // These must remain StyleSheet — passed to BottomSheet via backgroundStyle/handleIndicatorStyle props
 // (third-party component props, not core RN style/className)

@@ -5,7 +5,12 @@ import type { Feature, MultiPolygon, Point, Polygon } from "geojson";
 import { startTransition, useEffect, useState } from "react";
 
 import type { Question, Questions } from "../../src/maps/schema";
-import { mapGeoJSON, questions } from "../lib/context";
+import {
+    customPOIs,
+    excludedPOIs,
+    mapGeoJSON,
+    questions,
+} from "../lib/context";
 import { toast } from "../lib/notifications";
 import {
     fetchAdminBoundary,
@@ -178,18 +183,24 @@ export function useEliminationMask() {
                             ? features[0]
                             : turf.union(turf.featureCollection(features));
                     if (!zoneRaw) return;
-                    console.log(`[eliminationMask] union: ${Date.now()-tU}ms coords=${turf.coordAll(zoneRaw).length}`);
+                    console.log(
+                        `[eliminationMask] union: ${Date.now() - tU}ms coords=${turf.coordAll(zoneRaw).length}`,
+                    );
 
                     const tT = Date.now();
                     const zoneOrNull = trunc(zoneRaw);
-                    console.log(`[eliminationMask] trunc: ${Date.now()-tT}ms coords=${turf.coordAll(zoneOrNull).length}`);
+                    console.log(
+                        `[eliminationMask] trunc: ${Date.now() - tT}ms coords=${turf.coordAll(zoneOrNull).length}`,
+                    );
 
                     setZoneBoundary(zoneOrNull);
                     const tD = Date.now();
                     const mask = turf.difference(
                         turf.featureCollection([world, zoneOrNull]),
                     );
-                    console.log(`[eliminationMask] difference (world-zone): ${Date.now()-tD}ms`);
+                    console.log(
+                        `[eliminationMask] difference (world-zone): ${Date.now() - tD}ms`,
+                    );
                     setEliminationMask(mask ? trunc(mask) : null);
 
                     const radius = await computeRadiusRegions(
@@ -405,7 +416,9 @@ async function computeTentaclesRegions(
             if (isCancelled()) return null;
             poiFeatures = pts.features as Feature<Point>[];
         } catch (e) {
-            Sentry.captureException(e, { tags: { question_type: "tentacles" } });
+            Sentry.captureException(e, {
+                tags: { question_type: "tentacles" },
+            });
             if (isCancelled()) return null;
         }
 
@@ -539,7 +552,9 @@ async function computeMatchingRegions(
                     circles: result.circles,
                 });
         } catch (e) {
-            Sentry.captureException(e, { tags: { question_type: "measuring" } });
+            Sentry.captureException(e, {
+                tags: { question_type: "measuring" },
+            });
         }
     }
 
@@ -916,10 +931,14 @@ async function resolveMeasuringBuffer(
             const fetchBbox = zoneOrNull
                 ? (turf.bbox(zoneOrNull) as [number, number, number, number])
                 : poiBbox(lng, lat, 500, null);
-            console.log(`[adminMask] level=${adminLevel} fetchBbox=[${fetchBbox.map(n => n.toFixed(2)).join(",")}]`);
+            console.log(
+                `[adminMask] level=${adminLevel} fetchBbox=[${fetchBbox.map((n) => n.toFixed(2)).join(",")}]`,
+            );
             const t1 = Date.now();
             const allLines = await fetchAdminBoundaries(adminLevel, fetchBbox);
-            console.log(`[adminMask] level=${adminLevel} fetch done: ${allLines.features.length} lines in ${Date.now() - t1} ms`);
+            console.log(
+                `[adminMask] level=${adminLevel} fetch done: ${allLines.features.length} lines in ${Date.now() - t1} ms`,
+            );
             if (!allLines.features.length) return null;
 
             // 2. Find seeker's distance to the nearest border segment.
@@ -927,7 +946,9 @@ async function resolveMeasuringBuffer(
             const nearest = nearestPointOnLines(lng, lat, allLines);
             if (!nearest) return null;
             const D = nearest.distanceKm;
-            console.log(`[adminMask] level=${adminLevel} nearestPointOnLines: D=${D.toFixed(1)} km in ${Date.now() - t2} ms`);
+            console.log(
+                `[adminMask] level=${adminLevel} nearestPointOnLines: D=${D.toFixed(1)} km in ${Date.now() - t2} ms`,
+            );
 
             // 3. Filter: keep only lines whose bbox overlaps the zone expanded by D.
             //    Lines outside this padded zone can't contribute to the mask within the zone.
@@ -943,7 +964,9 @@ async function resolveMeasuringBuffer(
                     n >= zs - degLat
                 );
             });
-            console.log(`[adminMask] level=${adminLevel} zone filter: ${withinReach.length}/${allLines.features.length} lines kept`);
+            console.log(
+                `[adminMask] level=${adminLevel} zone filter: ${withinReach.length}/${allLines.features.length} lines kept`,
+            );
             if (!withinReach.length) return null;
 
             // 4. Sort by centroid distance to seeker, cap at MAX_ADMIN_LINES to bound
@@ -952,16 +975,16 @@ async function resolveMeasuringBuffer(
             const toProcess = withinReach
                 .map((f) => ({
                     f,
-                    d: turf.distance(
-                        [lng, lat],
-                        turf.centroid(f),
-                        { units: "kilometers" },
-                    ),
+                    d: turf.distance([lng, lat], turf.centroid(f), {
+                        units: "kilometers",
+                    }),
                 }))
                 .sort((a, b) => a.d - b.d)
                 .slice(0, MAX_ADMIN_LINES)
                 .map(({ f }) => f);
-            console.log(`[adminMask] level=${adminLevel} after sort+cap: ${toProcess.length} lines`);
+            console.log(
+                `[adminMask] level=${adminLevel} after sort+cap: ${toProcess.length} lines`,
+            );
 
             // 5. Simplify to reduce vertex count before buffering.
             const t5 = Date.now();
@@ -969,12 +992,18 @@ async function resolveMeasuringBuffer(
                 turf.featureCollection(toProcess),
                 { tolerance: 0.01, highQuality: false },
             );
-            console.log(`[adminMask] level=${adminLevel} simplify done in ${Date.now() - t5} ms`);
+            console.log(
+                `[adminMask] level=${adminLevel} simplify done in ${Date.now() - t5} ms`,
+            );
 
             // 6. Buffer + union.
             const t6 = Date.now();
-            const bufferFC = turf.buffer(simplified, D, { units: "kilometers" });
-            console.log(`[adminMask] level=${adminLevel} buffer done in ${Date.now() - t6} ms`);
+            const bufferFC = turf.buffer(simplified, D, {
+                units: "kilometers",
+            });
+            console.log(
+                `[adminMask] level=${adminLevel} buffer done in ${Date.now() - t6} ms`,
+            );
             if (!bufferFC?.features.length) return null;
             const t7 = Date.now();
             const buffer =
@@ -983,7 +1012,9 @@ async function resolveMeasuringBuffer(
                     : (turf.union(
                           turf.featureCollection(bufferFC.features),
                       ) as Feature<Polygon | MultiPolygon> | null);
-            console.log(`[adminMask] level=${adminLevel} union(${bufferFC.features.length} polys) done in ${Date.now() - t7} ms`);
+            console.log(
+                `[adminMask] level=${adminLevel} union(${bufferFC.features.length} polys) done in ${Date.now() - t7} ms`,
+            );
             if (!buffer) return null;
 
             // 7. Perimeter circle centred on the seeker at radius D — rendered on the
@@ -992,8 +1023,14 @@ async function resolveMeasuringBuffer(
                 turf.circle([lng, lat], D, { steps: 64, units: "kilometers" }),
             );
 
-            console.log(`[adminMask] level=${adminLevel} total ${Date.now() - tTotal} ms`);
-            return { buffer: trunc(buffer), pois: [], circles: [perimeterCircle] };
+            console.log(
+                `[adminMask] level=${adminLevel} total ${Date.now() - tTotal} ms`,
+            );
+            return {
+                buffer: trunc(buffer),
+                pois: [],
+                circles: [perimeterCircle],
+            };
         }
 
         case "aquarium":
@@ -1029,9 +1066,24 @@ async function resolveMeasuringBuffer(
                     .features as Feature<Point>[],
                 zoneOrNull,
             );
-            const result = buildPOIUnionBuffer(lng, lat, pts, type);
+            // Merge custom POIs and filter excluded Overpass POIs
+            const baseType = type.replace(/-full$/, "");
+            const excluded = new Set(excludedPOIs.get()[baseType] ?? []);
+            const filteredPts = pts.filter(
+                (f) =>
+                    !excluded.has(
+                        `${f.geometry.coordinates[0].toFixed(5)},${f.geometry.coordinates[1].toFixed(5)}`,
+                    ),
+            );
+            const custom = customPOIs.get()[baseType] ?? [];
+            const allPts = [...filteredPts, ...custom];
+            const result = buildPOIUnionBuffer(lng, lat, allPts, type);
             if (!result) return null;
-            return { buffer: result.union, circles: result.circles, pois: pts };
+            return {
+                buffer: result.union,
+                circles: result.circles,
+                pois: allPts,
+            };
         }
 
         // Phase 3: mcdonalds, seven11, rail-measure — not yet implemented on mobile

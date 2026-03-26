@@ -19,7 +19,11 @@ import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Questions } from "../../../src/maps/schema";
-import { polyGeoJSON, showHidingZoneCircles, uniformQuestionColor } from "../../lib/context";
+import {
+    polyGeoJSON,
+    showHidingZoneCircles,
+    uniformQuestionColor,
+} from "../../lib/context";
 import { colors } from "../../lib/colors";
 import {
     radiusCircle,
@@ -70,6 +74,20 @@ interface Props {
     drawingPolygon: boolean;
     /** Vertices collected so far during polygon drawing. */
     polygonVertices: [number, number][];
+    /** True while the user is in map-tap mode for adding/removing custom POIs. */
+    customPOITapActive: boolean;
+    /** User-added custom POI points for the selected type. */
+    customPOIPoints: Feature<Point>[];
+    /** Overpass-fetched POIs for the selected type. */
+    overpassPOIPoints: Feature<Point>[];
+    /** Coord IDs of excluded Overpass POIs. */
+    excludedPOIIds: Set<string>;
+    /** Called when the user taps a custom (green) POI. */
+    onCustomPOIPress: (id: string) => void;
+    /** Called when the user taps an Overpass POI to toggle exclusion. */
+    onOverpassPOIPress: (coordId: string) => void;
+    /** Draft coord placed by tapping the map — shown as a ring until confirmed. */
+    pendingCustomPOICoord: [number, number] | null;
 }
 
 /**
@@ -84,6 +102,11 @@ interface Props {
  * the parent <MapView>. This is required — MapLibre layers must be direct
  * children of <MapView>.
  */
+/** Coord ID for a Point feature: `${lng.toFixed(5)},${lat.toFixed(5)}` */
+function poiCoordId(f: Feature<Point>): string {
+    return `${f.geometry.coordinates[0].toFixed(5)},${f.geometry.coordinates[1].toFixed(5)}`;
+}
+
 export function MapLayers({
     eliminationMask,
     zoneBoundary,
@@ -104,11 +127,19 @@ export function MapLayers({
     selectedHidingZonePoi,
     drawingPolygon,
     polygonVertices,
+    customPOITapActive,
+    customPOIPoints,
+    overpassPOIPoints,
+    excludedPOIIds,
+    onCustomPOIPress,
+    onOverpassPOIPress,
+    pendingCustomPOICoord,
 }: Props) {
     const $showHidingZoneCircles = useStore(showHidingZoneCircles);
     const $polyGeoJSON = useStore(polyGeoJSON);
     const $uniformQuestionColor = useStore(uniformQuestionColor);
-    const qc = (typeColor: string) => $uniformQuestionColor ? colors.PRIMARY : typeColor;
+    const qc = (typeColor: string) =>
+        $uniformQuestionColor ? colors.PRIMARY : typeColor;
 
     // ── Consolidated FeatureCollections (one per question type) ──────────────
     // Each replaces N per-question ShapeSources with a single source, reducing
@@ -315,7 +346,10 @@ export function MapLayers({
                 <ShapeSource id="match-fills" shape={matchingFills}>
                     <FillLayer
                         id="match-fill"
-                        style={{ fillColor: qc(colors.MATCHING), fillOpacity: 0.2 }}
+                        style={{
+                            fillColor: qc(colors.MATCHING),
+                            fillOpacity: 0.2,
+                        }}
                     />
                 </ShapeSource>
             )}
@@ -362,18 +396,23 @@ export function MapLayers({
             )}
 
             {/* Hiding zone circle outlines */}
-            {$showHidingZoneCircles && hidingZoneCircles && hidingZoneCircles.features.length > 0 && (
-                <ShapeSource id="hiding-zone-circles" shape={hidingZoneCircles}>
-                    <LineLayer
-                        id="hiding-zone-line"
-                        style={{
-                            lineColor: colors.RADIUS,
-                            lineWidth: 1.5,
-                            lineOpacity: 0.7,
-                        }}
-                    />
-                </ShapeSource>
-            )}
+            {$showHidingZoneCircles &&
+                hidingZoneCircles &&
+                hidingZoneCircles.features.length > 0 && (
+                    <ShapeSource
+                        id="hiding-zone-circles"
+                        shape={hidingZoneCircles}
+                    >
+                        <LineLayer
+                            id="hiding-zone-line"
+                            style={{
+                                lineColor: colors.RADIUS,
+                                lineWidth: 1.5,
+                                lineOpacity: 0.7,
+                            }}
+                        />
+                    </ShapeSource>
+                )}
 
             {/* Indigo overlay covering the eliminated (impossible) zone */}
             {eliminationMask && (
@@ -405,7 +444,9 @@ export function MapLayers({
             {/* Drawn polygon outlines — always mounted to avoid MapLibre source-removal crash */}
             <ShapeSource
                 id="poly-geojson-outline"
-                shape={$polyGeoJSON ?? { type: "FeatureCollection", features: [] }}
+                shape={
+                    $polyGeoJSON ?? { type: "FeatureCollection", features: [] }
+                }
             >
                 <LineLayer
                     id="poly-geojson-outline-line"
@@ -447,7 +488,12 @@ export function MapLayers({
             {/* First-vertex close-target — rendered larger when ≥ 3 vertices */}
             <ShapeSource
                 id="polygon-draw-first"
-                shape={drawFirstVertex ?? { type: "FeatureCollection", features: [] }}
+                shape={
+                    drawFirstVertex ?? {
+                        type: "FeatureCollection",
+                        features: [],
+                    }
+                }
             >
                 <CircleLayer
                     id="polygon-draw-first-layer"
@@ -466,7 +512,10 @@ export function MapLayers({
                 <ShapeSource id="radius-fills" shape={radiusFills}>
                     <FillLayer
                         id="radius-fill"
-                        style={{ fillColor: qc(colors.RADIUS), fillOpacity: 0.2 }}
+                        style={{
+                            fillColor: qc(colors.RADIUS),
+                            fillOpacity: 0.2,
+                        }}
                     />
                 </ShapeSource>
             )}
@@ -553,7 +602,10 @@ export function MapLayers({
                     if (drawingPolygon) return;
                     const f = e.features[0];
                     if (!f || f.geometry.type !== "Point") return;
-                    const [lng, lat] = f.geometry.coordinates as [number, number];
+                    const [lng, lat] = f.geometry.coordinates as [
+                        number,
+                        number,
+                    ];
                     onHidingZonePoiPress([lng, lat]);
                 }}
             >
@@ -576,7 +628,10 @@ export function MapLayers({
                     selectedHidingZonePoi
                         ? {
                               type: "Feature" as const,
-                              geometry: { type: "Point" as const, coordinates: selectedHidingZonePoi },
+                              geometry: {
+                                  type: "Point" as const,
+                                  coordinates: selectedHidingZonePoi,
+                              },
                               properties: {},
                           }
                         : { type: "FeatureCollection" as const, features: [] }
@@ -590,6 +645,109 @@ export function MapLayers({
                         circleOpacity: 1,
                         circleStrokeWidth: 2,
                         circleStrokeColor: "white",
+                    }}
+                />
+            </ShapeSource>
+
+            {/* Custom POI mode — Overpass POIs (tappable; excluded ones grey) */}
+            {customPOITapActive && (
+                <ShapeSource
+                    id="custom-mode-overpass"
+                    shape={{
+                        type: "FeatureCollection",
+                        features: overpassPOIPoints.map((f) => ({
+                            ...f,
+                            properties: {
+                                ...f.properties,
+                                _excluded: excludedPOIIds.has(poiCoordId(f))
+                                    ? 1
+                                    : 0,
+                                _coordId: poiCoordId(f),
+                            },
+                        })),
+                    }}
+                    onPress={(e) => {
+                        const coordId = e.features[0]?.properties?._coordId as
+                            | string
+                            | undefined;
+                        if (coordId) onOverpassPOIPress(coordId);
+                    }}
+                >
+                    <CircleLayer
+                        id="custom-mode-overpass-layer"
+                        style={{
+                            circleRadius: 7,
+                            circleColor: [
+                                "case",
+                                ["==", ["get", "_excluded"], 1],
+                                "#9ca3af",
+                                colors.PRIMARY,
+                            ] as any,
+                            circleOpacity: [
+                                "case",
+                                ["==", ["get", "_excluded"], 1],
+                                0.4,
+                                0.8,
+                            ] as any,
+                            circleStrokeWidth: 1.5,
+                            circleStrokeColor: "white",
+                        }}
+                    />
+                </ShapeSource>
+            )}
+
+            {/* Custom POI mode — user-added POIs (green, tappable to delete) */}
+            {customPOITapActive && (
+                <ShapeSource
+                    id="custom-mode-custom"
+                    shape={{
+                        type: "FeatureCollection",
+                        features: customPOIPoints,
+                    }}
+                    onPress={(e) => {
+                        const id = e.features[0]?.properties?.id as
+                            | string
+                            | undefined;
+                        if (id) onCustomPOIPress(id);
+                    }}
+                >
+                    <CircleLayer
+                        id="custom-mode-custom-layer"
+                        style={{
+                            circleRadius: 9,
+                            circleColor: colors.PRIMARY,
+                            circleOpacity: 0.9,
+                            circleStrokeWidth: 2,
+                            circleStrokeColor: "white",
+                        }}
+                    />
+                </ShapeSource>
+            )}
+
+            {/* Custom POI mode — draft pending coord (ring, always mounted) */}
+            <ShapeSource
+                id="custom-mode-pending"
+                shape={
+                    pendingCustomPOICoord
+                        ? {
+                              type: "Feature" as const,
+                              geometry: {
+                                  type: "Point" as const,
+                                  coordinates: pendingCustomPOICoord,
+                              },
+                              properties: {},
+                          }
+                        : { type: "FeatureCollection" as const, features: [] }
+                }
+            >
+                <CircleLayer
+                    id="custom-mode-pending-layer"
+                    style={{
+                        circleRadius: 11,
+                        circleColor: "white",
+                        circleOpacity: 1,
+                        circleStrokeWidth: 3,
+                        circleStrokeColor: colors.PRIMARY,
                     }}
                 />
             </ShapeSource>
@@ -609,7 +767,10 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.RADIUS) }, markerShadow]}
+                                style={[
+                                    { backgroundColor: qc(colors.RADIUS) },
+                                    markerShadow,
+                                ]}
                             >
                                 <Ionicons
                                     name="disc-outline"
@@ -636,9 +797,18 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.THERMOMETER_A) }, markerShadow]}
+                                style={[
+                                    {
+                                        backgroundColor: qc(
+                                            colors.THERMOMETER_A,
+                                        ),
+                                    },
+                                    markerShadow,
+                                ]}
                             >
-                                <Text className="text-white text-sm font-bold">A</Text>
+                                <Text className="text-white text-sm font-bold">
+                                    A
+                                </Text>
                             </View>
                         </Pressable>
                     </MarkerView>,
@@ -653,9 +823,18 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.THERMOMETER_B) }, markerShadow]}
+                                style={[
+                                    {
+                                        backgroundColor: qc(
+                                            colors.THERMOMETER_B,
+                                        ),
+                                    },
+                                    markerShadow,
+                                ]}
                             >
-                                <Text className="text-white text-sm font-bold">B</Text>
+                                <Text className="text-white text-sm font-bold">
+                                    B
+                                </Text>
                             </View>
                         </Pressable>
                     </MarkerView>,
@@ -676,7 +855,10 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.TENTACLES) }, markerShadow]}
+                                style={[
+                                    { backgroundColor: qc(colors.TENTACLES) },
+                                    markerShadow,
+                                ]}
                             >
                                 <Ionicons
                                     name="pie-chart-outline"
@@ -707,9 +889,16 @@ export function MapLayers({
                                   hitSlop={8}
                               >
                                   <View
-                                  className="w-[26px] h-[26px] rounded-full items-center justify-center"
-                                  style={[{ backgroundColor: qc(colors.TENTACLES) }, markerShadow]}
-                              >
+                                      className="w-[26px] h-[26px] rounded-full items-center justify-center"
+                                      style={[
+                                          {
+                                              backgroundColor: qc(
+                                                  colors.TENTACLES,
+                                              ),
+                                          },
+                                          markerShadow,
+                                      ]}
+                                  >
                                       <Ionicons
                                           name="location"
                                           size={14}
@@ -737,7 +926,10 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.MATCHING) }, markerShadow]}
+                                style={[
+                                    { backgroundColor: qc(colors.MATCHING) },
+                                    markerShadow,
+                                ]}
                             >
                                 <Ionicons
                                     name="reorder-two-outline"
@@ -764,7 +956,10 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[34px] h-[34px] rounded-full items-center justify-center"
-                                style={[{ backgroundColor: qc(colors.MEASURING) }, markerShadow]}
+                                style={[
+                                    { backgroundColor: qc(colors.MEASURING) },
+                                    markerShadow,
+                                ]}
                             >
                                 <Ionicons
                                     name="resize-outline"
@@ -798,7 +993,10 @@ export function MapLayers({
                         >
                             <View
                                 className="w-[26px] h-[26px] rounded-full border-2 border-white items-center justify-center opacity-[0.85]"
-                                style={[{ backgroundColor: qc(colors.MEASURING) }, markerShadow]}
+                                style={[
+                                    { backgroundColor: qc(colors.MEASURING) },
+                                    markerShadow,
+                                ]}
                             >
                                 <Ionicons
                                     name="search-outline"

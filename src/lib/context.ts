@@ -1,5 +1,11 @@
 import { persistentAtom } from "@nanostores/persistent";
-import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import type {
+    Feature,
+    FeatureCollection,
+    MultiPolygon,
+    Point,
+    Polygon,
+} from "geojson";
 import type { Map } from "leaflet";
 import { atom, computed, onSet } from "nanostores";
 
@@ -357,10 +363,14 @@ export const thunderforestEnabled = persistentAtom<boolean>(
 export const thunderforestTileUsage = persistentAtom<{
     count: number;
     month: string;
-}>("thunderforestTileUsage", { count: 0, month: "" }, {
-    encode: JSON.stringify,
-    decode: JSON.parse,
-});
+}>(
+    "thunderforestTileUsage",
+    { count: 0, month: "" },
+    {
+        encode: JSON.stringify,
+        decode: JSON.parse,
+    },
+);
 export const followMe = persistentAtom<boolean>("followMe", false, {
     encode: JSON.stringify,
     decode: JSON.parse,
@@ -389,4 +399,19 @@ export const customInitPreference = persistentAtom<"ask" | "blank" | "prefill">(
         encode: JSON.stringify,
         decode: JSON.parse,
     },
+);
+
+// User-added custom POI points, keyed by base POI type string
+export const customPOIs = persistentAtom<Record<string, Feature<Point>[]>>(
+    "customPOIs",
+    {},
+    { encode: JSON.stringify, decode: JSON.parse },
+);
+
+// Overpass-fetched POIs the user has excluded, keyed by base POI type
+// Values are coordinate IDs: `${lng.toFixed(5)},${lat.toFixed(5)}`
+export const excludedPOIs = persistentAtom<Record<string, string[]>>(
+    "excludedPOIs",
+    {},
+    { encode: JSON.stringify, decode: JSON.parse },
 );

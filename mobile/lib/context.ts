@@ -24,6 +24,8 @@ if (!thunderforestApiKey.get()) {
 export {
     additionalMapGeoLocations,
     addQuestion,
+    customPOIs,
+    excludedPOIs,
     alwaysUsePastebin,
     animateMapMovements,
     autoSave,

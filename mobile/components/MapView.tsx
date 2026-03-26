@@ -7,13 +7,22 @@ import {
     setAccessToken,
 } from "@maplibre/maplibre-react-native";
 import { useStore } from "@nanostores/react";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, ActivityIndicator, Keyboard, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import * as turf from "@turf/turf";
+import type {
+    Feature,
+    FeatureCollection,
+    MultiPolygon,
+    Point,
+    Polygon,
+} from "geojson";
 import type { Questions } from "../../src/maps/schema";
 import {
+    customPOIs,
+    excludedPOIs,
     hidingRadius,
     hidingRadiusUnits,
     mapGeoJSON,
@@ -24,6 +33,7 @@ import {
     thunderforestApiKey,
     thunderforestEnabled,
 } from "../lib/context";
+import { fetchMeasuringPOIs } from "../lib/measuringApi";
 import { draftQuestion } from "../lib/draftQuestion";
 import { useEliminationMask } from "../hooks/useEliminationMask";
 import { useHidingZones } from "../hooks/useHidingZones";
@@ -32,6 +42,8 @@ import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { useZoneBoundary } from "../hooks/useZoneBoundary";
 import { MapActionButtons } from "./map/MapActionButtons";
+import { CustomPOIConfirmBanner } from "./map/CustomPOIConfirmBanner";
+import { CustomPOITapBanner } from "./map/CustomPOITapBanner";
 import { DrawPolygonBanner } from "./map/DrawPolygonBanner";
 import { HidingZonePoiPrompt } from "./map/HidingZonePoiPrompt";
 import { MapLayers } from "./map/MapLayers";
@@ -104,6 +116,8 @@ export function AppMapView() {
     const $questions = useStore(questions) as Questions;
     const $thunderforestApiKey = useStore(thunderforestApiKey);
     const $thunderforestEnabled = useStore(thunderforestEnabled);
+    const $customPOIs = useStore(customPOIs);
+    const $excludedPOIs = useStore(excludedPOIs);
 
     const cameraRef = useRef<CameraRef>(null);
     const mapRef = useRef<MapViewRef>(null);
@@ -146,9 +160,26 @@ export function AppMapView() {
     const [zoneModalVisible, setZoneModalVisible] = useState(false);
     const [settingsVisible, setSettingsVisible] = useState(false);
 
+    // ── Custom POI mode ──────────────────────────────────────────────────────
+    // customPOISelectedType: type selected in the panel dropdown (drives Overpass fetch)
+    // customPOITapActive: true while the user is tapping the map to add/remove POIs
+    const [customPOISelectedType, setCustomPOISelectedType] = useState<
+        string | null
+    >(null);
+    const [customPOITapActive, setCustomPOITapActive] = useState(false);
+    const [pendingCustomPOICoord, setPendingCustomPOICoord] = useState<
+        [number, number] | null
+    >(null);
+    const [customModeOverpassPOIs, setCustomModeOverpassPOIs] = useState<
+        Feature<Point>[]
+    >([]);
+    const [customModeLoading, setCustomModeLoading] = useState(false);
+
     // ── Polygon drawing state ────────────────────────────────────────────────
     const [drawingPolygon, setDrawingPolygon] = useState(false);
-    const [polygonVertices, setPolygonVertices] = useState<[number, number][]>([]);
+    const [polygonVertices, setPolygonVertices] = useState<[number, number][]>(
+        [],
+    );
 
     // ── Pick-location-on-map state ──────────────────────────────────────────
     // pickingLocationForKey: which question is being edited (non-null = active)
@@ -169,10 +200,14 @@ export function AppMapView() {
     // the Reanimated animation runs on the UI thread but onChange fires on
     // the JS thread with an unpredictable delay.
     const pickReadyRef = useRef(false);
-    const pickReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pickReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
 
     // Hiding zone POI tap — coord of the tapped stop (null = prompt hidden)
-    const [pendingHidingZonePoi, setPendingHidingZonePoi] = useState<[number, number] | null>(null);
+    const [pendingHidingZonePoi, setPendingHidingZonePoi] = useState<
+        [number, number] | null
+    >(null);
     // Prevents the map's onPress from immediately dismissing the prompt that
     // the ShapeSource onPress just set (both fire on the same tap).
     const poiJustTappedRef = useRef(false);
@@ -215,12 +250,50 @@ export function AppMapView() {
         return mapCenterRef.current;
     }, []);
 
+    // ── Custom POI mode effects ──────────────────────────────────────────────
+
+    /** Fetch Overpass POIs when the selected type or map zone changes. */
+    useEffect(() => {
+        const type = customPOISelectedType;
+        if (!type || !$mapGeoJSON) {
+            setCustomModeOverpassPOIs([]);
+            return;
+        }
+        let cancelled = false;
+        setCustomModeLoading(true);
+        const zoneBbox = turf.bbox($mapGeoJSON) as [
+            number,
+            number,
+            number,
+            number,
+        ];
+        fetchMeasuringPOIs(type, zoneBbox)
+            .then((fc) => {
+                if (!cancelled) {
+                    setCustomModeOverpassPOIs(fc.features as Feature<Point>[]);
+                    setCustomModeLoading(false);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setCustomModeLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [customPOISelectedType, $mapGeoJSON]);
+
     /** Opens pick-mode: closes the panel and waits for a map tap. */
     const handlePickLocationOnMap = useCallback(
         (key: number, field?: "A" | "B") => {
-            console.log("[pickMode] entering pick mode — key:", key, "field:", field);
+            console.log(
+                "[pickMode] entering pick mode — key:",
+                key,
+                "field:",
+                field,
+            );
             pickReadyRef.current = false;
-            if (pickReadyTimerRef.current) clearTimeout(pickReadyTimerRef.current);
+            if (pickReadyTimerRef.current)
+                clearTimeout(pickReadyTimerRef.current);
             setPickingLocationForKey(key);
             setPickingLocationField(field ?? null);
             setPendingCoord(null);
@@ -239,6 +312,88 @@ export function AppMapView() {
     const handleQuestionsClose = useCallback(() => {
         setQuestionsVisible(false);
         setEditingQuestionKey(null);
+        setCustomPOITapActive(false);
+    }, []);
+
+    /** Closes the questions panel and enters map-tap mode for adding custom POIs. */
+    const handleEnterCustomPOITapMode = useCallback(() => {
+        setQuestionsVisible(false);
+        setCustomPOITapActive(true);
+    }, []);
+
+    /** Exits map-tap mode and reopens the questions panel (back on Screen 4). */
+    const handleExitCustomPOITapMode = useCallback(() => {
+        setCustomPOITapActive(false);
+        setPendingCustomPOICoord(null);
+        setQuestionsVisible(true);
+    }, []);
+
+    const handleCustomPOIPress = useCallback(
+        (id: string) => {
+            poiJustTappedRef.current = true;
+            setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+            const type = customPOISelectedType;
+            if (!type) return;
+            Alert.alert("Remove Custom POI", "Remove this custom location?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Remove",
+                    style: "destructive",
+                    onPress: () => {
+                        const next = { ...customPOIs.get() };
+                        next[type] = (next[type] ?? []).filter(
+                            (f) => (f as any).properties?.id !== id,
+                        );
+                        customPOIs.set(next);
+                    },
+                },
+            ]);
+        },
+        [customPOISelectedType],
+    );
+
+    const handleOverpassPOIPress = useCallback(
+        (coordId: string) => {
+            poiJustTappedRef.current = true;
+            setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+            const type = customPOISelectedType;
+            if (!type) return;
+            const current = excludedPOIs.get();
+            const typeExcluded = current[type] ?? [];
+            const next = { ...current };
+            if (typeExcluded.includes(coordId)) {
+                next[type] = typeExcluded.filter((id) => id !== coordId);
+            } else {
+                next[type] = [...typeExcluded, coordId];
+            }
+            excludedPOIs.set(next);
+        },
+        [customPOISelectedType],
+    );
+
+    /** Confirms the draft custom POI by adding it with the user-entered name. */
+    const handleConfirmCustomPOI = useCallback(
+        (name: string) => {
+            if (!pendingCustomPOICoord || !customPOISelectedType) return;
+            const [lng, lat] = pendingCustomPOICoord;
+            const id = Date.now().toString(36);
+            const next = { ...customPOIs.get() };
+            next[customPOISelectedType] = [
+                ...(next[customPOISelectedType] ?? []),
+                {
+                    type: "Feature" as const,
+                    geometry: { type: "Point" as const, coordinates: [lng, lat] },
+                    properties: { id, name },
+                },
+            ];
+            customPOIs.set(next);
+            setPendingCustomPOICoord(null);
+        },
+        [pendingCustomPOICoord, customPOISelectedType],
+    );
+
+    const handleCancelCustomPOI = useCallback(() => {
+        setPendingCustomPOICoord(null);
     }, []);
 
     /** Exits pick-mode and reopens the edit panel for the given question. */
@@ -336,28 +491,35 @@ export function AppMapView() {
         // if ShapeSource fires first). Clear it after the current event batch
         // so it doesn't swallow a subsequent map tap to dismiss the prompt.
         poiJustTappedRef.current = true;
-        setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+        setTimeout(() => {
+            poiJustTappedRef.current = false;
+        }, 0);
         setPendingHidingZonePoi(coord);
     }, []);
 
-    const handleCompletePolygon = useCallback((vertices: [number, number][]) => {
-        if (vertices.length < 3) return;
-        const ring = [...vertices, vertices[0]];
-        const polygon: Feature<Polygon> = {
-            type: "Feature",
-            geometry: { type: "Polygon", coordinates: [ring] },
-            properties: { added: true },
-        };
-        const existing = polyGeoJSON.get();
-        const fc: FeatureCollection<Polygon | MultiPolygon> = {
-            type: "FeatureCollection",
-            features: existing ? [...existing.features, polygon] : [polygon],
-        };
-        polyGeoJSON.set(fc);
-        mapGeoJSON.set(null); // trigger useZoneBoundary refetch with new polygon list
-        setDrawingPolygon(false);
-        setPolygonVertices([]);
-    }, []);
+    const handleCompletePolygon = useCallback(
+        (vertices: [number, number][]) => {
+            if (vertices.length < 3) return;
+            const ring = [...vertices, vertices[0]];
+            const polygon: Feature<Polygon> = {
+                type: "Feature",
+                geometry: { type: "Polygon", coordinates: [ring] },
+                properties: { added: true },
+            };
+            const existing = polyGeoJSON.get();
+            const fc: FeatureCollection<Polygon | MultiPolygon> = {
+                type: "FeatureCollection",
+                features: existing
+                    ? [...existing.features, polygon]
+                    : [polygon],
+            };
+            polyGeoJSON.set(fc);
+            mapGeoJSON.set(null); // trigger useZoneBoundary refetch with new polygon list
+            setDrawingPolygon(false);
+            setPolygonVertices([]);
+        },
+        [],
+    );
 
     const handleCancelDrawPolygon = useCallback(() => {
         setDrawingPolygon(false);
@@ -410,7 +572,17 @@ export function AppMapView() {
                     if (poiJustTappedRef.current) return;
 
                     if (feature.geometry.type !== "Point") return;
-                    const [lng, lat] = feature.geometry.coordinates as [number, number];
+                    const [lng, lat] = feature.geometry.coordinates as [
+                        number,
+                        number,
+                    ];
+
+                    // Custom POI tap mode: set draft coord for confirm banner.
+                    if (customPOITapActive && customPOISelectedType) {
+                        Keyboard.dismiss();
+                        setPendingCustomPOICoord([lng, lat]);
+                        return;
+                    }
 
                     // Drawing mode: collect vertices; close polygon if near first vertex.
                     if (drawingPolygon) {
@@ -423,7 +595,10 @@ export function AppMapView() {
                                 return;
                             }
                         }
-                        setPolygonVertices((prev) => [...prev, [lng, lat] as [number, number]]);
+                        setPolygonVertices((prev) => [
+                            ...prev,
+                            [lng, lat] as [number, number],
+                        ]);
                         return;
                     }
 
@@ -433,7 +608,8 @@ export function AppMapView() {
                         return;
                     }
 
-                    if (pickingLocationForKey === null || !pickReadyRef.current) return;
+                    if (pickingLocationForKey === null || !pickReadyRef.current)
+                        return;
                     setPendingCoord([lng, lat]);
                 }}
             >
@@ -453,14 +629,14 @@ export function AppMapView() {
                 )}
 
                 <MapLayers
-                    eliminationMask={eliminationMask}
+                    eliminationMask={customPOITapActive ? null : eliminationMask}
                     zoneBoundary={zoneBoundary}
-                    radiusRegions={radiusRegions}
-                    thermometerRegions={thermometerRegions}
-                    tentaclesRegions={tentaclesRegions}
-                    matchingRegions={matchingRegions}
-                    measuringRegions={measuringRegions}
-                    questions={$questions}
+                    radiusRegions={customPOITapActive ? [] : radiusRegions}
+                    thermometerRegions={customPOITapActive ? [] : thermometerRegions}
+                    tentaclesRegions={customPOITapActive ? [] : tentaclesRegions}
+                    matchingRegions={customPOITapActive ? [] : matchingRegions}
+                    measuringRegions={customPOITapActive ? [] : measuringRegions}
+                    questions={customPOITapActive ? [] : $questions}
                     userCoord={userCoord}
                     pendingCoord={pendingCoord}
                     onMarkerPress={handleMarkerPress}
@@ -472,11 +648,31 @@ export function AppMapView() {
                     selectedHidingZonePoi={pendingHidingZonePoi}
                     drawingPolygon={drawingPolygon}
                     polygonVertices={polygonVertices}
+                    customPOITapActive={customPOITapActive}
+                    customPOIPoints={
+                        customPOITapActive && customPOISelectedType
+                            ? ($customPOIs[customPOISelectedType] ?? [])
+                            : []
+                    }
+                    overpassPOIPoints={customPOITapActive ? customModeOverpassPOIs : []}
+                    excludedPOIIds={
+                        new Set(
+                            customPOITapActive && customPOISelectedType
+                                ? ($excludedPOIs[customPOISelectedType] ?? [])
+                                : [],
+                        )
+                    }
+                    onCustomPOIPress={handleCustomPOIPress}
+                    onOverpassPOIPress={handleOverpassPOIPress}
+                    pendingCustomPOICoord={pendingCustomPOICoord}
                 />
             </MLMapView>
 
             {(isComputingLayers || isLoadingHidingZones) && (
-                <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                <View
+                    className="absolute inset-0 items-center justify-center"
+                    pointerEvents="none"
+                >
                     <View
                         className="bg-white rounded-[20px] p-2.5"
                         style={{
@@ -502,11 +698,29 @@ export function AppMapView() {
                 />
             )}
 
-            {pendingHidingZonePoi !== null && pickingLocationForKey === null && (
-                <HidingZonePoiPrompt
+            {pendingHidingZonePoi !== null &&
+                pickingLocationForKey === null && (
+                    <HidingZonePoiPrompt
+                        topInset={insets.top}
+                        onConfirm={handleConfirmHidingZone}
+                        onDismiss={() => setPendingHidingZonePoi(null)}
+                    />
+                )}
+
+            {customPOITapActive && pickingLocationForKey === null && !pendingCustomPOICoord && (
+                <CustomPOITapBanner
                     topInset={insets.top}
-                    onConfirm={handleConfirmHidingZone}
-                    onDismiss={() => setPendingHidingZonePoi(null)}
+                    typeName={customPOISelectedType ?? ""}
+                    onDone={handleExitCustomPOITapMode}
+                />
+            )}
+
+            {pendingCustomPOICoord && customPOITapActive && (
+                <CustomPOIConfirmBanner
+                    coord={pendingCustomPOICoord}
+                    topInset={insets.top}
+                    onConfirm={handleConfirmCustomPOI}
+                    onCancel={handleCancelCustomPOI}
                 />
             )}
 
@@ -547,6 +761,10 @@ export function AppMapView() {
                 userCoord={userCoord}
                 initialEditKey={editingQuestionKey}
                 onPickLocationOnMap={handlePickLocationOnMap}
+                customPOISelectedType={customPOISelectedType}
+                onCustomPOISelectType={setCustomPOISelectedType}
+                customPOIOverpassCount={customModeOverpassPOIs.length}
+                onEnterCustomPOITapMode={handleEnterCustomPOITapMode}
             />
 
             <SettingsSheet
