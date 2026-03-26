@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react-native";
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetScrollView,
+    BottomSheetTextInput,
     type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,13 +26,14 @@ import {
     showHidingZoneCircles,
 } from "../lib/context";
 import { colors } from "../lib/colors";
+import { ActionButton } from "./ActionButton";
 import {
     ActivityIndicator,
     Alert,
+    Keyboard,
     Pressable,
     Switch,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -134,10 +136,17 @@ interface Props {
     onStartDrawPolygon: () => void;
 }
 
-export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLocation, onStartDrawPolygon }: Props) {
+export function MapConfigPanel({
+    visible,
+    onClose,
+    onCustomLocation: _onCustomLocation,
+    onStartDrawPolygon,
+}: Props) {
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheet>(null);
+    const scrollViewRef = useRef<React.ElementRef<typeof BottomSheetScrollView>>(null);
+    const isRadiusFocused = useRef(false);
     const isProgrammaticCloseRef = useRef(false);
 
     const [query, setQuery] = useState("");
@@ -176,6 +185,14 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
             setResults([]);
         }
     }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        const sub = Keyboard.addListener("keyboardDidShow", () => {
+            if (!isRadiusFocused.current) return;
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+        });
+        return () => sub.remove();
+    }, []);
 
     const handleSheetChange = useCallback(
         (index: number) => {
@@ -323,11 +340,17 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
         try {
             parsed = JSON.parse(text);
         } catch {
-            Alert.alert("Invalid zone config", "Clipboard doesn't contain a valid zone.");
+            Alert.alert(
+                "Invalid zone config",
+                "Clipboard doesn't contain a valid zone.",
+            );
             return;
         }
         if (parsed?.v !== 1 || !parsed.base?.properties?.osm_id) {
-            Alert.alert("Invalid zone config", "Clipboard doesn't contain a valid zone.");
+            Alert.alert(
+                "Invalid zone config",
+                "Clipboard doesn't contain a valid zone.",
+            );
             return;
         }
         Alert.alert(
@@ -394,10 +417,12 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             onChange={handleSheetChange}
+            keyboardBehavior="extend"
+            keyboardBlurBehavior="restore"
         >
             <BottomSheetScrollView
+                ref={scrollViewRef}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 32 }}
             >
                 {/* Header */}
                 <View className="flex-row items-center px-4 py-4 border-b border-gray-100">
@@ -413,11 +438,13 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                 {selectedLocations.map((item, rowIndex) => (
                     <View
                         key={`${item.location.properties.osm_id}-${rowIndex}`}
-                        className={`flex-row items-center px-4 py-2${!item.base && !item.added ? " bg-[#e3e4e6]" : ""}`}
+                        className={`flex-row items-center p-4 ${!item.base && !item.added ? "bg-[#e3e4e6]" : ""}`}
                     >
                         <Text
                             className="flex-1 text-lg mr-2"
-                            style={{ color: item.added ? "#1f2937" : "#888888" }}
+                            style={{
+                                color: item.added ? "#1f2937" : "#888888",
+                            }}
                             numberOfLines={1}
                         >
                             {determineName(item.location)}
@@ -465,10 +492,16 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                             key={`poly-${i}`}
                             className={`flex-row items-center px-4 py-2${!isAdded ? " bg-[#e3e4e6]" : ""}`}
                         >
-                            <Ionicons name="shapes-outline" size={20} color={colors.PRIMARY} />
+                            <Ionicons
+                                name="shapes-outline"
+                                size={20}
+                                color={colors.PRIMARY}
+                            />
                             <Text
                                 className="flex-1 text-lg ml-2"
-                                style={{ color: isAdded ? "#1f2937" : "#888888" }}
+                                style={{
+                                    color: isAdded ? "#1f2937" : "#888888",
+                                }}
                             >
                                 Custom polygon {i + 1}
                             </Text>
@@ -477,17 +510,31 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                                     hitSlop={8}
                                     activeOpacity={0.6}
                                     onPress={() => {
-                                        const features = $polyGeoJSON.features.map((g, j) =>
-                                            j === i
-                                                ? { ...g, properties: { ...g.properties, added: !isAdded } }
-                                                : g,
-                                        );
-                                        polyGeoJSON.set({ type: "FeatureCollection", features });
+                                        const features =
+                                            $polyGeoJSON.features.map((g, j) =>
+                                                j === i
+                                                    ? {
+                                                          ...g,
+                                                          properties: {
+                                                              ...g.properties,
+                                                              added: !isAdded,
+                                                          },
+                                                      }
+                                                    : g,
+                                            );
+                                        polyGeoJSON.set({
+                                            type: "FeatureCollection",
+                                            features,
+                                        });
                                         mapGeoJSON.set(null);
                                     }}
                                 >
                                     <Ionicons
-                                        name={isAdded ? "ban-outline" : "add-outline"}
+                                        name={
+                                            isAdded
+                                                ? "ban-outline"
+                                                : "add-outline"
+                                        }
                                         size={24}
                                         color={colors.PRIMARY}
                                     />
@@ -496,25 +543,36 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                                     hitSlop={8}
                                     activeOpacity={0.6}
                                     onPress={() => {
-                                        const remaining = $polyGeoJSON.features.filter((_, j) => j !== i);
-                                        polyGeoJSON.set(remaining.length === 0 ? null : { type: "FeatureCollection", features: remaining });
+                                        const remaining =
+                                            $polyGeoJSON.features.filter(
+                                                (_, j) => j !== i,
+                                            );
+                                        polyGeoJSON.set(
+                                            remaining.length === 0
+                                                ? null
+                                                : {
+                                                      type: "FeatureCollection",
+                                                      features: remaining,
+                                                  },
+                                        );
                                         mapGeoJSON.set(null);
                                     }}
                                 >
-                                    <Ionicons name="trash-outline" size={24} color="#6b7280" />
+                                    <Ionicons
+                                        name="trash-outline"
+                                        size={24}
+                                        color="#6b7280"
+                                    />
                                 </TouchableOpacity>
                             </View>
                         </View>
                     );
                 })}
 
-                {/* Separator */}
-                <View className="h-px bg-gray-200 mx-4 my-2" />
-
                 {/* Search bar */}
                 <View className="mx-4 mb-3 flex flex-row items-center bg-gray-100 rounded-xl px-3 h-11">
                     <Ionicons name="search" size={18} color="#888" />
-                    <TextInput
+                    <BottomSheetTextInput
                         style={searchInputStyle}
                         placeholder="Search for a location…"
                         placeholderTextColor="#aaa"
@@ -542,90 +600,68 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                 </View>
 
                 {/* Search results */}
-                {results.length > 0
-                    ? results.map((item) => {
-                          const label = determineName(swapCoords(item));
-                          const seen = (_placeSeen[label] =
-                              (_placeSeen[label] || 0) + 1);
-                          const displayLabel =
-                              _placeLabelCounts[label] > 1
-                                  ? `${label} (${seen})`
-                                  : label;
-                          return (
-                              <Pressable
-                                  key={`${item.properties.osm_id}${item.properties.name}`}
-                                  onPress={() => handleSelectResult(item)}
-                                  style={resultRowStyle}
-                              >
-                                  <Ionicons
-                                      name="location-outline"
-                                      size={20}
-                                      color={colors.PRIMARY}
-                                  />
-                                  <View className="ml-3 flex-1">
-                                      <Text
-                                          className="text-base text-gray-800"
-                                          numberOfLines={1}
-                                      >
-                                          {displayLabel}
-                                      </Text>
-                                      {item.properties.state ||
-                                      item.properties.country ? (
-                                          <Text
-                                              className="text-sm text-gray-400 mt-0.5"
-                                              numberOfLines={1}
-                                          >
-                                              {[
-                                                  item.properties.state,
-                                                  item.properties.country,
-                                              ]
-                                                  .filter(Boolean)
-                                                  .join(", ")}
-                                          </Text>
-                                      ) : null}
-                                  </View>
-                                  <Ionicons
-                                      name="chevron-forward"
-                                      size={16}
-                                      color="#ccc"
-                                  />
-                              </Pressable>
-                          );
-                      })
-                    : query.length > 0 && !loading
-                      ? (
-                          <Text className="text-center text-gray-400 my-8">
-                              No results found
-                          </Text>
-                        )
-                      : null}
+                {results.length > 0 ? (
+                    results.map((item) => {
+                        const label = determineName(swapCoords(item));
+                        const seen = (_placeSeen[label] =
+                            (_placeSeen[label] || 0) + 1);
+                        const displayLabel =
+                            _placeLabelCounts[label] > 1
+                                ? `${label} (${seen})`
+                                : label;
+                        return (
+                            <Pressable
+                                key={`${item.properties.osm_id}${item.properties.name}`}
+                                onPress={() => handleSelectResult(item)}
+                                style={resultRowStyle}
+                            >
+                                <Ionicons
+                                    name="location-outline"
+                                    size={20}
+                                    color={colors.PRIMARY}
+                                />
+                                <View className="ml-3 flex-1">
+                                    <Text
+                                        className="text-base text-gray-800"
+                                        numberOfLines={1}
+                                    >
+                                        {displayLabel}
+                                    </Text>
+                                    {item.properties.state ||
+                                    item.properties.country ? (
+                                        <Text
+                                            className="text-sm text-gray-400 mt-0.5"
+                                            numberOfLines={1}
+                                        >
+                                            {[
+                                                item.properties.state,
+                                                item.properties.country,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(", ")}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={16}
+                                    color="#ccc"
+                                />
+                            </Pressable>
+                        );
+                    })
+                ) : query.length > 0 && !loading ? (
+                    <Text className="text-center text-gray-400 my-8">
+                        No results found
+                    </Text>
+                ) : null}
 
                 {/* Footer buttons */}
-                <View className="px-4 pt-2 pb-4 border-t border-gray-100 mt-2 flex-row gap-2">
-                    <Pressable onPress={handleCopyZone} style={footerButtonStyle} className="flex-1">
-                        <Ionicons name="copy-outline" size={18} color={colors.PRIMARY} />
-                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
-                            Copy
-                        </Text>
-                    </Pressable>
-                    <Pressable onPress={handlePasteZone} style={footerButtonStyle} className="flex-1">
-                        <Ionicons name="clipboard-outline" size={18} color={colors.PRIMARY} />
-                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
-                            Paste
-                        </Text>
-                    </Pressable>
-                    <Pressable onPress={handleDrawPolygon} style={footerButtonStyle} className="flex-1">
-                        <Ionicons name="pencil-outline" size={18} color={colors.PRIMARY} />
-                        <Text className="ml-1.5 text-sm font-medium" style={{ color: colors.PRIMARY }}>
-                            Draw
-                        </Text>
-                    </Pressable>
-                    <Pressable onPress={handleClearZone} style={footerButtonStyle} className="flex-1">
-                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                        <Text className="ml-1.5 text-sm font-medium text-red-500">
-                            Clear
-                        </Text>
-                    </Pressable>
+                <View className="px-4 pt-2 pb-4 border-gray-100 flex-row gap-2">
+                    <ActionButton icon="copy-outline" label="Copy" onPress={handleCopyZone} />
+                    <ActionButton icon="clipboard-outline" label="Paste" onPress={handlePasteZone} />
+                    <ActionButton icon="pencil-outline" label="Draw" onPress={handleDrawPolygon} />
+                    <ActionButton icon="trash-outline" label="Clear" color="#ef4444" onPress={handleClearZone} />
                 </View>
 
                 {/* ── Hiding Zones ────────────────────────────────────────── */}
@@ -638,7 +674,7 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
 
                     {/* Toggle */}
                     <View className="flex-row items-center justify-between mb-3">
-                        <Text className="text-base text-gray-700">
+                        <Text className="text-lg text-gray-700">
                             Show hiding zones
                         </Text>
                         <Switch
@@ -655,12 +691,14 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
                         <>
                             {/* Show circles toggle */}
                             <View className="flex-row items-center justify-between mb-3">
-                                <Text className="text-base text-gray-700">
+                                <Text className="text-lg text-gray-700">
                                     Show circles
                                 </Text>
                                 <Switch
                                     value={$showHidingZoneCircles}
-                                    onValueChange={(v) => showHidingZoneCircles.set(v)}
+                                    onValueChange={(v) =>
+                                        showHidingZoneCircles.set(v)
+                                    }
                                     trackColor={{
                                         false: "#d1d5db",
                                         true: colors.RADIUS,
@@ -705,17 +743,21 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
 
                             {/* Radius row */}
                             <View className="flex-row items-center gap-3 mb-3">
-                                <Text className="text-base text-gray-700 flex-1">
+                                <Text className="text-lg text-gray-700 flex-1">
                                     Radius
                                 </Text>
-                                <TextInput
+                                <BottomSheetTextInput
                                     style={radiusInputStyle}
                                     keyboardType="decimal-pad"
                                     value={hidingRadiusText}
                                     onChangeText={setHidingRadiusText}
-                                    onBlur={() =>
-                                        commitRadiusText(hidingRadiusText)
-                                    }
+                                    onFocus={() => {
+                                        isRadiusFocused.current = true;
+                                    }}
+                                    onBlur={() => {
+                                        isRadiusFocused.current = false;
+                                        commitRadiusText(hidingRadiusText);
+                                    }}
                                     onEndEditing={() =>
                                         commitRadiusText(hidingRadiusText)
                                     }
@@ -772,7 +814,7 @@ export function MapConfigPanel({ visible, onClose, onCustomLocation: _onCustomLo
 
                             {/* Shade non-hiding areas */}
                             <View className="flex-row items-center justify-between">
-                                <Text className="text-base text-gray-700">
+                                <Text className="text-lg text-gray-700">
                                     Shade non-hiding areas
                                 </Text>
                                 <Switch
@@ -811,14 +853,6 @@ const resultRowStyle = {
     paddingVertical: 12,
 };
 
-const footerButtonStyle = {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    height: 48,
-};
 
 const chipStyle = {
     paddingHorizontal: 12,

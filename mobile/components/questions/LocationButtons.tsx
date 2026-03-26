@@ -1,10 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Location from "expo-location";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Text, View } from "react-native";
 
+import { ActionButton } from "../ActionButton";
 import { questionModified } from "../../lib/context";
-import { editorStyles } from "./editorStyles";
 import { formatCoord, parseCoordinatesFromText } from "./utils";
 
 interface Props {
@@ -19,7 +18,7 @@ interface Props {
 }
 
 /**
- * Reusable 4-button location row: Select on Map / Set to Current / Paste / Copy.
+ * Reusable 4-button location row: Select on Map / Set to Current / Copy / Paste.
  * Renders the coordinate display line below the buttons.
  */
 export function LocationButtons({
@@ -34,18 +33,20 @@ export function LocationButtons({
     return (
         <>
             <View className="flex-row gap-2">
-                <Pressable
+                <ActionButton
+                    vertical
+                    icon="map-outline"
+                    label="Select"
+                    color={color}
+                    numberOfLines={1}
                     onPress={() => onPickLocationOnMap?.(editingKey, field)}
-                    style={editorStyles.locationBtn}
-                    className="active:opacity-70"
-                >
-                    <Ionicons name="map-outline" size={20} color={color} />
-                    <Text className="text-xs mt-1 text-gray-500">
-                        Select on Map
-                    </Text>
-                </Pressable>
-
-                <Pressable
+                />
+                <ActionButton
+                    vertical
+                    icon="locate-outline"
+                    label="Set to Current"
+                    color={color}
+                    numberOfLines={1}
                     onPress={async () => {
                         const { status } =
                             await Location.requestForegroundPermissionsAsync();
@@ -62,16 +63,22 @@ export function LocationButtons({
                         onUpdate(pos.coords.latitude, pos.coords.longitude);
                         questionModified();
                     }}
-                    style={editorStyles.locationBtn}
-                    className="active:opacity-70"
-                >
-                    <Ionicons name="locate-outline" size={20} color={color} />
-                    <Text className="text-xs mt-1 text-gray-500">
-                        Set to Current
-                    </Text>
-                </Pressable>
-
-                <Pressable
+                />
+                <ActionButton
+                    vertical
+                    icon="copy-outline"
+                    label="Copy"
+                    color={color}
+                    onPress={async () => {
+                        const text = `${Math.abs(lat)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lng)}°${lng >= 0 ? "E" : "W"}`;
+                        await Clipboard.setStringAsync(text);
+                    }}
+                />
+                <ActionButton
+                    vertical
+                    icon="clipboard-outline"
+                    label="Paste"
+                    color={color}
                     onPress={async () => {
                         const text = await Clipboard.getStringAsync();
                         const parsed = parseCoordinatesFromText(text);
@@ -85,28 +92,7 @@ export function LocationButtons({
                             );
                         }
                     }}
-                    style={editorStyles.locationBtn}
-                    className="active:opacity-70"
-                >
-                    <Ionicons
-                        name="clipboard-outline"
-                        size={20}
-                        color={color}
-                    />
-                    <Text className="text-xs mt-1 text-gray-500">Paste</Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={async () => {
-                        const text = `${Math.abs(lat)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lng)}°${lng >= 0 ? "E" : "W"}`;
-                        await Clipboard.setStringAsync(text);
-                    }}
-                    style={editorStyles.locationBtn}
-                    className="active:opacity-70"
-                >
-                    <Ionicons name="copy-outline" size={20} color={color} />
-                    <Text className="text-xs mt-1 text-gray-500">Copy</Text>
-                </Pressable>
+                />
             </View>
 
             <Text className="text-center text-sm text-gray-500">

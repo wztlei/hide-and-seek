@@ -334,7 +334,11 @@ export function AppMapView() {
             setTimeout(() => { poiJustTappedRef.current = false; }, 0);
             const type = customPOISelectedType;
             if (!type) return;
-            Alert.alert("Remove Custom POI", "Remove this custom location?", [
+            const poi = (customPOIs.get()[type] ?? []).find(
+                (f) => (f as any).properties?.id === id,
+            );
+            const name = (poi as any)?.properties?.name ?? "this location";
+            Alert.alert(`Remove "${name}"?`, "Are you sure you want to remove this custom POI?", [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Remove",

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Feature, Point } from "geojson";
 import { customPOIs, excludedPOIs } from "../lib/context";
 import { colors } from "../lib/colors";
+import { ActionButton } from "./ActionButton";
 
 const POI_TYPES: { label: string; value: string }[] = [
     { label: "Aquarium", value: "aquarium" },
@@ -335,38 +336,8 @@ export function CustomPOIPanel({
 
                         {/* Per-type import / export */}
                         <View className="flex-row gap-2 mb-2">
-                            <Pressable
-                                onPress={handleCopyType}
-                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                            >
-                                <Ionicons
-                                    name="copy-outline"
-                                    size={16}
-                                    color="#555"
-                                />
-                                <Text
-                                    className="text-base text-gray-700"
-                                    numberOfLines={1}
-                                >
-                                    Copy {selectedLabel} POIs
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handlePasteType}
-                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                            >
-                                <Ionicons
-                                    name="clipboard-outline"
-                                    size={16}
-                                    color="#555"
-                                />
-                                <Text
-                                    className="text-base text-gray-700"
-                                    numberOfLines={1}
-                                >
-                                    Paste {selectedLabel} POIs
-                                </Text>
-                            </Pressable>
+                            <ActionButton icon="copy-outline" label={`Copy ${selectedLabel} POIs`} onPress={handleCopyType} numberOfLines={1} />
+                            <ActionButton icon="clipboard-outline" label={`Paste ${selectedLabel} POIs`} onPress={handlePasteType} numberOfLines={1} />
                         </View>
                     </>
                 )}
@@ -379,28 +350,8 @@ export function CustomPOIPanel({
                     All Custom POIs
                 </Text>
                 <View className="flex-row gap-2 mb-6">
-                    <Pressable
-                        onPress={handleCopyAll}
-                        className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                    >
-                        <Ionicons name="copy-outline" size={16} color="#555" />
-                        <Text className="text-base text-gray-700">
-                            Copy All Custom POIs
-                        </Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={handlePasteAll}
-                        className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                    >
-                        <Ionicons
-                            name="clipboard-outline"
-                            size={16}
-                            color="#555"
-                        />
-                        <Text className="text-base text-gray-700">
-                            Paste Custom POIs
-                        </Text>
-                    </Pressable>
+                    <ActionButton icon="copy-outline" label="Copy All Custom POIs" onPress={handleCopyAll} />
+                    <ActionButton icon="clipboard-outline" label="Paste Custom POIs" onPress={handlePasteAll} />
                 </View>
 
                 {/* Done button */}

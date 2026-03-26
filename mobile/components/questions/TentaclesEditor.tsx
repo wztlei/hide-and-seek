@@ -13,7 +13,7 @@ import { Dropdown } from "react-native-element-dropdown";
 import type { Feature, Point } from "geojson";
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { questionModified, questions } from "../../lib/context";
+import { customPOIs, questionModified, questions } from "../../lib/context";
 import { draftQuestion } from "../../lib/draftQuestion";
 import { fetchTentacleLocations } from "../../lib/tentacleApi";
 import { LocationButtons } from "./LocationButtons";
@@ -50,6 +50,7 @@ export function TentaclesEditor({
 }: Props) {
     const $questions = useStore(questions) as Questions;
     const $draftQuestion = useStore(draftQuestion);
+    const $customPOIs = useStore(customPOIs);
 
     const [radiusText, setRadiusText] = useState(String(data.radius));
     const [pois, setPois] = useState<Feature<Point>[]>([]);
@@ -110,7 +111,21 @@ export function TentaclesEditor({
             ? ((data.location as any).properties?.name ?? null)
             : null;
 
-    const poiOptions = [...pois]
+    // Merge custom POIs for this type into the selectable list.
+    const customForType: Feature<Point>[] = $customPOIs[data.locationType] ?? [];
+    const allPois = [
+        ...pois,
+        ...customForType.filter(
+            (cp) =>
+                !pois.some(
+                    (p) =>
+                        (p as any).properties?.name ===
+                        (cp as any).properties?.name,
+                ),
+        ),
+    ];
+
+    const poiOptions = [...allPois]
         .sort((a, b) => {
             const aSelected = (a as any).properties.name === selectedPoiName;
             const bSelected = (b as any).properties.name === selectedPoiName;
@@ -257,7 +272,9 @@ export function TentaclesEditor({
                     <View className="gap-2">
                         <Text
                             className="text-sm font-semibold uppercase tracking-wide"
-                            style={{ color: data.within ? "#6b7280" : "#d1d5db" }}
+                            style={{
+                                color: data.within ? "#6b7280" : "#d1d5db",
+                            }}
                         >
                             Location Type
                         </Text>
@@ -294,7 +311,9 @@ export function TentaclesEditor({
                         >
                             <Text
                                 className="text-sm font-semibold uppercase tracking-wide"
-                                style={{ color: data.within ? "#6b7280" : "#d1d5db" }}
+                                style={{
+                                    color: data.within ? "#6b7280" : "#d1d5db",
+                                }}
                             >
                                 Location
                             </Text>
@@ -337,14 +356,14 @@ export function TentaclesEditor({
                                 search
                                 searchPlaceholder="Search…"
                                 placeholder={
-                                    pois.length === 0
+                                    allPois.length === 0
                                         ? "No locations found nearby"
                                         : "Select a location…"
                                 }
-                                disable={!data.within || pois.length === 0}
+                                disable={!data.within || allPois.length === 0}
                                 style={[
                                     dropdownStyle.container,
-                                    (!data.within || pois.length === 0) && {
+                                    (!data.within || allPois.length === 0) && {
                                         opacity: 0.45,
                                     },
                                 ]}

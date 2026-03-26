@@ -40,6 +40,7 @@ import {
     type Questions,
 } from "../../src/maps/schema";
 
+import { ActionButton } from "./ActionButton";
 import { MatchingEditor } from "./questions/MatchingEditor";
 import { MeasuringEditor } from "./questions/MeasuringEditor";
 import { RadiusEditor } from "./questions/RadiusEditor";
@@ -362,6 +363,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     const [editingKey, setEditingKey] = useState<number | null>(null);
     // Prevents the onChange handler from discarding the draft on programmatic close.
     const isProgrammaticCloseRef = useRef(false);
+    const customPOIsReturnX = useRef(0);
 
     const $draftQuestion = useStore(draftQuestion);
 
@@ -448,10 +450,11 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
     }
 
-    function goToCustomPOIs() {
+    function goToCustomPOIs(returnX = 0) {
         if (!customPOISelectedType) {
             onCustomPOISelectType?.(CUSTOM_POI_TYPES[0].value);
         }
+        customPOIsReturnX.current = returnX;
         Animated.spring(slideX, {
             toValue: -SCREEN_WIDTH * 3,
             useNativeDriver: true,
@@ -462,7 +465,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
 
     function goBackFromCustomPOIs() {
         Animated.spring(slideX, {
-            toValue: 0,
+            toValue: customPOIsReturnX.current,
             useNativeDriver: true,
             restDisplacementThreshold: 1,
             restSpeedThreshold: 1,
@@ -1036,6 +1039,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 data={editData.data}
                                 editingKey={editingKey!}
                                 onPickLocationOnMap={onPickLocationOnMap}
+                                onOpenCustomPOIs={(type) => {
+                                    onCustomPOISelectType?.(type);
+                                    goToCustomPOIs(-SCREEN_WIDTH * 2);
+                                }}
                             />
                         )}
                         {editData?.id === "measuring" && (
@@ -1043,6 +1050,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 data={editData.data}
                                 editingKey={editingKey!}
                                 onPickLocationOnMap={onPickLocationOnMap}
+                                onOpenCustomPOIs={(type) => {
+                                    onCustomPOISelectType?.(type);
+                                    goToCustomPOIs(-SCREEN_WIDTH * 2);
+                                }}
                             />
                         )}
                     </BottomSheetScrollView>
@@ -1180,60 +1191,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
 
                                 {/* Per-type actions row: Edit on map / copy / paste */}
                                 <View className="flex-row gap-2 mb-2 mt-3">
-                                    <Pressable
-                                        onPress={onEnterCustomPOITapMode}
-                                        style={customPOIActionButtonStyle}
-                                        className="flex-1 active:opacity-70"
-                                    >
-                                        <Ionicons
-                                            name="map-outline"
-                                            size={18}
-                                            color={colors.PRIMARY}
-                                        />
-                                        <Text
-                                            className="ml-1.5 text-sm font-medium"
-                                            style={{ color: colors.PRIMARY }}
-                                            numberOfLines={1}
-                                        >
-                                            Edit
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={handleCopyCustomPOIType}
-                                        style={customPOIActionButtonStyle}
-                                        className="flex-1 active:opacity-70"
-                                    >
-                                        <Ionicons
-                                            name="copy-outline"
-                                            size={18}
-                                            color={colors.PRIMARY}
-                                        />
-                                        <Text
-                                            className="ml-1.5 text-sm font-medium"
-                                            style={{ color: colors.PRIMARY }}
-                                            numberOfLines={1}
-                                        >
-                                            Copy
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={handlePasteCustomPOIType}
-                                        style={customPOIActionButtonStyle}
-                                        className="flex-1 active:opacity-70"
-                                    >
-                                        <Ionicons
-                                            name="clipboard-outline"
-                                            size={18}
-                                            color={colors.PRIMARY}
-                                        />
-                                        <Text
-                                            className="ml-1.5 text-sm font-medium"
-                                            style={{ color: colors.PRIMARY }}
-                                            numberOfLines={1}
-                                        >
-                                            Paste
-                                        </Text>
-                                    </Pressable>
+                                    <ActionButton icon="map-outline" label="Edit" onPress={onEnterCustomPOITapMode ?? (() => {})} numberOfLines={1} />
+                                    <ActionButton icon="copy-outline" label="Copy" onPress={handleCopyCustomPOIType} numberOfLines={1} />
+                                    <ActionButton icon="clipboard-outline" label="Paste" onPress={handlePasteCustomPOIType} numberOfLines={1} />
                                 </View>
                             </>
                         )}
@@ -1246,32 +1206,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             All Custom POIs
                         </Text>
                         <View className="flex-row gap-2">
-                            <Pressable
-                                onPress={handleCopyAllCustomPOIs}
-                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                            >
-                                <Ionicons
-                                    name="copy-outline"
-                                    size={16}
-                                    color="#555"
-                                />
-                                <Text className="text-base text-gray-700">
-                                    Copy All
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handlePasteAllCustomPOIs}
-                                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 active:opacity-70"
-                            >
-                                <Ionicons
-                                    name="clipboard-outline"
-                                    size={16}
-                                    color="#555"
-                                />
-                                <Text className="text-base text-gray-700">
-                                    Paste All
-                                </Text>
-                            </Pressable>
+                            <ActionButton icon="copy-outline" label="Copy All" onPress={handleCopyAllCustomPOIs} />
+                            <ActionButton icon="clipboard-outline" label="Paste All" onPress={handlePasteAllCustomPOIs} />
                         </View>
                     </ScrollView>
                 </View>
@@ -1293,15 +1229,6 @@ const customPOIDropdownStyle = {
 const customPOIDropdownTextStyle = {
     fontSize: 16,
     color: "#111827",
-} as const;
-
-const customPOIActionButtonStyle = {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    height: 48,
 } as const;
 
 // These must remain StyleSheet — passed to BottomSheet via backgroundStyle/handleIndicatorStyle props

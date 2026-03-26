@@ -743,10 +743,10 @@ export function MapLayers({
                 <CircleLayer
                     id="custom-mode-pending-layer"
                     style={{
-                        circleRadius: 11,
+                        circleRadius: 7,
                         circleColor: "white",
-                        circleOpacity: 1,
-                        circleStrokeWidth: 3,
+                        circleOpacity: 0.7,
+                        circleStrokeWidth: 2.5,
                         circleStrokeColor: colors.PRIMARY,
                     }}
                 />

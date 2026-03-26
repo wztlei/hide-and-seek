@@ -41,16 +41,6 @@ export const editorStyles = StyleSheet.create({
         color: "#fff",
         fontWeight: "600",
     },
-    locationBtn: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 10,
-        borderWidth: 1,
-        borderColor: "#d1d5db",
-        borderRadius: 10,
-        backgroundColor: "#fff",
-    },
     typeRow: {
         flexDirection: "row",
         alignItems: "center",

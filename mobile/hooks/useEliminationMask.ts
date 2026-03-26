@@ -422,6 +422,15 @@ async function computeTentaclesRegions(
             if (isCancelled()) return null;
         }
 
+        // Merge custom POIs for this type (de-dupe by name).
+        const customForType: Feature<Point>[] =
+            customPOIs.get()[q.data.locationType] ?? [];
+        for (const cp of customForType) {
+            const name = (cp as any).properties?.name;
+            if (!name || poiFeatures.some((p) => (p as any).properties?.name === name)) continue;
+            poiFeatures = [...poiFeatures, cp];
+        }
+
         // Yield after the fetch so touch events can be processed before the
         // synchronous Voronoi / turf work below runs.
         await tick();
@@ -704,10 +713,19 @@ async function resolveMatchingBoundary(
                 zoneOrNull,
             );
             const pts = await fetchMatchingPOIs(type, bbox);
-            const inZone = filterPoisByZone(
+            const filtered = filterPoisByZone(
                 pts.features as Feature<Point>[],
                 zoneOrNull,
             );
+            const excluded = new Set(excludedPOIs.get()[type] ?? []);
+            const filteredPts = filtered.filter(
+                (f) =>
+                    !excluded.has(
+                        `${f.geometry.coordinates[0].toFixed(5)},${f.geometry.coordinates[1].toFixed(5)}`,
+                    ),
+            );
+            const custom = customPOIs.get()[type] ?? [];
+            const inZone = [...filteredPts, ...custom];
             return {
                 boundary: findVoronoiCell(
                     q.data.lng,

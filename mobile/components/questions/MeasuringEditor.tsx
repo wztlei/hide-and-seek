@@ -9,15 +9,23 @@ import * as Location from "expo-location";
 
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
-import { additionalMapGeoLocations, mapGeoJSON, mapGeoLocation, polyGeoJSON, questionModified } from "../../lib/context";
+import { editorStyles } from "./editorStyles";
+import {
+    additionalMapGeoLocations,
+    customPOIs,
+    mapGeoJSON,
+    mapGeoLocation,
+    polyGeoJSON,
+    questionModified,
+} from "../../lib/context";
 import { getCached, setCached } from "../../lib/storage";
 import {
     fetchAdminBoundaries,
     fetchAirports,
     fetchMeasuringPOIs,
 } from "../../lib/measuringApi";
+import { ActionButton } from "../ActionButton";
 import { LocationButtons } from "./LocationButtons";
-import { editorStyles } from "./editorStyles";
 import { parseCoordinatesFromText } from "./utils";
 
 type MeasuringData = Extract<Questions[number], { id: "measuring" }>["data"];
@@ -81,7 +89,9 @@ const DROPDOWN_HEADER_HEIGHT = 28; // paddingTop 10 + paddingBottom 4 + ~14 text
 const DROPDOWN_ITEM_LAYOUTS = DROPDOWN_DATA.reduce<
     { length: number; offset: number }[]
 >((acc, item, i) => {
-    const length = item.isHeader ? DROPDOWN_HEADER_HEIGHT : DROPDOWN_ITEM_HEIGHT;
+    const length = item.isHeader
+        ? DROPDOWN_HEADER_HEIGHT
+        : DROPDOWN_ITEM_HEIGHT;
     const offset = i === 0 ? 0 : acc[i - 1].offset + acc[i - 1].length;
     acc.push({ length, offset });
     return acc;
@@ -126,10 +136,7 @@ const MEASURING_POI_TYPES = new Set([
 ]);
 
 // Types that support a configurable search area + search center (all Overpass-backed types).
-const MEASURING_SEARCH_TYPES = new Set([
-    "airport",
-    ...MEASURING_POI_TYPES,
-]);
+const MEASURING_SEARCH_TYPES = new Set(["airport", ...MEASURING_POI_TYPES]);
 
 const SEARCH_RADIUS_OPTIONS = [
     { km: 100, label: "100 km" },
@@ -142,12 +149,14 @@ interface Props {
     data: MeasuringData;
     editingKey: number;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
+    onOpenCustomPOIs?: (type: string) => void;
 }
 
 export function MeasuringEditor({
     data,
     editingKey,
     onPickLocationOnMap,
+    onOpenCustomPOIs,
 }: Props) {
     const [poiCount, setPoiCount] = useState<number | null>(null);
     const [nearestPOIName, setNearestPOIName] = useState<string | null>(null);
@@ -156,8 +165,10 @@ export function MeasuringEditor({
     >(null);
     const [loadingPOIs, setLoadingPOIs] = useState(false);
     // null = loading/no zone; Set = resolved (levels with data in this zone)
-    const [availableAdminLevels, setAvailableAdminLevels] = useState<Set<number> | null>(null);
+    const [availableAdminLevels, setAvailableAdminLevels] =
+        useState<Set<number> | null>(null);
     const $mapGeoJSON = useStore(mapGeoJSON);
+    const $customPOIs = useStore(customPOIs);
 
     const isAdminBorder = data.type?.startsWith("admin-border-") ?? false;
     const isPOIType = MEASURING_POI_TYPES.has(data.type);
@@ -188,7 +199,8 @@ export function MeasuringEditor({
         const poly = polyGeoJSON.get();
         const parts = [String(loc.properties.osm_id)];
         for (const a of [...additional].sort(
-            (x, y) => x.location.properties.osm_id - y.location.properties.osm_id,
+            (x, y) =>
+                x.location.properties.osm_id - y.location.properties.osm_id,
         )) {
             parts.push(`${a.location.properties.osm_id}:${a.added}`);
         }
@@ -215,7 +227,12 @@ export function MeasuringEditor({
             }
         }
 
-        const zoneBbox = turf.bbox($mapGeoJSON) as [number, number, number, number];
+        const zoneBbox = turf.bbox($mapGeoJSON) as [
+            number,
+            number,
+            number,
+            number,
+        ];
         let cancelled = false;
         Promise.all(
             [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(async (level) => {
@@ -228,9 +245,14 @@ export function MeasuringEditor({
             }),
         ).then((results) => {
             if (!cancelled) {
-                const available = results.filter((r) => r.hasData).map((r) => r.level);
+                const available = results
+                    .filter((r) => r.hasData)
+                    .map((r) => r.level);
                 setAvailableAdminLevels(new Set(available));
-                setCached(`admin-levels:${zoneHash}`, JSON.stringify(available));
+                setCached(
+                    `admin-levels:${zoneHash}`,
+                    JSON.stringify(available),
+                );
             }
         });
         return () => {
@@ -287,10 +309,19 @@ export function MeasuringEditor({
         fetchPromise
             .then((fc) => {
                 if (cancelled) return;
-                setPoiCount(fc.features.length);
-                if (fc.features.length > 0) {
+                // Merge custom POIs for POI-based types (not airport).
+                const baseType = data.type.replace(/-full$/, "");
+                const custom = isPOIType
+                    ? (customPOIs.get()[baseType] ?? [])
+                    : [];
+                const allFeatures = [...fc.features, ...custom];
+                setPoiCount(allFeatures.length);
+                if (allFeatures.length > 0) {
                     const seekerPt = turf.point([data.lng, data.lat]);
-                    const nearest = turf.nearestPoint(seekerPt, fc as any);
+                    const nearest = turf.nearestPoint(seekerPt, {
+                        type: "FeatureCollection",
+                        features: allFeatures,
+                    } as any);
                     setNearestPOIName(
                         (nearest as any).properties?.name ?? null,
                     );
@@ -321,6 +352,7 @@ export function MeasuringEditor({
         $mapGeoJSON,
         isSearchType,
         (data as any).poiSearchRadius,
+        $customPOIs,
     ]);
 
     // The main dropdown shows "__admin-border" for any admin-border-* type so
@@ -397,7 +429,9 @@ export function MeasuringEditor({
                     autoScroll={false}
                     flatListProps={{
                         initialScrollIndex: dropdownInitialIndex(
-                            isAdminBorder ? "__admin-border" : (data.type ?? ""),
+                            isAdminBorder
+                                ? "__admin-border"
+                                : (data.type ?? ""),
                         ),
                         getItemLayout: (_, index) => ({
                             length:
@@ -446,7 +480,9 @@ export function MeasuringEditor({
                                     <View
                                         style={[
                                             dropdownItemStyle,
-                                            selected && { backgroundColor: "#ecfeff" },
+                                            selected && {
+                                                backgroundColor: "#ecfeff",
+                                            },
                                         ]}
                                     >
                                         <Text
@@ -615,23 +651,20 @@ export function MeasuringEditor({
                                 Search POIs around a second point.
                             </Text>
                             <View className="flex-row gap-2">
-                                <Pressable
+                                <ActionButton
+                                    vertical
+                                    icon="map-outline"
+                                    label="Select on Map"
+                                    color={colors.MEASURING}
                                     onPress={() =>
                                         onPickLocationOnMap?.(editingKey, "B")
                                     }
-                                    style={editorStyles.locationBtn}
-                                    className="active:opacity-70"
-                                >
-                                    <Ionicons
-                                        name="map-outline"
-                                        size={20}
-                                        color={colors.MEASURING}
-                                    />
-                                    <Text className="text-xs mt-1 text-gray-500">
-                                        Select on Map
-                                    </Text>
-                                </Pressable>
-                                <Pressable
+                                />
+                                <ActionButton
+                                    vertical
+                                    icon="locate-outline"
+                                    label="Set to Current"
+                                    color={colors.MEASURING}
                                     onPress={async () => {
                                         const { status } =
                                             await Location.requestForegroundPermissionsAsync();
@@ -650,19 +683,12 @@ export function MeasuringEditor({
                                             pos.coords.longitude;
                                         questionModified();
                                     }}
-                                    style={editorStyles.locationBtn}
-                                    className="active:opacity-70"
-                                >
-                                    <Ionicons
-                                        name="locate-outline"
-                                        size={20}
-                                        color={colors.MEASURING}
-                                    />
-                                    <Text className="text-xs mt-1 text-gray-500">
-                                        Set to Current
-                                    </Text>
-                                </Pressable>
-                                <Pressable
+                                />
+                                <ActionButton
+                                    vertical
+                                    icon="clipboard-outline"
+                                    label="Paste"
+                                    color={colors.MEASURING}
                                     onPress={async () => {
                                         const text =
                                             await Clipboard.getStringAsync();
@@ -679,18 +705,7 @@ export function MeasuringEditor({
                                             questionModified();
                                         }
                                     }}
-                                    style={editorStyles.locationBtn}
-                                    className="active:opacity-70"
-                                >
-                                    <Ionicons
-                                        name="clipboard-outline"
-                                        size={20}
-                                        color={colors.MEASURING}
-                                    />
-                                    <Text className="text-xs mt-1 text-gray-500">
-                                        Paste
-                                    </Text>
-                                </Pressable>
+                                />
                             </View>
                         </>
                     )}
@@ -722,37 +737,70 @@ export function MeasuringEditor({
                             No locations found in this zone
                         </Text>
                     ) : (
-                        <View style={poiInfoBoxStyle}>
-                            <Text style={poiInfoCountStyle}>
-                                {poiCount}{" "}
-                                {poiCount === 1 ? "location" : "locations"}{" "}
-                                found
-                            </Text>
-                            {nearestPOIName && (
-                                <>
-                                    <Text
-                                        style={poiInfoNearestStyle}
-                                        numberOfLines={1}
-                                    >
-                                        <Text className="font-semibold">
-                                            Nearest
+                        <Pressable
+                            style={poiInfoBoxStyle}
+                            onPress={
+                                isPOIType
+                                    ? () =>
+                                          onOpenCustomPOIs?.(
+                                              data.type.replace(/-full$/, ""),
+                                          )
+                                    : undefined
+                            }
+                        >
+                            <View style={{ flex: 1, gap: 2 }}>
+                                <Text style={poiInfoCountStyle}>
+                                    {(() => {
+                                        const baseType = data.type.replace(
+                                            /-full$/,
+                                            "",
+                                        );
+                                        const customCount = (
+                                            $customPOIs[baseType] ?? []
+                                        ).length;
+                                        const fetchedCount =
+                                            (poiCount ?? 0) - customCount;
+                                        const parts = [
+                                            `${fetchedCount} fetched`,
+                                        ];
+                                        if (customCount > 0)
+                                            parts.push(`${customCount} custom`);
+                                        return parts.join(" · ");
+                                    })()}
+                                </Text>
+                                {nearestPOIName && (
+                                    <>
+                                        <Text
+                                            style={poiInfoNearestStyle}
+                                            numberOfLines={1}
+                                        >
+                                            <Text className="font-semibold">
+                                                Nearest
+                                            </Text>
+                                            : {nearestPOIName}
                                         </Text>
-                                        : {nearestPOIName}
-                                    </Text>
-                                    <Text
-                                        style={poiInfoNearestStyle}
-                                        numberOfLines={1}
-                                    >
-                                        <Text className="font-semibold">
-                                            Distance
+                                        <Text
+                                            style={poiInfoNearestStyle}
+                                            numberOfLines={1}
+                                        >
+                                            <Text className="font-semibold">
+                                                Distance
+                                            </Text>
+                                            :{" "}
+                                            {nearestPOIDistanceKm !== null &&
+                                                `${nearestPOIDistanceKm < 100 ? nearestPOIDistanceKm.toFixed(1) : Math.round(nearestPOIDistanceKm)} km`}
                                         </Text>
-                                        :{" "}
-                                        {nearestPOIDistanceKm !== null &&
-                                            `${nearestPOIDistanceKm < 100 ? nearestPOIDistanceKm.toFixed(1) : Math.round(nearestPOIDistanceKm)} km`}
-                                    </Text>
-                                </>
+                                    </>
+                                )}
+                            </View>
+                            {isPOIType && onOpenCustomPOIs && (
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={18}
+                                    color="#9ca3af"
+                                />
                             )}
-                        </View>
+                        </Pressable>
                     )}
                 </View>
             )}
@@ -807,7 +855,9 @@ const poiInfoBoxStyle = {
     borderWidth: 1,
     borderColor: "#e5e7eb",
     backgroundColor: "#fff",
-    gap: 2,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
 };
 
 const poiInfoCountStyle = {

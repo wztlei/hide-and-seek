@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
@@ -7,6 +8,7 @@ import * as turf from "@turf/turf";
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
 import {
+    customPOIs,
     mapGeoJSON,
     mapGeoLocation,
     questionModified,
@@ -50,6 +52,7 @@ interface Props {
     data: MatchingData;
     editingKey: number;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
+    onOpenCustomPOIs?: (type: string) => void;
 }
 
 const POI_TYPES = new Set([
@@ -77,9 +80,11 @@ export function MatchingEditor({
     data,
     editingKey,
     onPickLocationOnMap,
+    onOpenCustomPOIs,
 }: Props) {
     const $mapGeoLocation = useStore(mapGeoLocation);
     const $mapGeoJSON = useStore(mapGeoJSON);
+    const $customPOIs = useStore(customPOIs);
     const zoneOsmId = $mapGeoLocation.properties.osm_id;
 
     const [subLevels, setSubLevels] = useState<AdminSubLevel[]>([]);
@@ -159,11 +164,13 @@ export function MatchingEditor({
         fetchMatchingPOIs((data as any).type, bbox)
             .then((fc) => {
                 if (cancelled) return;
-                setPoiCount(fc.features.length);
-                if (fc.features.length > 0) {
+                const custom = customPOIs.get()[(data as any).type] ?? [];
+                const allFeatures = [...fc.features, ...custom];
+                setPoiCount(allFeatures.length);
+                if (allFeatures.length > 0) {
                     const nearest = turf.nearestPoint(
                         turf.point([data.lng, data.lat]),
-                        fc as any,
+                        turf.featureCollection(allFeatures) as any,
                     );
                     setNearestPOIName(
                         (nearest as any).properties?.name ?? null,
@@ -186,6 +193,7 @@ export function MatchingEditor({
         $mapGeoJSON,
         isPOIType,
         (data as any).poiSearchRadius,
+        $customPOIs,
     ]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const selectedItem = SELECTABLE_DATA.find(
@@ -465,21 +473,39 @@ export function MatchingEditor({
                             No locations found in this zone
                         </Text>
                     ) : (
-                        <View style={poiInfoBoxStyle}>
-                            {nearestPOIName && (
-                                <Text
-                                    style={poiInfoNearestStyle}
-                                    numberOfLines={1}
-                                >
-                                    Nearest: {nearestPOIName}
+                        <Pressable
+                            style={poiInfoBoxStyle}
+                            onPress={() =>
+                                onOpenCustomPOIs?.((data as any).type)
+                            }
+                        >
+                            <View style={{ flex: 1, gap: 2 }}>
+                                {nearestPOIName && (
+                                    <Text
+                                        style={poiInfoNearestStyle}
+                                        numberOfLines={1}
+                                    >
+                                        Nearest: {nearestPOIName}
+                                    </Text>
+                                )}
+                                <Text style={poiInfoCountStyle}>
+                                    {(() => {
+                                        const customCount = ($customPOIs[(data as any).type] ?? []).length;
+                                        const fetchedCount = (poiCount ?? 0) - customCount;
+                                        const parts = [`${fetchedCount} fetched`];
+                                        if (customCount > 0) parts.push(`${customCount} custom`);
+                                        return parts.join(" · ");
+                                    })()}
                                 </Text>
+                            </View>
+                            {onOpenCustomPOIs && (
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={18}
+                                    color="#9ca3af"
+                                />
                             )}
-                            <Text style={poiInfoCountStyle}>
-                                {poiCount}{" "}
-                                {poiCount === 1 ? "location" : "locations"}{" "}
-                                fetched
-                            </Text>
-                        </View>
+                        </Pressable>
                     )}
                 </View>
             )}
@@ -596,7 +622,9 @@ const poiInfoBoxStyle = {
     borderWidth: 1,
     borderColor: "#e5e7eb",
     backgroundColor: "#fff",
-    gap: 2,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
 };
 
 const poiInfoNearestStyle = {
