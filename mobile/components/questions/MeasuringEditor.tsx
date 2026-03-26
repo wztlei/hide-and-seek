@@ -640,7 +640,7 @@ export function MeasuringEditor({
                                 }}
                                 className="active:opacity-70"
                             >
-                                <Text className="text-sm text-center text-red-400">
+                                <Text className="text-base text-center text-red-400">
                                     Reset to Seeker Location
                                 </Text>
                             </Pressable>
@@ -683,6 +683,14 @@ export function MeasuringEditor({
                                             pos.coords.longitude;
                                         questionModified();
                                     }}
+                                />
+                                <ActionButton
+                                    vertical
+                                    icon="copy-outline"
+                                    label="Copy"
+                                    color={colors.MEASURING}
+                                    disabled
+                                    onPress={() => {}}
                                 />
                                 <ActionButton
                                     vertical
