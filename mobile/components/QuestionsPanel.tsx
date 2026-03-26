@@ -482,7 +482,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         const custom = ($customPOIs[customPOISelectedType] ?? []).map((f) => ({
             lng: f.geometry.coordinates[0],
             lat: f.geometry.coordinates[1],
-            id: (f as Feature<Point, { id: string }>).properties?.id,
+            id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
+            name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
         }));
         const excluded = $excludedPOIs[customPOISelectedType] ?? [];
         await Clipboard.setStringAsync(
@@ -509,7 +510,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 return;
             }
             const type = data.type as string;
-            const incomingCustom: { lng: number; lat: number; id: string }[] =
+            const incomingCustom: { lng: number; lat: number; id: string; name?: string }[] =
                 data.custom ?? [];
             const incomingExcluded: string[] = data.excluded ?? [];
             const existingCustom = customPOIs.get()[type] ?? [];
@@ -524,7 +525,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                     (p): Feature<Point> => ({
                         type: "Feature",
                         geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-                        properties: { id: p.id, name: "Custom" },
+                        properties: { id: p.id, name: p.name ?? "Custom" },
                     }),
                 );
             customPOIs.set({
@@ -552,13 +553,14 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     async function handleCopyAllCustomPOIs() {
         const custom: Record<
             string,
-            { lng: number; lat: number; id: string }[]
+            { lng: number; lat: number; id: string; name?: string }[]
         > = {};
         for (const [type, features] of Object.entries($customPOIs)) {
             custom[type] = features.map((f) => ({
                 lng: f.geometry.coordinates[0],
                 lat: f.geometry.coordinates[1],
-                id: (f as Feature<Point, { id: string }>).properties?.id,
+                id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
+                name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
             }));
         }
         await Clipboard.setStringAsync(
@@ -583,7 +585,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             const nextCustom = { ...customPOIs.get() };
             const nextExcluded = { ...excludedPOIs.get() };
             for (const [type, features] of Object.entries<
-                { lng: number; lat: number; id: string }[]
+                { lng: number; lat: number; id: string; name?: string }[]
             >(data.custom ?? {})) {
                 const existing = nextCustom[type] ?? [];
                 const existingIds = new Set(
@@ -601,7 +603,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 type: "Point",
                                 coordinates: [p.lng, p.lat],
                             },
-                            properties: { id: p.id, name: "Custom" },
+                            properties: { id: p.id, name: p.name ?? "Custom" },
                         }),
                     );
                 nextCustom[type] = [...existing, ...newFeatures];
