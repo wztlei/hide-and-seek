@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        gap: 8,
+        gap: 12,
         backgroundColor: colors.PRIMARY,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
