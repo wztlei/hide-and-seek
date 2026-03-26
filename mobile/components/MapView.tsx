@@ -357,20 +357,34 @@ export function AppMapView() {
     );
 
     const handleOverpassPOIPress = useCallback(
-        (coordId: string) => {
+        (coordId: string, name: string | undefined, isExcluded: boolean) => {
             poiJustTappedRef.current = true;
             setTimeout(() => { poiJustTappedRef.current = false; }, 0);
             const type = customPOISelectedType;
             if (!type) return;
-            const current = excludedPOIs.get();
-            const typeExcluded = current[type] ?? [];
-            const next = { ...current };
-            if (typeExcluded.includes(coordId)) {
-                next[type] = typeExcluded.filter((id) => id !== coordId);
-            } else {
-                next[type] = [...typeExcluded, coordId];
-            }
-            excludedPOIs.set(next);
+            const label = name ? `"${name}"` : "This location";
+            const title = isExcluded ? "Re-include location?" : "Exclude location?";
+            const message = isExcluded
+                ? `${label} will be included again in this question type.`
+                : `${label} will be excluded from this question type.`;
+            Alert.alert(title, message, [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: isExcluded ? "Re-include" : "Exclude",
+                    style: isExcluded ? "default" : "destructive",
+                    onPress: () => {
+                        const current = excludedPOIs.get();
+                        const typeExcluded = current[type] ?? [];
+                        const next = { ...current };
+                        if (isExcluded) {
+                            next[type] = typeExcluded.filter((id) => id !== coordId);
+                        } else {
+                            next[type] = [...typeExcluded, coordId];
+                        }
+                        excludedPOIs.set(next);
+                    },
+                },
+            ]);
         },
         [customPOISelectedType],
     );

@@ -85,7 +85,7 @@ interface Props {
     /** Called when the user taps a custom (green) POI. */
     onCustomPOIPress: (id: string) => void;
     /** Called when the user taps an Overpass POI to toggle exclusion. */
-    onOverpassPOIPress: (coordId: string) => void;
+    onOverpassPOIPress: (coordId: string, name: string | undefined, isExcluded: boolean) => void;
     /** Draft coord placed by tapping the map — shown as a ring until confirmed. */
     pendingCustomPOICoord: [number, number] | null;
 }
@@ -667,10 +667,14 @@ export function MapLayers({
                         })),
                     }}
                     onPress={(e) => {
-                        const coordId = e.features[0]?.properties?._coordId as
-                            | string
-                            | undefined;
-                        if (coordId) onOverpassPOIPress(coordId);
+                        const props = e.features[0]?.properties;
+                        const coordId = props?._coordId as string | undefined;
+                        if (coordId)
+                            onOverpassPOIPress(
+                                coordId,
+                                props?.name as string | undefined,
+                                props?._excluded === 1,
+                            );
                     }}
                 >
                     <CircleLayer
