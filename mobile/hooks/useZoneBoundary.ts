@@ -36,7 +36,9 @@ export function useZoneBoundary() {
             try {
                 const t0 = Date.now();
                 const parsed = JSON.parse(cached);
-                console.log(`[useZoneBoundary] cache seed: parse=${Date.now()-t0}ms len=${cached.length}`);
+                console.log(
+                    `[useZoneBoundary] cache seed: parse=${Date.now() - t0}ms len=${cached.length}`,
+                );
                 mapGeoJSON.set(parsed);
             } catch (e) {
                 console.error("Failed to parse cached boundary:", e);
@@ -53,7 +55,9 @@ export function useZoneBoundary() {
         fetchAllZoneBoundaries()
             .then((boundary) => {
                 if (cancelled) return;
-                console.log(`[useZoneBoundary] fetchAllZoneBoundaries total: ${Date.now()-tFetch}ms`);
+                console.log(
+                    `[useZoneBoundary] fetchAllZoneBoundaries total: ${Date.now() - tFetch}ms`,
+                );
                 toast.success("Zone boundary loaded");
                 // Defer the heavy nanostore update so the toast text gets a
                 // paint cycle before the map re-render saturates the JS thread.
@@ -61,7 +65,9 @@ export function useZoneBoundary() {
                 requestAnimationFrame(() => {
                     if (cancelled) return;
                     mapGeoJSON.set(boundary);
-                    console.log(`[useZoneBoundary] mapGeoJSON.set + rAF: ${Date.now()-tSet}ms`);
+                    console.log(
+                        `[useZoneBoundary] mapGeoJSON.set + rAF: ${Date.now() - tSet}ms`,
+                    );
                     setCached(BOUNDARY_CACHE_KEY, JSON.stringify(boundary));
                 });
             })

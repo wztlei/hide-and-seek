@@ -17,15 +17,25 @@ interface Props {
 export function HidingZonePoiPrompt({ topInset, onConfirm, onDismiss }: Props) {
     return (
         <View
-            style={[styles.banner, { top: topInset + 16, backgroundColor: colors.PRIMARY }]}
+            style={[
+                styles.banner,
+                { top: topInset + 16, backgroundColor: colors.PRIMARY },
+            ]}
             pointerEvents="box-none"
         >
             <Ionicons name="bus-outline" size={20} color="white" />
             <Text className="flex-1 text-white text-[15px] font-semibold">
                 Add radius question at this stop?
             </Text>
-            <Pressable onPress={onConfirm} hitSlop={8} style={styles.confirmButton}>
-                <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>
+            <Pressable
+                onPress={onConfirm}
+                hitSlop={8}
+                style={styles.confirmButton}
+            >
+                <Text
+                    className="font-bold text-sm"
+                    style={{ color: colors.PRIMARY }}
+                >
                     Add
                 </Text>
             </Pressable>

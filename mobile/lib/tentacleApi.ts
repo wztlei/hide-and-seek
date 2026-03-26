@@ -123,7 +123,10 @@ export async function fetchTentacleLocations(
         const query = `[out:json][timeout:25];nwr["${tag}"="${question.locationType}"](around:${radiusMeters},${question.lat},${question.lng});out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`Overpass tentacles ${question.locationType} ${res.status}`);
+        if (!res.ok)
+            throw new Error(
+                `Overpass tentacles ${question.locationType} ${res.status}`,
+            );
         const data = await res.json();
         const features = parseElements(data.elements);
         tentPersistentSet(storeKey, features);

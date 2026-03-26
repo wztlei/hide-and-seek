@@ -96,8 +96,14 @@ async function fetchStopsForTag(
         return [];
     }
     const data = (await res.json()) as { elements: any[]; remark?: string };
-    if (data.remark?.includes("runtime error") || data.remark?.includes("timed out")) {
-        Sentry.captureMessage(`Overpass hiding zones ${tag} timed out: ${data.remark}`, "warning");
+    if (
+        data.remark?.includes("runtime error") ||
+        data.remark?.includes("timed out")
+    ) {
+        Sentry.captureMessage(
+            `Overpass hiding zones ${tag} timed out: ${data.remark}`,
+            "warning",
+        );
         console.warn(`[hidingZones] Overpass timeout for ${tag}:`, data.remark);
         return [];
     }
@@ -165,8 +171,9 @@ export function useHidingZones({
 
     const [hidingZoneCircles, setHidingZoneCircles] =
         useState<FeatureCollection<Polygon> | null>(null);
-    const [hidingZoneMask, setHidingZoneMask] =
-        useState<Feature<Polygon | MultiPolygon> | null>(null);
+    const [hidingZoneMask, setHidingZoneMask] = useState<Feature<
+        Polygon | MultiPolygon
+    > | null>(null);
     const [hidingZonePois, setHidingZonePois] = useState<Feature<Point>[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -254,7 +261,9 @@ export function useHidingZones({
                     //      only the mask (merge path) actually requires accurate clipping.
                     const simplifiedZone = $mergeDuplicates
                         ? (turf.simplify(
-                              JSON.parse(JSON.stringify(zoneBoundary)) as typeof zoneBoundary,
+                              JSON.parse(
+                                  JSON.stringify(zoneBoundary),
+                              ) as typeof zoneBoundary,
                               { tolerance: 0.001, highQuality: false },
                           ) as typeof zoneBoundary)
                         : null;
@@ -274,9 +283,13 @@ export function useHidingZones({
                         if (simplifiedZone) {
                             // Merging: clip each circle so the union/mask is accurate at zone edges.
                             const clipped = turf.intersect(
-                                turf.featureCollection([circle, simplifiedZone]),
+                                turf.featureCollection([
+                                    circle,
+                                    simplifiedZone,
+                                ]),
                             );
-                            if (clipped) circles.push(clipped as Feature<Polygon>);
+                            if (clipped)
+                                circles.push(clipped as Feature<Polygon>);
                         } else {
                             // Not merging: use raw circles (no clip needed for outline-only display).
                             circles.push(circle);
@@ -306,7 +319,8 @@ export function useHidingZones({
                         // 4a. Sequential pairwise union — only needed when merging.
                         //     Pairwise is more robust than turf.union(featureCollection(N))
                         //     for large / complex inputs.
-                        let unioned: Feature<Polygon | MultiPolygon> = circles[0];
+                        let unioned: Feature<Polygon | MultiPolygon> =
+                            circles[0];
                         for (let i = 1; i < circles.length; i++) {
                             if (isCancelled()) return;
                             const next = turf.union(
@@ -344,7 +358,9 @@ export function useHidingZones({
                     setHidingZoneCircles(resultCircles);
                     setHidingZoneMask(mask);
                     setHidingZonePois(capped);
-                    toast.success(`Hiding zones loaded (${capped.length} stops)`);
+                    toast.success(
+                        `Hiding zones loaded (${capped.length} stops)`,
+                    );
                 } catch (err) {
                     clearTimeout(slowTimer);
                     if (!isCancelled()) {

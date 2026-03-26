@@ -216,7 +216,11 @@ export async function fetchAirports(): Promise<FeatureCollection<Point>> {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Overpass airports ${res.status}`);
         const data = await res.json();
-        Sentry.addBreadcrumb({ category: "api", message: `Fetched ${data.elements?.length ?? 0} airports`, level: "info" });
+        Sentry.addBreadcrumb({
+            category: "api",
+            message: `Fetched ${data.elements?.length ?? 0} airports`,
+            level: "info",
+        });
         const fc = turf.featureCollection([]) as FeatureCollection<Point>;
         const seenIata = new Set<string>();
         for (const el of data.elements) {
@@ -257,7 +261,11 @@ export async function fetchMajorCities(): Promise<FeatureCollection<Point>> {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Overpass cities ${res.status}`);
         const data = await res.json();
-        Sentry.addBreadcrumb({ category: "api", message: `Fetched ${data.elements?.length ?? 0} major cities`, level: "info" });
+        Sentry.addBreadcrumb({
+            category: "api",
+            message: `Fetched ${data.elements?.length ?? 0} major cities`,
+            level: "info",
+        });
         const fc = turf.featureCollection([]) as FeatureCollection<Point>;
         for (const el of data.elements) {
             const coord =

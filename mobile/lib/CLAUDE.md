@@ -36,9 +36,9 @@ Two independent LRU namespaces:
 
 Simple non-LRU persistent entries (not evicted automatically — invalidated by cache clear):
 
-| Namespace               | Key format                       | Value            | Source                      |
-| ----------------------- | -------------------------------- | ---------------- | --------------------------- |
-| Available admin levels  | `admin-levels:{zoneHash}`        | `number[]` JSON  | `MeasuringEditor.tsx`       |
+| Namespace              | Key format                | Value           | Source                |
+| ---------------------- | ------------------------- | --------------- | --------------------- |
+| Available admin levels | `admin-levels:{zoneHash}` | `number[]` JSON | `MeasuringEditor.tsx` |
 
 `zoneHash` = `primaryOsmId[,additionalOsmId:added]...[,poly:lng,lat;...]` — OSM IDs sorted, plus coords of any additive custom polygon features (subtractive poly features are excluded since they can't introduce new admin levels).
 

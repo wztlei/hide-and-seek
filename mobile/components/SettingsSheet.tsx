@@ -8,11 +8,23 @@ import { useStore } from "@nanostores/react";
 import Constants from "expo-constants";
 import { useCallback, useRef, useEffect } from "react";
 import * as Clipboard from "expo-clipboard";
-import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import {
+    Alert,
+    Linking,
+    Pressable,
+    StyleSheet,
+    Switch,
+    Text,
+    View,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { thunderforestApiKey, thunderforestEnabled, thunderforestTileUsage } from "../lib/context";
+import {
+    thunderforestApiKey,
+    thunderforestEnabled,
+    thunderforestTileUsage,
+} from "../lib/context";
 import { colors } from "../lib/colors";
 
 interface Props {
@@ -53,7 +65,9 @@ function LinkRow({
                 <Ionicons name={icon} size={22} color={colors.PRIMARY} />
             </View>
             <View className="flex-1">
-                <Text className="text-base font-medium text-gray-900">{label}</Text>
+                <Text className="text-base font-medium text-gray-900">
+                    {label}
+                </Text>
                 <Text className="text-sm text-gray-500 mt-px">{sublabel}</Text>
             </View>
             <Ionicons name="open-outline" size={16} color="#9ca3af" />
@@ -64,15 +78,25 @@ function LinkRow({
 const TILE_LIMIT = 150;
 const BUILTIN_KEY = process.env.EXPO_PUBLIC_THUNDERFOREST_API_KEY ?? "";
 
-export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, storeUrl }: Props) {
+export function SettingsSheet({
+    visible,
+    onClose,
+    hasUpdate,
+    latestVersion,
+    storeUrl,
+}: Props) {
     const sheetRef = useRef<BottomSheet>(null);
     const insets = useSafeAreaInsets();
     const $thunderforestApiKey = useStore(thunderforestApiKey);
     const $thunderforestEnabled = useStore(thunderforestEnabled);
     const $tileUsage = useStore(thunderforestTileUsage);
 
-    const usingBuiltinKey = !!BUILTIN_KEY && $thunderforestApiKey === BUILTIN_KEY;
-    const month = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+    const usingBuiltinKey =
+        !!BUILTIN_KEY && $thunderforestApiKey === BUILTIN_KEY;
+    const month = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    })();
     const tileUsageCount = $tileUsage.month === month ? $tileUsage.count : 0;
     const isProgrammaticCloseRef = useRef(false);
 
@@ -135,7 +159,11 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                                 Tap to open the app store
                             </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color="#92400e" />
+                        <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color="#92400e"
+                        />
                     </Pressable>
                 )}
 
@@ -151,9 +179,9 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
 
                 {/* Description */}
                 <Text className="text-base leading-6 text-gray-700 mb-5">
-                    A companion app for Jet Lag: The Game — Hide and Seek.
-                    Add questions, track zone eliminations, and narrow down
-                    where the hider could be hiding on the map.
+                    A companion app for Jet Lag: The Game — Hide and Seek. Add
+                    questions, track zone eliminations, and narrow down where
+                    the hider could be hiding on the map.
                 </Text>
 
                 {/* Divider */}
@@ -166,7 +194,10 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                 >
                     MAP TILES
                 </Text>
-                <View className="flex-row items-center justify-between py-3.5 px-1" style={styles.linkRowBorder}>
+                <View
+                    className="flex-row items-center justify-between py-3.5 px-1"
+                    style={styles.linkRowBorder}
+                >
                     <View className="flex-1 pr-4">
                         <Text className="text-base font-medium text-gray-900">
                             Transport map tiles
@@ -181,7 +212,10 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                         trackColor={{ false: "#d1d5db", true: colors.PRIMARY }}
                     />
                 </View>
-                <View className="py-3.5 px-1 gap-1" style={styles.linkRowBorder}>
+                <View
+                    className="py-3.5 px-1 gap-1"
+                    style={styles.linkRowBorder}
+                >
                     <Text className="text-base font-medium text-gray-900">
                         Your Thunderforest API key
                     </Text>
@@ -191,11 +225,10 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                     </Text>
                     <View className="flex-row items-center mt-2 gap-2">
                         <View style={styles.apiKeyDisplay} className="flex-1">
-                            <Text
-                                style={styles.apiKeyText}
-                                numberOfLines={1}
-                            >
-                                {usingBuiltinKey ? "Using shared key" : ($thunderforestApiKey || "No key set")}
+                            <Text style={styles.apiKeyText} numberOfLines={1}>
+                                {usingBuiltinKey
+                                    ? "Using shared key"
+                                    : $thunderforestApiKey || "No key set"}
                             </Text>
                         </View>
                         <Pressable
@@ -206,20 +239,32 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                             className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center"
                             style={styles.actionButton}
                         >
-                            <Text className="text-base font-medium" style={{ color: colors.PRIMARY }}>Paste</Text>
+                            <Text
+                                className="text-base font-medium"
+                                style={{ color: colors.PRIMARY }}
+                            >
+                                Paste
+                            </Text>
                         </Pressable>
                         {!usingBuiltinKey && !!$thunderforestApiKey && (
                             <Pressable
-                                onPress={() => thunderforestApiKey.set(BUILTIN_KEY)}
+                                onPress={() =>
+                                    thunderforestApiKey.set(BUILTIN_KEY)
+                                }
                                 className="active:opacity-60 px-3 py-2 rounded-lg bg-red-50"
                             >
-                                <Text className="text-base font-medium text-red-600">Clear</Text>
+                                <Text className="text-base font-medium text-red-600">
+                                    Clear
+                                </Text>
                             </Pressable>
                         )}
                     </View>
                 </View>
                 {usingBuiltinKey && (
-                    <View className="py-3 px-1 gap-1.5" style={styles.linkRowBorder}>
+                    <View
+                        className="py-3 px-1 gap-1.5"
+                        style={styles.linkRowBorder}
+                    >
                         <View className="flex-row items-center justify-between">
                             <Text className="text-sm text-gray-500">
                                 Shared tile budget this month
@@ -247,7 +292,8 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                                         backgroundColor:
                                             tileUsageCount >= TILE_LIMIT
                                                 ? "#ef4444"
-                                                : tileUsageCount >= TILE_LIMIT * 0.8
+                                                : tileUsageCount >=
+                                                    TILE_LIMIT * 0.8
                                                   ? "#f59e0b"
                                                   : colors.PRIMARY,
                                     },
@@ -256,8 +302,9 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                         </View>
                         {tileUsageCount >= TILE_LIMIT && (
                             <Text className="text-sm text-red-500">
-                                Limit reached — map has switched to a free tile style.
-                                Paste your own API key above to restore transport maps.
+                                Limit reached — map has switched to a free tile
+                                style. Paste your own API key above to restore
+                                transport maps.
                             </Text>
                         )}
                     </View>
@@ -272,7 +319,10 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                 >
                     CACHE
                 </Text>
-                <View className="flex-row items-center py-3.5 px-1 gap-3" style={styles.linkRowBorder}>
+                <View
+                    className="flex-row items-center py-3.5 px-1 gap-3"
+                    style={styles.linkRowBorder}
+                >
                     <View className="flex-1">
                         <Text className="text-base font-medium text-gray-900">
                             Clear local cache
@@ -304,12 +354,18 @@ export function SettingsSheet({ visible, onClose, hasUpdate, latestVersion, stor
                                                 "hiding:",
                                                 "admin-levels:",
                                             ];
-                                            const allKeys = await AsyncStorage.getAllKeys();
-                                            const toRemove = allKeys.filter((k) =>
-                                                CACHE_PREFIXES.some((p) => k.startsWith(p)),
+                                            const allKeys =
+                                                await AsyncStorage.getAllKeys();
+                                            const toRemove = allKeys.filter(
+                                                (k) =>
+                                                    CACHE_PREFIXES.some((p) =>
+                                                        k.startsWith(p),
+                                                    ),
                                             );
                                             if (toRemove.length > 0) {
-                                                await AsyncStorage.multiRemove(toRemove);
+                                                await AsyncStorage.multiRemove(
+                                                    toRemove,
+                                                );
                                             }
                                         },
                                     },

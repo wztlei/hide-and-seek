@@ -38,7 +38,9 @@ export function useUpdateCheck(): UpdateInfo {
                 const current =
                     Constants.expoConfig?.version ??
                     // @ts-ignore — manifest2 exists in Expo Go (SDK 44+) but is not in the type definitions
-                    (Constants.manifest2?.extra?.expoClient?.version as string | undefined) ??
+                    (Constants.manifest2?.extra?.expoClient?.version as
+                        | string
+                        | undefined) ??
                     Constants.manifest?.version ??
                     "0.0.0";
                 const hasUpdate = versionGt(data.version, current);

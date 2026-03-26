@@ -7,7 +7,11 @@ import type {
     Polygon,
 } from "geojson";
 
-import { mapGeoLocation, additionalMapGeoLocations, polyGeoJSON } from "./context";
+import {
+    mapGeoLocation,
+    additionalMapGeoLocations,
+    polyGeoJSON,
+} from "./context";
 import { getCached, setCached } from "./storage";
 
 const OVERPASS_API = "https://overpass-api.de/api/interpreter";
@@ -34,7 +38,9 @@ async function fetchGeoJSONForZone(
         try {
             const t0 = Date.now();
             const persisted = JSON.parse(persistedRaw) as FeatureCollection;
-            console.log(`[zone-geo] cache hit osm_id=${osmId}: parse=${Date.now()-t0}ms coords=${turf.coordAll(persisted).length}`);
+            console.log(
+                `[zone-geo] cache hit osm_id=${osmId}: parse=${Date.now() - t0}ms coords=${turf.coordAll(persisted).length}`,
+            );
             geoJSONCache.set(osmId, persisted);
             return persisted;
         } catch {
@@ -79,10 +85,16 @@ async function fetchGeoJSONForZone(
         // Simplify before caching to reduce storage size and speed up subsequent reads.
         // Tolerance of 0.001° ≈ 111 m — negligible for game use.
         const coordsBefore = turf.coordAll(result).length;
-        turf.simplify(result as any, { tolerance: 0.001, highQuality: false, mutate: true });
+        turf.simplify(result as any, {
+            tolerance: 0.001,
+            highQuality: false,
+            mutate: true,
+        });
         const coordsAfter = turf.coordAll(result).length;
         const t3 = Date.now();
-        console.log(`[zone-geo] fetch osm_id=${osmId}: json=${t1-t0}ms osmtogeo=${t2-t1}ms simplify=${t3-t2}ms coords ${coordsBefore}→${coordsAfter}`);
+        console.log(
+            `[zone-geo] fetch osm_id=${osmId}: json=${t1 - t0}ms osmtogeo=${t2 - t1}ms simplify=${t3 - t2}ms coords ${coordsBefore}→${coordsAfter}`,
+        );
         geoJSONCache.set(osmId, result);
         setCached(zoneGeoKey(osmId), JSON.stringify(result));
         return result;
@@ -137,16 +149,28 @@ export async function fetchAllZoneBoundaries(): Promise<
     // Pre-simplify (non-mutating — preserves the in-memory geoJSONCache entries)
     // before boolean ops. 0.005° ≈ 550 m, adequate for game zone boundaries.
     const simplifiedForOps = addedFeatures.map(
-        (f) => turf.simplify(f, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>,
+        (f) =>
+            turf.simplify(f, {
+                tolerance: 0.005,
+                highQuality: false,
+            }) as Feature<Polygon | MultiPolygon>,
     );
 
     const tA = Date.now();
     let merged: Feature<Polygon | MultiPolygon> = safeUnion(simplifiedForOps);
-    console.log(`[zone-geo] safeUnion: ${Date.now()-tA}ms coords=${turf.coordAll(merged).length}`);
+    console.log(
+        `[zone-geo] safeUnion: ${Date.now() - tA}ms coords=${turf.coordAll(merged).length}`,
+    );
 
     for (const subtracted of results.filter((x) => !x.added)) {
-        const subFeatures = (subtracted.data.features as Feature<Polygon | MultiPolygon>[]).map(
-            (f) => turf.simplify(f, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>,
+        const subFeatures = (
+            subtracted.data.features as Feature<Polygon | MultiPolygon>[]
+        ).map(
+            (f) =>
+                turf.simplify(f, {
+                    tolerance: 0.005,
+                    highQuality: false,
+                }) as Feature<Polygon | MultiPolygon>,
         );
         const diff = turf.difference(
             turf.featureCollection([merged, ...subFeatures]),
@@ -155,13 +179,20 @@ export async function fetchAllZoneBoundaries(): Promise<
     }
 
     for (const subFeature of polySubtracted) {
-        const simplified = turf.simplify(subFeature, { tolerance: 0.005, highQuality: false }) as Feature<Polygon | MultiPolygon>;
-        const diff = turf.difference(turf.featureCollection([merged, simplified]));
+        const simplified = turf.simplify(subFeature, {
+            tolerance: 0.005,
+            highQuality: false,
+        }) as Feature<Polygon | MultiPolygon>;
+        const diff = turf.difference(
+            turf.featureCollection([merged, simplified]),
+        );
         if (diff) merged = diff;
     }
 
     const coordCount = turf.coordAll(merged).length;
-    console.log(`[zone-geo] merged coords before final simplify: ${coordCount}`);
+    console.log(
+        `[zone-geo] merged coords before final simplify: ${coordCount}`,
+    );
     if (coordCount > 500) {
         const tS = Date.now();
         turf.simplify(merged, {
@@ -169,13 +200,17 @@ export async function fetchAllZoneBoundaries(): Promise<
             highQuality: false,
             mutate: true,
         });
-        console.log(`[zone-geo] final simplify: ${Date.now()-tS}ms → ${turf.coordAll(merged).length} coords`);
+        console.log(
+            `[zone-geo] final simplify: ${Date.now() - tS}ms → ${turf.coordAll(merged).length} coords`,
+        );
     }
 
     const tC = Date.now();
     const combined = turf.combine(
         turf.featureCollection([merged]),
     ) as FeatureCollection<MultiPolygon>;
-    console.log(`[zone-geo] combine: ${Date.now()-tC}ms, final coords: ${turf.coordAll(combined).length}`);
+    console.log(
+        `[zone-geo] combine: ${Date.now() - tC}ms, final coords: ${turf.coordAll(combined).length}`,
+    );
     return combined;
 }

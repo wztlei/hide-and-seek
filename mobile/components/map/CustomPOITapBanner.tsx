@@ -24,9 +24,7 @@ export function CustomPOITapBanner({ topInset, typeName, onDone }: Props) {
                 className="flex-1 text-white text-[15px] font-semibold"
                 numberOfLines={1}
             >
-                {typeName
-                    ? `Add/remove ${typeName} · tap map`
-                    : "Tap map to add POI"}
+                    Tap map to add/remove POIs
             </Text>
             <Pressable onPress={onDone} hitSlop={8} style={styles.doneButton}>
                 <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>

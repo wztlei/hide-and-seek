@@ -83,7 +83,11 @@ export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
         throw new Error(`Failed to fetch coastline: ${res.status}`);
     }
     const data = await res.json();
-    Sentry.addBreadcrumb({ category: "api", message: "Fetched coastline GeoJSON", level: "info" });
+    Sentry.addBreadcrumb({
+        category: "api",
+        message: "Fetched coastline GeoJSON",
+        level: "info",
+    });
     coastlineCache = data;
     return data as FeatureCollection<LineString>;
 }
@@ -212,7 +216,11 @@ export async function fetchHighSpeedRail(): Promise<
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Overpass high-speed rail ${res.status}`);
     const data = await res.json();
-    Sentry.addBreadcrumb({ category: "api", message: `Fetched ${data.elements?.length ?? 0} rail segments`, level: "info" });
+    Sentry.addBreadcrumb({
+        category: "api",
+        message: `Fetched ${data.elements?.length ?? 0} rail segments`,
+        level: "info",
+    });
     const fc = turf.featureCollection<LineString | MultiLineString>([]);
     for (const el of data.elements) {
         if (el.type !== "way" || !el.geometry) continue;
@@ -310,7 +318,10 @@ function measLinePersistentGet(key: string): Feature<LineString>[] | null {
     return JSON.parse(raw) as Feature<LineString>[];
 }
 
-function measLinePersistentSet(key: string, features: Feature<LineString>[]): void {
+function measLinePersistentSet(
+    key: string,
+    features: Feature<LineString>[],
+): void {
     setCached(key, JSON.stringify(features));
     const lru = JSON.parse(getCached(MEAS_LINE_LRU_KEY) ?? "[]") as string[];
     const idx = lru.indexOf(key);
@@ -336,10 +347,16 @@ export async function fetchAdminBoundaries(
     const storeKey = measLineStoreKey(adminLevel, bbox);
 
     const persisted = measLinePersistentGet(storeKey);
-    if (persisted) return turf.featureCollection(persisted) as FeatureCollection<LineString>;
+    if (persisted)
+        return turf.featureCollection(
+            persisted,
+        ) as FeatureCollection<LineString>;
 
     const inflight = measLineInFlight.get(storeKey);
-    if (inflight) return turf.featureCollection(await inflight) as FeatureCollection<LineString>;
+    if (inflight)
+        return turf.featureCollection(
+            await inflight,
+        ) as FeatureCollection<LineString>;
 
     const promise = (async (): Promise<Feature<LineString>[]> => {
         const [west, south, east, north] = bbox;
@@ -354,35 +371,47 @@ export async function fetchAdminBoundaries(
         // Those relations include coastal segments that would be nearest to any
         // coastal city, drowning out the actual land border. Bilateral border
         // relations (e.g. US-Mexico border) don't carry ISO3166-1 tags.
-        const isoFilter = adminLevel === 2
-            ? `[!"ISO3166-1"][!"ISO3166-1:alpha2"]`
-            : "";
+        const isoFilter =
+            adminLevel === 2 ? `[!"ISO3166-1"][!"ISO3166-1:alpha2"]` : "";
         const query = `[out:json][timeout:60];rel["boundary"="administrative"]["admin_level"="${adminLevel}"]${isoFilter}(${south},${west},${north},${east})->.rels;way(r.rels)(${south},${west},${north},${east});out geom;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
 
-        console.log(`[adminBoundaries] level=${adminLevel} bbox=[${bbox.map(n => n.toFixed(2)).join(",")}] — fetching…`);
+        console.log(
+            `[adminBoundaries] level=${adminLevel} bbox=[${bbox.map((n) => n.toFixed(2)).join(",")}] — fetching…`,
+        );
         const t0 = Date.now();
 
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`Overpass admin boundaries level ${adminLevel} ${res.status}`);
+        if (!res.ok)
+            throw new Error(
+                `Overpass admin boundaries level ${adminLevel} ${res.status}`,
+            );
 
         const text = await res.text();
-        console.log(`[adminBoundaries] level=${adminLevel} — response ${(text.length / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
+        console.log(
+            `[adminBoundaries] level=${adminLevel} — response ${(text.length / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`,
+        );
 
         const data = JSON.parse(text) as { elements: any[] };
-        Sentry.addBreadcrumb({ category: "api", message: `Fetched admin level ${adminLevel} boundaries`, level: "info" });
+        Sentry.addBreadcrumb({
+            category: "api",
+            message: `Fetched admin level ${adminLevel} boundaries`,
+            level: "info",
+        });
 
         const features: Feature<LineString>[] = [];
         for (const el of data.elements) {
             // New query returns way elements directly (not relation members).
             if (el.type !== "way" || !el.geometry) continue;
-            const coords: [number, number][] = (el.geometry as { lat: number; lon: number }[]).map(
-                (node) => [node.lon, node.lat] as [number, number],
-            );
+            const coords: [number, number][] = (
+                el.geometry as { lat: number; lon: number }[]
+            ).map((node) => [node.lon, node.lat] as [number, number]);
             if (coords.length < 2) continue;
             features.push(turf.lineString(coords));
         }
-        console.log(`[adminBoundaries] level=${adminLevel} — ${features.length} segments in ${Date.now() - t0} ms`);
+        console.log(
+            `[adminBoundaries] level=${adminLevel} — ${features.length} segments in ${Date.now() - t0} ms`,
+        );
 
         // Cap at 500 way-member segments to bound parse time and memory.
         const capped = features.slice(0, 500);
@@ -393,7 +422,9 @@ export async function fetchAdminBoundaries(
     measLineInFlight.set(storeKey, promise);
     try {
         const features = await promise;
-        return turf.featureCollection(features) as FeatureCollection<LineString>;
+        return turf.featureCollection(
+            features,
+        ) as FeatureCollection<LineString>;
     } finally {
         measLineInFlight.delete(storeKey);
     }

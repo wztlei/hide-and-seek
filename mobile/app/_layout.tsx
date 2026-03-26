@@ -19,7 +19,6 @@ Sentry.init({
 // Suppress deprecation warning emitted by expo-router's own internal code
 LogBox.ignoreLogs(["SafeAreaView has been deprecated"]);
 
-
 function RootLayout() {
     const [ready, setReady] = useState(false);
 
@@ -45,7 +44,11 @@ function RootLayout() {
                 {ready && (
                     <>
                         <Stack />
-                        <Toast config={toastConfig} position="top" topOffset={60} />
+                        <Toast
+                            config={toastConfig}
+                            position="top"
+                            topOffset={60}
+                        />
                     </>
                 )}
             </GestureHandlerRootView>

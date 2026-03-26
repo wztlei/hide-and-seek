@@ -2,7 +2,11 @@ import { useStore } from "@nanostores/react";
 import { useCallback } from "react";
 import Toast from "react-native-toast-message";
 
-import { thunderforestApiKey, thunderforestEnabled, thunderforestTileUsage } from "../lib/context";
+import {
+    thunderforestApiKey,
+    thunderforestEnabled,
+    thunderforestTileUsage,
+} from "../lib/context";
 
 /** Tiles per month we allow users of the built-in shared key to consume. */
 const TILE_LIMIT = 150;

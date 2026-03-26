@@ -14,22 +14,40 @@ interface Props {
  * Floating banner shown while the user is drawing a custom polygon zone.
  * Matches the position and style of HidingZonePoiPrompt.
  */
-export function DrawPolygonBanner({ topInset, vertexCount, onFinish, onCancel }: Props) {
+export function DrawPolygonBanner({
+    topInset,
+    vertexCount,
+    onFinish,
+    onCancel,
+}: Props) {
     const canFinish = vertexCount >= 3;
     const label = `Draw zone (${vertexCount} point${vertexCount === 1 ? "" : "s"})`;
 
     return (
         <View
-            style={[styles.banner, { top: topInset + 16, backgroundColor: colors.PRIMARY }]}
+            style={[
+                styles.banner,
+                { top: topInset + 16, backgroundColor: colors.PRIMARY },
+            ]}
             pointerEvents="box-none"
         >
             <Ionicons name="pencil-outline" size={20} color="white" />
-            <Text className="flex-1 text-white text-[15px] font-semibold" numberOfLines={1}>
+            <Text
+                className="flex-1 text-white text-[15px] font-semibold"
+                numberOfLines={1}
+            >
                 {label}
             </Text>
             {canFinish && (
-                <Pressable onPress={onFinish} hitSlop={8} style={styles.confirmButton}>
-                    <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>
+                <Pressable
+                    onPress={onFinish}
+                    hitSlop={8}
+                    style={styles.confirmButton}
+                >
+                    <Text
+                        className="font-bold text-sm"
+                        style={{ color: colors.PRIMARY }}
+                    >
                         Finish
                     </Text>
                 </Pressable>

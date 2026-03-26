@@ -64,7 +64,10 @@ export function PickLocationBanner({
                         hitSlop={8}
                         style={styles.confirmButton}
                     >
-                        <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>
+                        <Text
+                            className="font-bold text-sm"
+                            style={{ color: colors.PRIMARY }}
+                        >
                             Confirm
                         </Text>
                     </Pressable>

@@ -226,14 +226,14 @@ Initialized in `app/_layout.tsx` at module level. Enabled in **production only**
 
 **Where Sentry is used:**
 
-| File | What is logged |
-| ---- | -------------- |
-| `lib/storage.ts` | AsyncStorage `setItem` / `removeItem` errors; `getAllKeys` / `multiGet` failure on startup |
-| `lib/matchingApi.ts` | Non-OK HTTP responses from Overpass (admin boundary, admin levels, airports, cities, POIs); breadcrumbs for airports and cities fetch counts |
-| `lib/measuringApi.ts` | Non-OK HTTP responses from Overpass/GitHub Pages (coastline, airports, cities, high-speed rail, POIs); breadcrumb for coastline and rail fetch |
-| `lib/tentacleApi.ts` | Non-OK HTTP responses from Overpass for tentacles POI queries |
-| `hooks/useEliminationMask.ts` | Top-level computation error (`captureException`); slow render >10 s (`captureMessage "warning"`); per-question-type errors for tentacles, matching, and measuring |
-| `components/MapConfigPanel.tsx` | Photon geocoder network/HTTP errors in `searchLocations` |
+| File                            | What is logged                                                                                                                                                    |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/storage.ts`                | AsyncStorage `setItem` / `removeItem` errors; `getAllKeys` / `multiGet` failure on startup                                                                        |
+| `lib/matchingApi.ts`            | Non-OK HTTP responses from Overpass (admin boundary, admin levels, airports, cities, POIs); breadcrumbs for airports and cities fetch counts                      |
+| `lib/measuringApi.ts`           | Non-OK HTTP responses from Overpass/GitHub Pages (coastline, airports, cities, high-speed rail, POIs); breadcrumb for coastline and rail fetch                    |
+| `lib/tentacleApi.ts`            | Non-OK HTTP responses from Overpass for tentacles POI queries                                                                                                     |
+| `hooks/useEliminationMask.ts`   | Top-level computation error (`captureException`); slow render >10 s (`captureMessage "warning"`); per-question-type errors for tentacles, matching, and measuring |
+| `components/MapConfigPanel.tsx` | Photon geocoder network/HTTP errors in `searchLocations`                                                                                                          |
 
 ### PostHog (analytics)
 
@@ -241,14 +241,14 @@ Initialized in `app/_layout.tsx` via `<PostHogProvider>`. Disabled when `EXPO_PU
 
 **Events captured:**
 
-| Event | Where | Properties |
-| ----- | ----- | ---------- |
-| `zone_added` | `MapConfigPanel` → `handleSelectResult` | `zone_name`, `osm_id` |
-| `zone_removed` | `MapConfigPanel` → `handleRemove` | `was_base` |
-| `zone_toggled` | `MapConfigPanel` → `handleToggleAdded` | `added` (new state) |
-| `zone_cleared` | `MapConfigPanel` → `handleClearZone` confirm | — |
-| `question_add_started` | `QuestionsPanel` → `handleAddQuestion` | `question_type` |
-| `question_saved_new` | `QuestionsPanel` → Save button (new draft) | `question_type` |
-| `question_saved_edit` | `QuestionsPanel` → Save button (edit existing) | `question_type` |
-| `question_deleted` | `QuestionsPanel` → Delete confirm (list or edit screen) | `question_type` |
-| `questions_cleared` | `QuestionsPanel` → Clear All confirm | `count` |
+| Event                  | Where                                                   | Properties            |
+| ---------------------- | ------------------------------------------------------- | --------------------- |
+| `zone_added`           | `MapConfigPanel` → `handleSelectResult`                 | `zone_name`, `osm_id` |
+| `zone_removed`         | `MapConfigPanel` → `handleRemove`                       | `was_base`            |
+| `zone_toggled`         | `MapConfigPanel` → `handleToggleAdded`                  | `added` (new state)   |
+| `zone_cleared`         | `MapConfigPanel` → `handleClearZone` confirm            | —                     |
+| `question_add_started` | `QuestionsPanel` → `handleAddQuestion`                  | `question_type`       |
+| `question_saved_new`   | `QuestionsPanel` → Save button (new draft)              | `question_type`       |
+| `question_saved_edit`  | `QuestionsPanel` → Save button (edit existing)          | `question_type`       |
+| `question_deleted`     | `QuestionsPanel` → Delete confirm (list or edit screen) | `question_type`       |
+| `questions_cleared`    | `QuestionsPanel` → Clear All confirm                    | `count`               |
