@@ -34,7 +34,7 @@ export function CustomPOIConfirmBanner({
             pointerEvents="box-none"
         >
             {/* Row 1: coord + cancel */}
-            <View style={styles.row}>
+            <View className="flex-row items-center gap-2">
                 <Ionicons name="location-outline" size={18} color="white" />
                 <Text
                     className="flex-1 text-white text-[13px] font-medium"
@@ -48,7 +48,7 @@ export function CustomPOIConfirmBanner({
             </View>
 
             {/* Row 2: name input + add */}
-            <View style={styles.row}>
+            <View className="flex-row items-center gap-2">
                 <TextInput
                     style={styles.input}
                     placeholder="Name this location…"
@@ -56,18 +56,14 @@ export function CustomPOIConfirmBanner({
                     value={name}
                     onChangeText={setName}
                     returnKeyType="done"
-                    onSubmitEditing={() =>
-                        canConfirm && onConfirm(name.trim())
-                    }
+                    onSubmitEditing={() => canConfirm && onConfirm(name.trim())}
                     autoFocus
                 />
                 <Pressable
                     onPress={() => canConfirm && onConfirm(name.trim())}
                     hitSlop={8}
-                    style={[
-                        styles.addButton,
-                        !canConfirm && styles.addButtonDisabled,
-                    ]}
+                    className="bg-white rounded-lg px-[14px] py-1.5"
+                    style={!canConfirm && styles.addButtonDisabled}
                 >
                     <Text
                         className="font-bold text-sm"
@@ -99,22 +95,11 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 6,
     },
-    row: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
     input: {
         flex: 1,
         color: "white",
         fontSize: 15,
         paddingVertical: 0,
-    },
-    addButton: {
-        backgroundColor: "white",
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 6,
     },
     addButtonDisabled: {
         backgroundColor: "rgba(255,255,255,0.3)",

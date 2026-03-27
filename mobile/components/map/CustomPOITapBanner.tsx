@@ -24,10 +24,17 @@ export function CustomPOITapBanner({ topInset, typeName, onDone }: Props) {
                 className="flex-1 text-white text-[15px] font-semibold"
                 numberOfLines={1}
             >
-                    Tap map to add/remove POIs
+                Tap map to add/remove POIs
             </Text>
-            <Pressable onPress={onDone} hitSlop={8} style={styles.doneButton}>
-                <Text className="font-bold text-sm" style={{ color: colors.PRIMARY }}>
+            <Pressable
+                onPress={onDone}
+                hitSlop={8}
+                className="bg-white rounded-lg px-3 py-1.5"
+            >
+                <Text
+                    className="font-bold text-sm"
+                    style={{ color: colors.PRIMARY }}
+                >
                     Done
                 </Text>
             </Pressable>
@@ -52,11 +59,5 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 6,
-    },
-    doneButton: {
-        backgroundColor: "white",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
     },
 });

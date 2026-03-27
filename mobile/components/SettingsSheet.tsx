@@ -147,15 +147,14 @@ export function SettingsSheet({
                 {hasUpdate && storeUrl && (
                     <Pressable
                         onPress={() => Linking.openURL(storeUrl)}
-                        style={styles.updateBanner}
-                        className="active:opacity-70"
+                        className="flex-row items-center bg-[#fef3c7] border border-[#fcd34d] rounded-[10px] py-3 px-[14px] mb-4 active:opacity-70"
                     >
                         <Ionicons name="sparkles" size={18} color="#92400e" />
-                        <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={styles.updateBannerTitle}>
+                        <View className="flex-1 ml-2.5">
+                            <Text className="text-[15px] font-semibold text-[#92400e]">
                                 Update available — v{latestVersion}
                             </Text>
-                            <Text style={styles.updateBannerSubtitle}>
+                            <Text className="text-[13px] text-[#b45309] mt-px">
                                 Tap to open the app store
                             </Text>
                         </View>
@@ -224,7 +223,7 @@ export function SettingsSheet({
                         Paste your own key to use your personal quota instead.
                     </Text>
                     <View className="flex-row items-center mt-2 gap-2">
-                        <View style={styles.apiKeyDisplay} className="flex-1">
+                        <View className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50">
                             <Text style={styles.apiKeyText} numberOfLines={1}>
                                 {usingBuiltinKey
                                     ? "Using shared key"
@@ -236,8 +235,7 @@ export function SettingsSheet({
                                 const text = await Clipboard.getStringAsync();
                                 if (text) thunderforestApiKey.set(text.trim());
                             }}
-                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center"
-                            style={styles.actionButton}
+                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center w-16"
                         >
                             <Text
                                 className="text-base font-medium"
@@ -283,7 +281,7 @@ export function SettingsSheet({
                                 {tileUsageCount} / {TILE_LIMIT}
                             </Text>
                         </View>
-                        <View style={styles.usageTrack}>
+                        <View className="h-1 bg-gray-200 rounded-sm overflow-hidden">
                             <View
                                 style={[
                                     styles.usageFill,
@@ -372,8 +370,7 @@ export function SettingsSheet({
                                 ],
                             )
                         }
-                        className="px-3 py-2 rounded-lg bg-red-50 active:opacity-60 items-center"
-                        style={styles.actionButton}
+                        className="px-3 py-2 rounded-lg bg-red-50 active:opacity-60 items-center w-16"
                     >
                         <Text className="text-base font-medium text-red-600">
                             Clear
@@ -428,51 +425,13 @@ const styles = StyleSheet.create({
     sectionTracking: {
         letterSpacing: 0.8,
     },
-    apiKeyDisplay: {
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        backgroundColor: "#f9fafb",
-    },
     apiKeyText: {
         fontSize: 14,
         color: "#6b7280",
         fontFamily: "monospace",
     },
-    actionButton: {
-        width: 64,
-    },
-    usageTrack: {
-        height: 4,
-        backgroundColor: "#e5e7eb",
-        borderRadius: 2,
-        overflow: "hidden",
-    },
     usageFill: {
         height: 4,
         borderRadius: 2,
-    },
-    updateBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#fef3c7",
-        borderWidth: 1,
-        borderColor: "#fcd34d",
-        borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        marginBottom: 16,
-    },
-    updateBannerTitle: {
-        fontSize: 15,
-        fontWeight: "600",
-        color: "#92400e",
-    },
-    updateBannerSubtitle: {
-        fontSize: 13,
-        color: "#b45309",
-        marginTop: 1,
     },
 });

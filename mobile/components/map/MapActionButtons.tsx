@@ -45,19 +45,7 @@ export function MapActionButtons({
                     color={colors.PRIMARY}
                 />
                 {hasUpdate && (
-                    <View
-                        style={{
-                            position: "absolute",
-                            top: 4,
-                            right: 4,
-                            width: 14,
-                            height: 14,
-                            borderRadius: 7,
-                            backgroundColor: "#ef4444",
-                            borderWidth: 2,
-                            borderColor: "white",
-                        }}
-                    />
+                    <View className="absolute top-1 right-1 w-[14px] h-[14px] rounded-full bg-red-500 border-2 border-white" />
                 )}
             </Pressable>
 

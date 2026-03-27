@@ -62,7 +62,7 @@ export function PickLocationBanner({
                     <Pressable
                         onPress={onConfirm}
                         hitSlop={8}
-                        style={styles.confirmButton}
+                        className="bg-white rounded-lg px-3 py-1.5"
                     >
                         <Text
                             className="font-bold text-sm"
@@ -96,11 +96,5 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 6,
-    },
-    confirmButton: {
-        backgroundColor: "white",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
     },
 });

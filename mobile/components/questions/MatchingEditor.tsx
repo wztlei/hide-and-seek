@@ -225,8 +225,8 @@ export function MatchingEditor({
                     renderItem={(item) => {
                         if (item.isHeader) {
                             return (
-                                <View style={groupHeaderStyle}>
-                                    <Text style={groupHeaderTextStyle}>
+                                <View className="px-3.5 pt-2.5 pb-1 bg-gray-50">
+                                    <Text className="text-[11px] font-bold text-gray-400 uppercase" style={{ letterSpacing: 0.8 }}>
                                         {item.label}
                                     </Text>
                                 </View>
@@ -490,10 +490,17 @@ export function MatchingEditor({
                                 )}
                                 <Text className="text-sm text-[#6b7280]">
                                     {(() => {
-                                        const customCount = ($customPOIs[(data as any).type] ?? []).length;
-                                        const fetchedCount = (poiCount ?? 0) - customCount;
-                                        const parts = [`${fetchedCount} fetched`];
-                                        if (customCount > 0) parts.push(`${customCount} custom`);
+                                        const customCount = (
+                                            $customPOIs[(data as any).type] ??
+                                            []
+                                        ).length;
+                                        const fetchedCount =
+                                            (poiCount ?? 0) - customCount;
+                                        const parts = [
+                                            `${fetchedCount} fetched`,
+                                        ];
+                                        if (customCount > 0)
+                                            parts.push(`${customCount} custom`);
                                         return parts.join(" · ");
                                     })()}
                                 </Text>
@@ -553,21 +560,6 @@ function dropdownInitialIndex(selectedValue: string): number | undefined {
     return idx > 0 ? idx : undefined;
 }
 
-const groupHeaderStyle = {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 4,
-    backgroundColor: "#f9fafb",
-};
-
-const groupHeaderTextStyle = {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#9ca3af",
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.8,
-};
-
 const dropdownItemStyle = {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -596,4 +588,3 @@ function levelBadgeTextStyle(selected: boolean) {
         color: selected ? "#fff" : "#6b7280",
     };
 }
-

@@ -90,8 +90,10 @@ export function CustomPOIPanel({
         const custom = ($customPOIs[selectedType] ?? []).map((f) => ({
             lng: f.geometry.coordinates[0],
             lat: f.geometry.coordinates[1],
-            id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
-            name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
+            id: (f as Feature<Point, { id: string; name: string }>).properties
+                ?.id,
+            name: (f as Feature<Point, { id: string; name: string }>).properties
+                ?.name,
         }));
         const excluded = $excludedPOIs[selectedType] ?? [];
         await Clipboard.setStringAsync(
@@ -118,8 +120,12 @@ export function CustomPOIPanel({
                 return;
             }
             const type = data.type as string;
-            const incomingCustom: { lng: number; lat: number; id: string; name?: string }[] =
-                data.custom ?? [];
+            const incomingCustom: {
+                lng: number;
+                lat: number;
+                id: string;
+                name?: string;
+            }[] = data.custom ?? [];
             const incomingExcluded: string[] = data.excluded ?? [];
             // Merge custom POIs (no duplicate IDs)
             const existingCustom = customPOIs.get()[type] ?? [];
@@ -172,8 +178,10 @@ export function CustomPOIPanel({
             custom[type] = features.map((f) => ({
                 lng: f.geometry.coordinates[0],
                 lat: f.geometry.coordinates[1],
-                id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
-                name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
+                id: (f as Feature<Point, { id: string; name: string }>)
+                    .properties?.id,
+                name: (f as Feature<Point, { id: string; name: string }>)
+                    .properties?.name,
             }));
         }
         await Clipboard.setStringAsync(
@@ -303,10 +311,7 @@ export function CustomPOIPanel({
                     <>
                         <View className="flex-row flex-wrap items-center mb-2">
                             <Text className="text-base text-gray-700">
-                                <Text
-                                    className="font-semibold"
-                                    style={{ color: "#22c55e" }}
-                                >
+                                <Text className="font-semibold text-green-500">
                                     {customCount} custom
                                 </Text>
                                 {"  ·  "}
@@ -338,8 +343,18 @@ export function CustomPOIPanel({
 
                         {/* Per-type import / export */}
                         <View className="flex-row gap-2 mb-2">
-                            <ActionButton icon="copy-outline" label={`Copy ${selectedLabel} POIs`} onPress={handleCopyType} numberOfLines={1} />
-                            <ActionButton icon="clipboard-outline" label={`Paste ${selectedLabel} POIs`} onPress={handlePasteType} numberOfLines={1} />
+                            <ActionButton
+                                icon="copy-outline"
+                                label={`Copy ${selectedLabel} POIs`}
+                                onPress={handleCopyType}
+                                numberOfLines={1}
+                            />
+                            <ActionButton
+                                icon="clipboard-outline"
+                                label={`Paste ${selectedLabel} POIs`}
+                                onPress={handlePasteType}
+                                numberOfLines={1}
+                            />
                         </View>
                     </>
                 )}
@@ -352,8 +367,16 @@ export function CustomPOIPanel({
                     All Custom POIs
                 </Text>
                 <View className="flex-row gap-2 mb-6">
-                    <ActionButton icon="copy-outline" label="Copy All Custom POIs" onPress={handleCopyAll} />
-                    <ActionButton icon="clipboard-outline" label="Paste Custom POIs" onPress={handlePasteAll} />
+                    <ActionButton
+                        icon="copy-outline"
+                        label="Copy All Custom POIs"
+                        onPress={handleCopyAll}
+                    />
+                    <ActionButton
+                        icon="clipboard-outline"
+                        label="Paste Custom POIs"
+                        onPress={handlePasteAll}
+                    />
                 </View>
 
                 {/* Done button */}

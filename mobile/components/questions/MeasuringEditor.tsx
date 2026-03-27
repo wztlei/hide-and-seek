@@ -390,8 +390,8 @@ export function MeasuringEditor({
                     renderItem={(item) => {
                         if (item.isHeader) {
                             return (
-                                <View style={groupHeaderStyle}>
-                                    <Text style={groupHeaderTextStyle}>
+                                <View className="px-3.5 pt-2.5 pb-1 bg-gray-50">
+                                    <Text className="text-[11px] font-bold text-gray-400 uppercase" style={{ letterSpacing: 0.8 }}>
                                         {item.label}
                                     </Text>
                                 </View>
@@ -831,21 +831,6 @@ const dropdownStyle = {
     },
 };
 
-const groupHeaderStyle = {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 4,
-    backgroundColor: "#f9fafb",
-};
-
-const groupHeaderTextStyle = {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#9ca3af",
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.8,
-};
-
 const dropdownItemStyle = {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -855,4 +840,3 @@ const dropdownItemTextStyle = {
     fontSize: 15,
     color: "#374151",
 };
-

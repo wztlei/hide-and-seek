@@ -145,7 +145,8 @@ export function MapConfigPanel({
     const posthog = usePostHog();
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheet>(null);
-    const scrollViewRef = useRef<React.ElementRef<typeof BottomSheetScrollView>>(null);
+    const scrollViewRef =
+        useRef<React.ElementRef<typeof BottomSheetScrollView>>(null);
     const isRadiusFocused = useRef(false);
     const isProgrammaticCloseRef = useRef(false);
 
@@ -658,10 +659,27 @@ export function MapConfigPanel({
 
                 {/* Footer buttons */}
                 <View className="px-4 pt-2 pb-4 border-gray-100 flex-row gap-2">
-                    <ActionButton icon="copy-outline" label="Copy" onPress={handleCopyZone} />
-                    <ActionButton icon="clipboard-outline" label="Paste" onPress={handlePasteZone} />
-                    <ActionButton icon="pencil-outline" label="Draw" onPress={handleDrawPolygon} />
-                    <ActionButton icon="trash-outline" label="Clear" color="#ef4444" onPress={handleClearZone} />
+                    <ActionButton
+                        icon="copy-outline"
+                        label="Copy"
+                        onPress={handleCopyZone}
+                    />
+                    <ActionButton
+                        icon="clipboard-outline"
+                        label="Paste"
+                        onPress={handlePasteZone}
+                    />
+                    <ActionButton
+                        icon="pencil-outline"
+                        label="Draw"
+                        onPress={handleDrawPolygon}
+                    />
+                    <ActionButton
+                        icon="trash-outline"
+                        label="Clear"
+                        color="#ef4444"
+                        onPress={handleClearZone}
+                    />
                 </View>
 
                 {/* ── Hiding Zones ────────────────────────────────────────── */}
