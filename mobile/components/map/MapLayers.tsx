@@ -740,33 +740,31 @@ export function MapLayers({
                 </ShapeSource>
             )}
 
-            {/* Custom POI mode — draft pending coord (ring, always mounted) */}
-            <ShapeSource
-                id="custom-mode-pending"
-                shape={
-                    pendingCustomPOICoord
-                        ? {
-                              type: "Feature" as const,
-                              geometry: {
-                                  type: "Point" as const,
-                                  coordinates: pendingCustomPOICoord,
-                              },
-                              properties: {},
-                          }
-                        : { type: "FeatureCollection" as const, features: [] }
-                }
-            >
-                <CircleLayer
-                    id="custom-mode-pending-layer"
-                    style={{
-                        circleRadius: 10,
-                        circleColor: "#f97316",
-                        circleOpacity: 0.9,
-                        circleStrokeWidth: 2.5,
-                        circleStrokeColor: "white",
+            {/* Custom POI mode — draft pending coord (orange dot) */}
+            {pendingCustomPOICoord && (
+                <ShapeSource
+                    id="custom-mode-pending"
+                    shape={{
+                        type: "Feature" as const,
+                        geometry: {
+                            type: "Point" as const,
+                            coordinates: pendingCustomPOICoord,
+                        },
+                        properties: {},
                     }}
-                />
-            </ShapeSource>
+                >
+                    <CircleLayer
+                        id="custom-mode-pending-layer"
+                        style={{
+                            circleRadius: 10,
+                            circleColor: "#f97316",
+                            circleOpacity: 0.9,
+                            circleStrokeWidth: 2.5,
+                            circleStrokeColor: "white",
+                        }}
+                    />
+                </ShapeSource>
+            )}
 
             {/* Radius center markers */}
             {questions
