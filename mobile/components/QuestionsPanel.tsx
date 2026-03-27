@@ -482,8 +482,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         const custom = ($customPOIs[customPOISelectedType] ?? []).map((f) => ({
             lng: f.geometry.coordinates[0],
             lat: f.geometry.coordinates[1],
-            id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
-            name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
+            id: (f as Feature<Point, { id: string; name: string }>).properties
+                ?.id,
+            name: (f as Feature<Point, { id: string; name: string }>).properties
+                ?.name,
         }));
         const excluded = $excludedPOIs[customPOISelectedType] ?? [];
         await Clipboard.setStringAsync(
@@ -510,8 +512,12 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 return;
             }
             const type = data.type as string;
-            const incomingCustom: { lng: number; lat: number; id: string; name?: string }[] =
-                data.custom ?? [];
+            const incomingCustom: {
+                lng: number;
+                lat: number;
+                id: string;
+                name?: string;
+            }[] = data.custom ?? [];
             const incomingExcluded: string[] = data.excluded ?? [];
             const existingCustom = customPOIs.get()[type] ?? [];
             const existingIds = new Set(
@@ -524,7 +530,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 .map(
                     (p): Feature<Point> => ({
                         type: "Feature",
-                        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+                        geometry: {
+                            type: "Point",
+                            coordinates: [p.lng, p.lat],
+                        },
                         properties: { id: p.id, name: p.name ?? "Custom" },
                     }),
                 );
@@ -559,12 +568,19 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             custom[type] = features.map((f) => ({
                 lng: f.geometry.coordinates[0],
                 lat: f.geometry.coordinates[1],
-                id: (f as Feature<Point, { id: string; name: string }>).properties?.id,
-                name: (f as Feature<Point, { id: string; name: string }>).properties?.name,
+                id: (f as Feature<Point, { id: string; name: string }>)
+                    .properties?.id,
+                name: (f as Feature<Point, { id: string; name: string }>)
+                    .properties?.name,
             }));
         }
         await Clipboard.setStringAsync(
-            JSON.stringify({ v: 1, scope: "all", custom, excluded: $excludedPOIs }),
+            JSON.stringify({
+                v: 1,
+                scope: "all",
+                custom,
+                excluded: $excludedPOIs,
+            }),
         );
         Alert.alert("Copied", "Copied all custom POI data to clipboard.");
     }
@@ -591,7 +607,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                 const existingIds = new Set(
                     existing.map(
                         (f) =>
-                            (f as Feature<Point, { id: string }>).properties?.id,
+                            (f as Feature<Point, { id: string }>).properties
+                                ?.id,
                     ),
                 );
                 const newFeatures = features
@@ -653,9 +670,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             backgroundStyle={styles.sheetBackground}
         >
             <Animated.View
-                className="flex-row flex-1 overflow-hidden"
                 style={[
-                    { width: SCREEN_WIDTH * 4 },
+                    { flexDirection: "row", flex: 1, overflow: "hidden", width: SCREEN_WIDTH * 4 },
                     { transform: [{ translateX: slideX }] },
                 ]}
             >
@@ -1150,7 +1166,9 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             labelField="label"
                             valueField="value"
                             value={customPOISelectedType ?? null}
-                            onChange={(item) => onCustomPOISelectType?.(item.value)}
+                            onChange={(item) =>
+                                onCustomPOISelectType?.(item.value)
+                            }
                             placeholder="Select a type…"
                             style={customPOIDropdownStyle}
                             selectedTextStyle={customPOIDropdownTextStyle}
@@ -1193,9 +1211,27 @@ export const QuestionsPanel = memo(function QuestionsPanel({
 
                                 {/* Per-type actions row: Edit on map / copy / paste */}
                                 <View className="flex-row gap-2 mb-2 mt-3">
-                                    <ActionButton icon="map-outline" label="Edit" onPress={onEnterCustomPOITapMode ?? (() => {})} numberOfLines={1} />
-                                    <ActionButton icon="copy-outline" label="Copy" onPress={handleCopyCustomPOIType} numberOfLines={1} />
-                                    <ActionButton icon="clipboard-outline" label="Paste" onPress={handlePasteCustomPOIType} numberOfLines={1} />
+                                    <ActionButton
+                                        icon="map-outline"
+                                        label="Edit"
+                                        onPress={
+                                            onEnterCustomPOITapMode ??
+                                            (() => {})
+                                        }
+                                        numberOfLines={1}
+                                    />
+                                    <ActionButton
+                                        icon="copy-outline"
+                                        label="Copy"
+                                        onPress={handleCopyCustomPOIType}
+                                        numberOfLines={1}
+                                    />
+                                    <ActionButton
+                                        icon="clipboard-outline"
+                                        label="Paste"
+                                        onPress={handlePasteCustomPOIType}
+                                        numberOfLines={1}
+                                    />
                                 </View>
                             </>
                         )}
@@ -1208,8 +1244,16 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                             All Custom POIs
                         </Text>
                         <View className="flex-row gap-2">
-                            <ActionButton icon="copy-outline" label="Copy All" onPress={handleCopyAllCustomPOIs} />
-                            <ActionButton icon="clipboard-outline" label="Paste All" onPress={handlePasteAllCustomPOIs} />
+                            <ActionButton
+                                icon="copy-outline"
+                                label="Copy All"
+                                onPress={handleCopyAllCustomPOIs}
+                            />
+                            <ActionButton
+                                icon="clipboard-outline"
+                                label="Paste All"
+                                onPress={handlePasteAllCustomPOIs}
+                            />
                         </View>
                     </ScrollView>
                 </View>
