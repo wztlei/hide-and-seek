@@ -746,7 +746,7 @@ export function MeasuringEditor({
                         </Text>
                     ) : (
                         <Pressable
-                            style={poiInfoBoxStyle}
+                            className="flex-row items-center gap-2 px-3 py-2.5 rounded-[10px] border border-gray-200 bg-white"
                             onPress={
                                 isPOIType
                                     ? () =>
@@ -756,8 +756,8 @@ export function MeasuringEditor({
                                     : undefined
                             }
                         >
-                            <View style={{ flex: 1, gap: 2 }}>
-                                <Text style={poiInfoCountStyle}>
+                            <View className="flex-1 gap-0.5">
+                                <Text className="text-[15px] font-semibold text-[#374151]">
                                     {(() => {
                                         const baseType = data.type.replace(
                                             /-full$/,
@@ -779,7 +779,7 @@ export function MeasuringEditor({
                                 {nearestPOIName && (
                                     <>
                                         <Text
-                                            style={poiInfoNearestStyle}
+                                            className="text-sm text-[#6b7280]"
                                             numberOfLines={1}
                                         >
                                             <Text className="font-semibold">
@@ -788,7 +788,7 @@ export function MeasuringEditor({
                                             : {nearestPOIName}
                                         </Text>
                                         <Text
-                                            style={poiInfoNearestStyle}
+                                            className="text-sm text-[#6b7280]"
                                             numberOfLines={1}
                                         >
                                             <Text className="font-semibold">
@@ -856,25 +856,3 @@ const dropdownItemTextStyle = {
     color: "#374151",
 };
 
-const poiInfoBoxStyle = {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-};
-
-const poiInfoCountStyle = {
-    fontSize: 15,
-    color: "#374151",
-    fontWeight: "600" as const,
-};
-
-const poiInfoNearestStyle = {
-    fontSize: 14,
-    color: "#6b7280",
-};

@@ -164,13 +164,7 @@ export function TentaclesEditor({
                 <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                     Radius
                 </Text>
-                <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "stretch",
-                        gap: 12,
-                    }}
-                >
+                <View className="flex-row items-stretch gap-3">
                     <TextInput
                         value={radiusText}
                         onChangeText={(text) => {
@@ -302,13 +296,7 @@ export function TentaclesEditor({
                     </View>
 
                     <View className="gap-2">
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                            }}
-                        >
+                        <View className="flex-row items-center justify-between">
                             <Text
                                 className="text-sm font-semibold uppercase tracking-wide"
                                 style={{
@@ -320,7 +308,7 @@ export function TentaclesEditor({
                             <Pressable
                                 onPress={handleReload}
                                 hitSlop={8}
-                                style={{ padding: 2 }}
+                                className="p-0.5"
                                 disabled={!data.within}
                             >
                                 <Ionicons

@@ -613,7 +613,7 @@ export function MapConfigPanel({
                             <Pressable
                                 key={`${item.properties.osm_id}${item.properties.name}`}
                                 onPress={() => handleSelectResult(item)}
-                                style={resultRowStyle}
+                                className="flex-row items-center px-4 py-3"
                             >
                                 <Ionicons
                                     name="location-outline"
@@ -763,7 +763,7 @@ export function MapConfigPanel({
                                     }
                                     returnKeyType="done"
                                 />
-                                <View style={unitToggleContainerStyle}>
+                                <View className="flex-row border border-gray-300 rounded-lg overflow-hidden">
                                     <Pressable
                                         onPress={() =>
                                             hidingRadiusUnits.set("miles")
@@ -846,14 +846,6 @@ const searchInputStyle = {
     fontSize: 16,
 };
 
-const resultRowStyle = {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-};
-
-
 const chipStyle = {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -884,13 +876,6 @@ const radiusInputStyle = {
     color: "#1f2937",
 };
 
-const unitToggleContainerStyle = {
-    flexDirection: "row" as const,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    overflow: "hidden" as const,
-};
 const unitToggleButtonStyle = {
     paddingHorizontal: 12,
     paddingVertical: 8,

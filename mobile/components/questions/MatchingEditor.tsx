@@ -357,12 +357,12 @@ export function MatchingEditor({
                                         questionModified();
                                     }}
                                     style={[
-                                        levelRowStyle,
                                         selected && {
                                             backgroundColor: "#fffbeb",
                                             borderColor: colors.MATCHING,
                                         },
                                     ]}
+                                    className="flex-row items-center gap-3 px-3 py-2.5 rounded-[10px] border border-gray-200 bg-white"
                                 >
                                     <View style={levelBadgeStyle(selected)}>
                                         <Text
@@ -375,12 +375,12 @@ export function MatchingEditor({
                                     </View>
                                     <Text
                                         style={[
-                                            levelNameStyle,
                                             selected && {
                                                 color: "#92400e",
                                                 fontWeight: "600",
                                             },
                                         ]}
+                                        className="flex-1 text-[15px] text-[#374151]"
                                         numberOfLines={1}
                                     >
                                         {level.name}
@@ -474,21 +474,21 @@ export function MatchingEditor({
                         </Text>
                     ) : (
                         <Pressable
-                            style={poiInfoBoxStyle}
+                            className="flex-row items-center gap-2 px-3 py-2.5 rounded-[10px] border border-gray-200 bg-white"
                             onPress={() =>
                                 onOpenCustomPOIs?.((data as any).type)
                             }
                         >
-                            <View style={{ flex: 1, gap: 2 }}>
+                            <View className="flex-1 gap-0.5">
                                 {nearestPOIName && (
                                     <Text
-                                        style={poiInfoNearestStyle}
+                                        className="text-[15px] font-semibold text-[#374151]"
                                         numberOfLines={1}
                                     >
                                         Nearest: {nearestPOIName}
                                     </Text>
                                 )}
-                                <Text style={poiInfoCountStyle}>
+                                <Text className="text-sm text-[#6b7280]">
                                     {(() => {
                                         const customCount = ($customPOIs[(data as any).type] ?? []).length;
                                         const fetchedCount = (poiCount ?? 0) - customCount;
@@ -578,18 +578,6 @@ const dropdownItemTextStyle = {
     color: "#374151",
 };
 
-const levelRowStyle = {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-};
-
 function levelBadgeStyle(selected: boolean) {
     return {
         width: 28,
@@ -609,31 +597,3 @@ function levelBadgeTextStyle(selected: boolean) {
     };
 }
 
-const levelNameStyle = {
-    flex: 1,
-    fontSize: 15,
-    color: "#374151",
-};
-
-const poiInfoBoxStyle = {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-};
-
-const poiInfoNearestStyle = {
-    fontSize: 15,
-    color: "#374151",
-    fontWeight: "600" as const,
-};
-
-const poiInfoCountStyle = {
-    fontSize: 14,
-    color: "#6b7280",
-};
