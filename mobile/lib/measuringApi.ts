@@ -376,11 +376,6 @@ export async function fetchAdminBoundaries(
         const query = `[out:json][timeout:60];rel["boundary"="administrative"]["admin_level"="${adminLevel}"]${isoFilter}(${south},${west},${north},${east})->.rels;way(r.rels)(${south},${west},${north},${east});out geom;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
 
-        console.log(
-            `[adminBoundaries] level=${adminLevel} bbox=[${bbox.map((n) => n.toFixed(2)).join(",")}] — fetching…`,
-        );
-        const t0 = Date.now();
-
         const res = await fetch(url);
         if (!res.ok)
             throw new Error(
@@ -388,10 +383,6 @@ export async function fetchAdminBoundaries(
             );
 
         const text = await res.text();
-        console.log(
-            `[adminBoundaries] level=${adminLevel} — response ${(text.length / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`,
-        );
-
         const data = JSON.parse(text) as { elements: any[] };
         Sentry.addBreadcrumb({
             category: "api",
@@ -409,9 +400,6 @@ export async function fetchAdminBoundaries(
             if (coords.length < 2) continue;
             features.push(turf.lineString(coords));
         }
-        console.log(
-            `[adminBoundaries] level=${adminLevel} — ${features.length} segments in ${Date.now() - t0} ms`,
-        );
 
         // Cap at 500 way-member segments to bound parse time and memory.
         const capped = features.slice(0, 500);

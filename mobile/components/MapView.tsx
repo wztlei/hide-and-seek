@@ -285,12 +285,6 @@ export function AppMapView() {
     /** Opens pick-mode: closes the panel and waits for a map tap. */
     const handlePickLocationOnMap = useCallback(
         (key: number, field?: "A" | "B") => {
-            console.log(
-                "[pickMode] entering pick mode — key:",
-                key,
-                "field:",
-                field,
-            );
             pickReadyRef.current = false;
             if (pickReadyTimerRef.current)
                 clearTimeout(pickReadyTimerRef.current);
@@ -303,7 +297,6 @@ export function AppMapView() {
             // 550 ms comfortably exceeds the default spring animation duration.
             pickReadyTimerRef.current = setTimeout(() => {
                 pickReadyRef.current = true;
-                console.log("[pickMode] pickReady = true");
             }, 550);
         },
         [],
@@ -331,27 +324,33 @@ export function AppMapView() {
     const handleCustomPOIPress = useCallback(
         (id: string) => {
             poiJustTappedRef.current = true;
-            setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+            setTimeout(() => {
+                poiJustTappedRef.current = false;
+            }, 0);
             const type = customPOISelectedType;
             if (!type) return;
             const poi = (customPOIs.get()[type] ?? []).find(
                 (f) => (f as any).properties?.id === id,
             );
             const name = (poi as any)?.properties?.name ?? "this location";
-            Alert.alert(`Remove "${name}"?`, "Are you sure you want to remove this custom POI?", [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Remove",
-                    style: "destructive",
-                    onPress: () => {
-                        const next = { ...customPOIs.get() };
-                        next[type] = (next[type] ?? []).filter(
-                            (f) => (f as any).properties?.id !== id,
-                        );
-                        customPOIs.set(next);
+            Alert.alert(
+                `Remove "${name}"?`,
+                "Are you sure you want to remove this custom POI?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Remove",
+                        style: "destructive",
+                        onPress: () => {
+                            const next = { ...customPOIs.get() };
+                            next[type] = (next[type] ?? []).filter(
+                                (f) => (f as any).properties?.id !== id,
+                            );
+                            customPOIs.set(next);
+                        },
                     },
-                },
-            ]);
+                ],
+            );
         },
         [customPOISelectedType],
     );
@@ -359,11 +358,15 @@ export function AppMapView() {
     const handleOverpassPOIPress = useCallback(
         (coordId: string, name: string | undefined, isExcluded: boolean) => {
             poiJustTappedRef.current = true;
-            setTimeout(() => { poiJustTappedRef.current = false; }, 0);
+            setTimeout(() => {
+                poiJustTappedRef.current = false;
+            }, 0);
             const type = customPOISelectedType;
             if (!type) return;
             const label = name ? `"${name}"` : "This location";
-            const title = isExcluded ? "Re-include location?" : "Exclude location?";
+            const title = isExcluded
+                ? "Re-include location?"
+                : "Exclude location?";
             const message = isExcluded
                 ? `${label} will be included again in this question type.`
                 : `${label} will be excluded from this question type.`;
@@ -377,7 +380,9 @@ export function AppMapView() {
                         const typeExcluded = current[type] ?? [];
                         const next = { ...current };
                         if (isExcluded) {
-                            next[type] = typeExcluded.filter((id) => id !== coordId);
+                            next[type] = typeExcluded.filter(
+                                (id) => id !== coordId,
+                            );
                         } else {
                             next[type] = [...typeExcluded, coordId];
                         }
@@ -400,7 +405,10 @@ export function AppMapView() {
                 ...(next[customPOISelectedType] ?? []),
                 {
                     type: "Feature" as const,
-                    geometry: { type: "Point" as const, coordinates: [lng, lat] },
+                    geometry: {
+                        type: "Point" as const,
+                        coordinates: [lng, lat],
+                    },
                     properties: { id, name },
                 },
             ];
@@ -647,13 +655,21 @@ export function AppMapView() {
                 )}
 
                 <MapLayers
-                    eliminationMask={customPOITapActive ? null : eliminationMask}
+                    eliminationMask={
+                        customPOITapActive ? null : eliminationMask
+                    }
                     zoneBoundary={zoneBoundary}
                     radiusRegions={customPOITapActive ? [] : radiusRegions}
-                    thermometerRegions={customPOITapActive ? [] : thermometerRegions}
-                    tentaclesRegions={customPOITapActive ? [] : tentaclesRegions}
+                    thermometerRegions={
+                        customPOITapActive ? [] : thermometerRegions
+                    }
+                    tentaclesRegions={
+                        customPOITapActive ? [] : tentaclesRegions
+                    }
                     matchingRegions={customPOITapActive ? [] : matchingRegions}
-                    measuringRegions={customPOITapActive ? [] : measuringRegions}
+                    measuringRegions={
+                        customPOITapActive ? [] : measuringRegions
+                    }
                     questions={customPOITapActive ? [] : $questions}
                     userCoord={userCoord}
                     pendingCoord={pendingCoord}
@@ -672,7 +688,9 @@ export function AppMapView() {
                             ? ($customPOIs[customPOISelectedType] ?? [])
                             : []
                     }
-                    overpassPOIPoints={customPOITapActive ? customModeOverpassPOIs : []}
+                    overpassPOIPoints={
+                        customPOITapActive ? customModeOverpassPOIs : []
+                    }
                     excludedPOIIds={
                         new Set(
                             customPOITapActive && customPOISelectedType
@@ -725,13 +743,15 @@ export function AppMapView() {
                     />
                 )}
 
-            {customPOITapActive && pickingLocationForKey === null && !pendingCustomPOICoord && (
-                <CustomPOITapBanner
-                    topInset={insets.top}
-                    typeName={customPOISelectedType ?? ""}
-                    onDone={handleExitCustomPOITapMode}
-                />
-            )}
+            {customPOITapActive &&
+                pickingLocationForKey === null &&
+                !pendingCustomPOICoord && (
+                    <CustomPOITapBanner
+                        topInset={insets.top}
+                        typeName={customPOISelectedType ?? ""}
+                        onDone={handleExitCustomPOITapMode}
+                    />
+                )}
 
             {pendingCustomPOICoord && customPOITapActive && (
                 <CustomPOIConfirmBanner
