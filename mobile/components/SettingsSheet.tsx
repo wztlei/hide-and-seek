@@ -29,6 +29,8 @@ import { colors } from "../lib/colors";
 
 interface Props {
     visible: boolean;
+    /** Increment to force-expand the sheet even when visible is already true. */
+    openNonce?: number;
     onClose: () => void;
     hasUpdate?: boolean;
     latestVersion?: string | null;
@@ -80,6 +82,7 @@ const BUILTIN_KEY = process.env.EXPO_PUBLIC_THUNDERFOREST_API_KEY ?? "";
 
 export function SettingsSheet({
     visible,
+    openNonce,
     onClose,
     hasUpdate,
     latestVersion,
@@ -109,6 +112,13 @@ export function SettingsSheet({
             sheetRef.current?.close();
         }
     }, [visible]);
+
+    useEffect(() => {
+        if (openNonce) {
+            isProgrammaticCloseRef.current = false;
+            sheetRef.current?.expand();
+        }
+    }, [openNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const renderBackdrop = useCallback(
         (props: BottomSheetBackdropProps) => (
@@ -235,10 +245,10 @@ export function SettingsSheet({
                                 const text = await Clipboard.getStringAsync();
                                 if (text) thunderforestApiKey.set(text.trim());
                             }}
-                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center w-16"
+                            className="active:opacity-60 px-3 py-2 rounded-lg bg-indigo-50 items-center w-20"
                         >
                             <Text
-                                className="text-base font-medium"
+                                className="text-base font-medium line-clamp-1"
                                 style={{ color: colors.PRIMARY }}
                             >
                                 Paste

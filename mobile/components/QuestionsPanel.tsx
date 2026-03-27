@@ -323,6 +323,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface Props {
     visible: boolean;
+    /** Increment to force-expand the sheet even when visible is already true. */
+    openNonce?: number;
     onClose: () => void;
     getMapCenter: () => [number, number] | null;
     userCoord?: [number, number] | null;
@@ -340,6 +342,7 @@ interface Props {
 
 export const QuestionsPanel = memo(function QuestionsPanel({
     visible,
+    openNonce,
     onClose,
     getMapCenter,
     userCoord,
@@ -393,6 +396,17 @@ export const QuestionsPanel = memo(function QuestionsPanel({
             setEditingKey(null);
         }
     }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Force-expand on every button press, even when visible is already true.
+    // The backdrop can close the sheet without changing React state, leaving
+    // visible=true while the sheet is actually closed. A nonce increment ensures
+    // expand() is always called on button press regardless of state.
+    useEffect(() => {
+        if (openNonce) {
+            isProgrammaticCloseRef.current = false;
+            sheetRef.current?.expand();
+        }
+    }, [openNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Jump to Screen 3 when initialEditKey is set (e.g. tapped map marker)
     useEffect(() => {

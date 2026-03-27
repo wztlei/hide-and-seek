@@ -684,7 +684,7 @@ export function MapLayers({
                     <CircleLayer
                         id="custom-mode-overpass-layer"
                         style={{
-                            circleRadius: 7,
+                            circleRadius: 4,
                             // Hollow ring: white fill with colored stroke
                             circleColor: "white",
                             circleOpacity: [
@@ -693,7 +693,7 @@ export function MapLayers({
                                 0.5,
                                 1,
                             ] as any,
-                            circleStrokeWidth: 2,
+                            circleStrokeWidth: 5,
                             circleStrokeColor: [
                                 "case",
                                 ["==", ["get", "_excluded"], 1],

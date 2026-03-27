@@ -34,10 +34,18 @@ export function ActionButton({
             onPress={disabled ? undefined : onPress}
             className={`flex-1 items-center justify-center bg-white rounded-xl py-3 px-0 border border-gray-200 ${vertical ? "flex-col gap-1" : "flex-row"} ${disabled ? "opacity-50" : "active:opacity-70"}`}
         >
-            <Ionicons name={icon} size={vertical ? 20 : 18} color={effectiveColor} />
+            <Ionicons
+                name={icon}
+                size={vertical ? 20 : 18}
+                color={effectiveColor}
+            />
             <Text
                 style={{ color: effectiveColor }}
-                className={vertical ? "text-[11px] font-medium text-center" : "text-[13px] font-medium ml-1.5"}
+                className={
+                    vertical
+                        ? "text-[11px] font-medium text-center"
+                        : "text-[13px] font-medium ml-1.5"
+                }
                 numberOfLines={vertical ? undefined : numberOfLines}
             >
                 {label}

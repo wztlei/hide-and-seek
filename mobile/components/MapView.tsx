@@ -157,8 +157,11 @@ export function AppMapView() {
         null,
     );
     const [questionsVisible, setQuestionsVisible] = useState(false);
+    const [questionsOpenNonce, setQuestionsOpenNonce] = useState(0);
     const [zoneModalVisible, setZoneModalVisible] = useState(false);
+    const [zoneOpenNonce, setZoneOpenNonce] = useState(0);
     const [settingsVisible, setSettingsVisible] = useState(false);
+    const [settingsOpenNonce, setSettingsOpenNonce] = useState(0);
 
     // ── Custom POI mode ──────────────────────────────────────────────────────
     // customPOISelectedType: type selected in the panel dropdown (drives Overpass fetch)
@@ -318,7 +321,10 @@ export function AppMapView() {
     const handleExitCustomPOITapMode = useCallback(() => {
         setCustomPOITapActive(false);
         setPendingCustomPOICoord(null);
-        setQuestionsVisible(true);
+        // QuestionsPanel's close() animation is still running (triggered when
+        // entering tap mode). Calling expand() immediately races with it and
+        // corrupts the gesture handler state — wait for the animation to finish.
+        setTimeout(() => setQuestionsVisible(true), 600);
     }, []);
 
     const handleCustomPOIPress = useCallback(
@@ -776,15 +782,16 @@ export function AppMapView() {
                     bottomInset={insets.bottom}
                     isLoadingZone={isLoadingZone}
                     hasUpdate={hasUpdate}
-                    onQuestionsPress={() => setQuestionsVisible(true)}
-                    onZonePress={() => setZoneModalVisible(true)}
+                    onQuestionsPress={() => { setQuestionsVisible(true); setQuestionsOpenNonce(n => n + 1); }}
+                    onZonePress={() => { setZoneModalVisible(true); setZoneOpenNonce(n => n + 1); }}
                     onLocatePress={zoomToUserLocation}
-                    onSettingsPress={() => setSettingsVisible(true)}
+                    onSettingsPress={() => { setSettingsVisible(true); setSettingsOpenNonce(n => n + 1); }}
                 />
             </View>
 
             <MapConfigPanel
                 visible={zoneModalVisible}
+                openNonce={zoneOpenNonce}
                 onClose={() => setZoneModalVisible(false)}
                 onCustomLocation={() => {
                     setZoneModalVisible(false);
@@ -794,6 +801,7 @@ export function AppMapView() {
 
             <QuestionsPanel
                 visible={questionsVisible}
+                openNonce={questionsOpenNonce}
                 onClose={handleQuestionsClose}
                 getMapCenter={getMapCenter}
                 userCoord={userCoord}
@@ -807,6 +815,7 @@ export function AppMapView() {
 
             <SettingsSheet
                 visible={settingsVisible}
+                openNonce={settingsOpenNonce}
                 onClose={() => setSettingsVisible(false)}
                 hasUpdate={hasUpdate}
                 latestVersion={latestVersion}

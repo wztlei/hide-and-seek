@@ -131,6 +131,8 @@ async function searchLocations(query: string): Promise<PhotonFeature[]> {
 
 interface Props {
     visible: boolean;
+    /** Increment to force-expand the sheet even when visible is already true. */
+    openNonce?: number;
     onClose: () => void;
     onCustomLocation: () => void;
     onStartDrawPolygon: () => void;
@@ -138,6 +140,7 @@ interface Props {
 
 export function MapConfigPanel({
     visible,
+    openNonce,
     onClose,
     onCustomLocation: _onCustomLocation,
     onStartDrawPolygon,
@@ -186,6 +189,13 @@ export function MapConfigPanel({
             setResults([]);
         }
     }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (openNonce) {
+            isProgrammaticCloseRef.current = false;
+            sheetRef.current?.expand();
+        }
+    }, [openNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const sub = Keyboard.addListener("keyboardDidShow", () => {
