@@ -85,7 +85,11 @@ interface Props {
     /** Called when the user taps a custom (green) POI. */
     onCustomPOIPress: (id: string) => void;
     /** Called when the user taps an Overpass POI to toggle exclusion. */
-    onOverpassPOIPress: (coordId: string, name: string | undefined, isExcluded: boolean) => void;
+    onOverpassPOIPress: (
+        coordId: string,
+        name: string | undefined,
+        isExcluded: boolean,
+    ) => void;
     /** Draft coord placed by tapping the map — shown as a ring until confirmed. */
     pendingCustomPOICoord: [number, number] | null;
 }
@@ -681,20 +685,27 @@ export function MapLayers({
                         id="custom-mode-overpass-layer"
                         style={{
                             circleRadius: 7,
-                            circleColor: [
+                            // Hollow ring: white fill with colored stroke
+                            circleColor: "white",
+                            circleOpacity: [
+                                "case",
+                                ["==", ["get", "_excluded"], 1],
+                                0.5,
+                                1,
+                            ] as any,
+                            circleStrokeWidth: 2,
+                            circleStrokeColor: [
                                 "case",
                                 ["==", ["get", "_excluded"], 1],
                                 "#9ca3af",
                                 colors.PRIMARY,
                             ] as any,
-                            circleOpacity: [
+                            circleStrokeOpacity: [
                                 "case",
                                 ["==", ["get", "_excluded"], 1],
-                                0.4,
-                                0.8,
+                                0.5,
+                                1,
                             ] as any,
-                            circleStrokeWidth: 1.5,
-                            circleStrokeColor: "white",
                         }}
                     />
                 </ShapeSource>
@@ -718,9 +729,10 @@ export function MapLayers({
                     <CircleLayer
                         id="custom-mode-custom-layer"
                         style={{
-                            circleRadius: 9,
+                            // Solid dot: colored fill with white stroke
+                            circleRadius: 8,
                             circleColor: colors.PRIMARY,
-                            circleOpacity: 0.9,
+                            circleOpacity: 1,
                             circleStrokeWidth: 2,
                             circleStrokeColor: "white",
                         }}
