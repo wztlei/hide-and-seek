@@ -19,6 +19,12 @@ const OVERPASS_API = "https://overpass-api.de/api/interpreter";
 // Module-level cache: avoids re-fetching the same zone within a session.
 const geoJSONCache = new Map<number, FeatureCollection>();
 
+// Bundled zone GeoJSON for known default zones — used on first install to
+// avoid an Overpass round-trip before AsyncStorage cache is populated.
+const BUNDLED_ZONES: Partial<Record<number, FeatureCollection>> = {
+    111968: require("../../assets/default-zones/sf.json") as FeatureCollection,
+};
+
 function zoneGeoKey(osmId: number): string {
     return `zone-geo:${osmId}`;
 }
@@ -42,6 +48,15 @@ async function fetchGeoJSONForZone(
         } catch {
             // Corrupted entry — fall through to re-fetch.
         }
+    }
+
+    // Use bundled asset on first install to avoid an Overpass round-trip.
+    // Seed both caches so subsequent calls return immediately.
+    const bundled = BUNDLED_ZONES[osmId];
+    if (bundled) {
+        geoJSONCache.set(osmId, bundled);
+        setCached(zoneGeoKey(osmId), JSON.stringify(bundled));
+        return bundled;
     }
 
     const typeMap = { W: "way", R: "relation", N: "node" } as const;
