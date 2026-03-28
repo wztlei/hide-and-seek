@@ -40,6 +40,7 @@ interface Props {
     editingKey: number;
     isNew?: boolean;
     onPickLocationOnMap?: (key: number, field?: "A" | "B") => void;
+    onOpenCustomPOIs?: (type: string) => void;
 }
 
 export function TentaclesEditor({
@@ -47,6 +48,7 @@ export function TentaclesEditor({
     editingKey,
     isNew,
     onPickLocationOnMap,
+    onOpenCustomPOIs,
 }: Props) {
     const $questions = useStore(questions) as Questions;
     const $draftQuestion = useStore(draftQuestion);
@@ -363,6 +365,44 @@ export function TentaclesEditor({
                             />
                         )}
                     </View>
+
+                    {/* Custom POIs — only when a type is selected */}
+                    {hasSelectedType && onOpenCustomPOIs && (
+                        <View className="gap-2">
+                            <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                Custom POIs
+                            </Text>
+                            <Pressable
+                                className="flex-row items-center gap-2 px-3 py-2.5 rounded-[10px] border border-gray-200 bg-white"
+                                onPress={() =>
+                                    onOpenCustomPOIs(data.locationType)
+                                }
+                            >
+                                <View className="flex-1 gap-0.5">
+                                    <Text className="text-[15px] text-[#374151]">
+                                        {(() => {
+                                            const customCount =
+                                                customForType.length;
+                                            const fetchedCount = pois.length;
+                                            const parts = [
+                                                `${fetchedCount} fetched`,
+                                            ];
+                                            if (customCount > 0)
+                                                parts.push(
+                                                    `${customCount} custom`,
+                                                );
+                                            return parts.join(" · ");
+                                        })()}
+                                    </Text>
+                                </View>
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={18}
+                                    color="#9ca3af"
+                                />
+                            </Pressable>
+                        </View>
+                    )}
                 </>
             )}
         </View>

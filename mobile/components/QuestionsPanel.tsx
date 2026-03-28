@@ -1065,6 +1065,10 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 editingKey={editingKey!}
                                 isNew={isAddMode}
                                 onPickLocationOnMap={onPickLocationOnMap}
+                                onOpenCustomPOIs={(type) => {
+                                    onCustomPOISelectType?.(type);
+                                    goToCustomPOIs(true);
+                                }}
                             />
                         )}
                         {editData?.id === "matching" && (
