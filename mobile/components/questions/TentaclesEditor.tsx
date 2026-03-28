@@ -381,16 +381,16 @@ export function TentaclesEditor({
                     {hasSelectedType && onOpenCustomPOIs && (
                         <View className="gap-2">
                             <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                                Custom POIs
+                                Edit POIs
                             </Text>
                             <Pressable
-                                className="flex-row items-center gap-2 px-3 py-2.5 rounded-[10px] border border-gray-200 bg-white"
+                                className="flex-row items-center gap-2 px-3 py-4 rounded-[10px] border border-gray-300 bg-white"
                                 onPress={() =>
                                     onOpenCustomPOIs(data.locationType)
                                 }
                             >
                                 <View className="flex-1 gap-0.5">
-                                    <Text className="text-[15px] text-[#374151]">
+                                    <Text className="text-[15px]">
                                         {(() => {
                                             const customCount =
                                                 customForType.length;
