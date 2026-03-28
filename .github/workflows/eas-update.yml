@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - production
+      - beta
 
 jobs:
   update:
@@ -25,5 +26,10 @@ jobs:
         run: npm install -g pnpm && pnpm install --frozen-lockfile
 
       - name: Publish update
-        run: eas update --channel production --auto
+        run: |
+          if [ "${{ github.ref_name }}" = "production" ]; then
+            eas update --channel production --auto
+          else
+            eas update --channel preview --auto
+          fi
         working-directory: mobile
