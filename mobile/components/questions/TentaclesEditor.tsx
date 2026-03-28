@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
 
+import * as turf from "@turf/turf";
+
 import type { Feature, Point } from "geojson";
 import type { Questions } from "../../../src/maps/schema";
 import { colors } from "../../lib/colors";
@@ -127,6 +129,15 @@ export function TentaclesEditor({
                 ),
         ),
     ];
+
+    const outsideCount = allPois.filter((poi) => {
+        const d = turf.distance(
+            [data.lng, data.lat],
+            poi.geometry.coordinates as [number, number],
+            { units: data.unit },
+        );
+        return d > data.radius;
+    }).length;
 
     const poiOptions = [...allPois]
         .sort((a, b) => {
@@ -390,6 +401,10 @@ export function TentaclesEditor({
                                             if (customCount > 0)
                                                 parts.push(
                                                     `${customCount} custom`,
+                                                );
+                                            if (outsideCount > 0)
+                                                parts.push(
+                                                    `${outsideCount} outside radius`,
                                                 );
                                             return parts.join(" · ");
                                         })()}
