@@ -142,7 +142,7 @@ export const customStations = persistentAtom<CustomStation[]>(
 );
 export const showHidingZoneCircles = persistentAtom<boolean>(
     "showHidingZoneCircles",
-    true,
+    false,
     {
         encode: JSON.stringify,
         decode: JSON.parse,
