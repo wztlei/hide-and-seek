@@ -366,7 +366,8 @@ export const QuestionsPanel = memo(function QuestionsPanel({
     const [editingKey, setEditingKey] = useState<number | null>(null);
     // Prevents the onChange handler from discarding the draft on programmatic close.
     const isProgrammaticCloseRef = useRef(false);
-    const customPOIsReturnX = useRef(0);
+    // true = return to editor (Screen 3), false = return to list (Screen 1)
+    const [customPOIReturnToEditor, setCustomPOIReturnToEditor] = useState(false);
 
     const $draftQuestion = useStore(draftQuestion);
 
@@ -464,11 +465,11 @@ export const QuestionsPanel = memo(function QuestionsPanel({
         Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
     }
 
-    function goToCustomPOIs(returnX = 0) {
+    function goToCustomPOIs(fromEditor = false) {
         if (!customPOISelectedType) {
             onCustomPOISelectType?.(CUSTOM_POI_TYPES[0].value);
         }
-        customPOIsReturnX.current = returnX;
+        setCustomPOIReturnToEditor(fromEditor);
         Animated.spring(slideX, {
             toValue: -SCREEN_WIDTH * 3,
             useNativeDriver: true,
@@ -479,7 +480,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
 
     function goBackFromCustomPOIs() {
         Animated.spring(slideX, {
-            toValue: customPOIsReturnX.current,
+            toValue: customPOIReturnToEditor ? -SCREEN_WIDTH * 2 : 0,
             useNativeDriver: true,
             restDisplacementThreshold: 1,
             restSpeedThreshold: 1,
@@ -759,7 +760,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                     </View>
 
                     <Pressable
-                        onPress={goToCustomPOIs}
+                        onPress={() => goToCustomPOIs()}
                         className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100 active:bg-gray-50"
                     >
                         <View className="flex-row items-center gap-3">
@@ -1073,7 +1074,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 onPickLocationOnMap={onPickLocationOnMap}
                                 onOpenCustomPOIs={(type) => {
                                     onCustomPOISelectType?.(type);
-                                    goToCustomPOIs(-SCREEN_WIDTH * 2);
+                                    goToCustomPOIs(true);
                                 }}
                             />
                         )}
@@ -1084,7 +1085,7 @@ export const QuestionsPanel = memo(function QuestionsPanel({
                                 onPickLocationOnMap={onPickLocationOnMap}
                                 onOpenCustomPOIs={(type) => {
                                     onCustomPOISelectType?.(type);
-                                    goToCustomPOIs(-SCREEN_WIDTH * 2);
+                                    goToCustomPOIs(true);
                                 }}
                             />
                         )}
