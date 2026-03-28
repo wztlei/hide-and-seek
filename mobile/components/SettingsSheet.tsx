@@ -90,8 +90,12 @@ export function SettingsSheet({
     const $thunderforestEnabled = useStore(thunderforestEnabled);
     const $tileUsage = useStore(thunderforestTileUsage);
 
+    // A key is "builtin" if it matches the env-embedded shared key, OR if no
+    // user key has been set (empty string defaults to the shared key in MapView).
     const usingBuiltinKey =
-        !!BUILTIN_KEY && $thunderforestApiKey === BUILTIN_KEY;
+        !$thunderforestApiKey || $thunderforestApiKey === BUILTIN_KEY;
+    // Safe display value — never expose the raw BUILTIN_KEY string as text.
+    const displayKey = usingBuiltinKey ? null : $thunderforestApiKey;
     const month = (() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -231,9 +235,7 @@ export function SettingsSheet({
                     <View className="flex-row items-center mt-2 gap-2">
                         <View className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50">
                             <Text style={styles.apiKeyText} numberOfLines={1}>
-                                {usingBuiltinKey
-                                    ? "Using shared key"
-                                    : $thunderforestApiKey || "No key set"}
+                                {displayKey ?? "Using shared key"}
                             </Text>
                         </View>
                         <Pressable
@@ -250,10 +252,10 @@ export function SettingsSheet({
                                 Paste
                             </Text>
                         </Pressable>
-                        {!usingBuiltinKey && !!$thunderforestApiKey && (
+                        {!!displayKey && (
                             <Pressable
                                 onPress={() =>
-                                    thunderforestApiKey.set(BUILTIN_KEY)
+                                    thunderforestApiKey.set("")
                                 }
                                 className="active:opacity-60 px-3 py-2 rounded-lg bg-red-50"
                             >
