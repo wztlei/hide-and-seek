@@ -117,7 +117,7 @@ export function TentaclesEditor({
 
     // Merge custom POIs for this type into the selectable list.
     const customForType: Feature<Point>[] =
-        $customPOIs[data.locationType] ?? [];
+        hasSelectedType ? ($customPOIs[data.locationType] ?? []) : [];
     const allPois = [
         ...pois,
         ...customForType.filter(
