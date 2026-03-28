@@ -26,6 +26,7 @@ import {
     thunderforestTileUsage,
 } from "../lib/context";
 import { colors } from "../lib/colors";
+import { JS_VERSION } from "../lib/version";
 
 interface Props {
     visible: boolean;
@@ -37,12 +38,7 @@ interface Props {
     storeUrl?: string | null;
 }
 
-const APP_VERSION =
-    Constants.expoConfig?.version ??
-    // @ts-ignore — manifest2 exists in Expo Go (SDK 44+) but is not in the type definitions
-    (Constants.manifest2?.extra?.expoClient?.version as string | undefined) ??
-    Constants.manifest?.version ??
-    "1.0.0";
+const APP_VERSION = JS_VERSION;
 const GITHUB_ISSUES_URL = "https://github.com/wztlei/hide-and-seek/issues";
 const FEEDBACK_FORM_URL = "https://forms.gle/bGJ1FWvdKPHFnjp56";
 
