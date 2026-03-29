@@ -123,6 +123,13 @@ export function AppMapView() {
     const mapRef = useRef<MapViewRef>(null);
     const insets = useSafeAreaInsets();
 
+    // Cached zone bounding box — recomputed only when the zone polygon changes.
+    // Passed to useUserLocation so the locate FAB can fitBounds to the game zone.
+    const zoneBbox = useMemo(
+        () => ($mapGeoJSON ? (turf.bbox($mapGeoJSON) as [number, number, number, number]) : null),
+        [$mapGeoJSON],
+    );
+
     // ── Custom hooks ────────────────────────────────────────────────────────
     const { overLimit, handleRegionDidChange } = useThunderforestBudget();
     const { hasUpdate, latestVersion, storeUrl } = useUpdateCheck();
@@ -140,9 +147,10 @@ export function AppMapView() {
     const {
         userCoord,
         hasLocationPermission,
-        zoomToUserLocation,
+        locateMode,
+        onLocatePress,
         handleLocationUpdate,
-    } = useUserLocation(cameraRef);
+    } = useUserLocation(cameraRef, zoneBbox);
     const {
         hidingZoneCircles,
         hidingZoneMask,
@@ -782,9 +790,10 @@ export function AppMapView() {
                     bottomInset={insets.bottom}
                     isLoadingZone={isLoadingZone}
                     hasUpdate={hasUpdate}
+                    locateMode={locateMode}
                     onQuestionsPress={() => { setQuestionsVisible(true); setQuestionsOpenNonce(n => n + 1); }}
                     onZonePress={() => { setZoneModalVisible(true); setZoneOpenNonce(n => n + 1); }}
-                    onLocatePress={zoomToUserLocation}
+                    onLocatePress={onLocatePress}
                     onSettingsPress={() => { setSettingsVisible(true); setSettingsOpenNonce(n => n + 1); }}
                 />
             </View>
