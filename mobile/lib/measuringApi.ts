@@ -9,6 +9,7 @@ import type {
 } from "geojson";
 
 import { LOCATION_FIRST_TAG, OVERPASS_API } from "../../src/maps/api/constants";
+import { overpassFetch } from "./overpassFetch";
 import { deleteCached, getCached, setCached } from "./storage";
 
 // ── Persistent LRU cache (airports, cities, POI types) ────────────────────────
@@ -78,7 +79,7 @@ const COASTLINE_URL =
  */
 export async function fetchCoastline(): Promise<FeatureCollection<LineString>> {
     if (coastlineCache) return coastlineCache as FeatureCollection<LineString>;
-    const res = await fetch(COASTLINE_URL);
+    const res = await overpassFetch(COASTLINE_URL, { query_type: "coastline" });
     if (!res.ok) {
         throw new Error(`Failed to fetch coastline: ${res.status}`);
     }
@@ -119,7 +120,7 @@ export async function fetchAirports(
         // qt (quadtile order) enables streaming output for lower latency.
         const query = `[out:json][timeout:30];(node["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east});way["aeroway"="aerodrome"]["iata"](${south},${west},${north},${east}););out center qt;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "meas_airports", bbox });
         if (!res.ok) throw new Error(`Overpass airports ${res.status}`);
         const data = await res.json();
         const seen = new Set<string>();
@@ -173,7 +174,7 @@ export async function fetchCities(
         const [west, south, east, north] = bbox;
         const query = `[out:json][timeout:30];node[place=city]["population"~"^[1-9][0-9]{6,}$"](${south},${west},${north},${east});out qt;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "meas_cities", bbox });
         if (!res.ok) throw new Error(`Overpass cities ${res.status}`);
         const data = await res.json();
         const features: Feature<Point>[] = [];
@@ -213,7 +214,7 @@ export async function fetchHighSpeedRail(): Promise<
     if (highSpeedRailCache) return highSpeedRailCache;
     const query = `[out:json][timeout:60];way["railway"]["highspeed"="yes"];out geom qt;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
+    const res = await overpassFetch(url, { query_type: "high_speed_rail" });
     if (!res.ok) throw new Error(`Overpass high-speed rail ${res.status}`);
     const data = await res.json();
     Sentry.addBreadcrumb({
@@ -267,7 +268,7 @@ export async function fetchMeasuringPOIs(
         const [west, south, east, north] = bbox;
         const query = `[out:json][timeout:25];nwr["${tag}"="${baseType}"](${south},${west},${north},${east});out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "meas_poi", poi_type: baseType, bbox });
         if (!res.ok) throw new Error(`Overpass POI ${baseType} ${res.status}`);
         const data = await res.json();
         const features: Feature<Point>[] = [];
@@ -376,7 +377,7 @@ export async function fetchAdminBoundaries(
         const query = `[out:json][timeout:60];rel["boundary"="administrative"]["admin_level"="${adminLevel}"]${isoFilter}(${south},${west},${north},${east})->.rels;way(r.rels)(${south},${west},${north},${east});out geom;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
 
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "admin_boundaries", admin_level: adminLevel, bbox });
         if (!res.ok)
             throw new Error(
                 `Overpass admin boundaries level ${adminLevel} ${res.status}`,

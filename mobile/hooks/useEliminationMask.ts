@@ -145,7 +145,21 @@ export function useEliminationMask() {
             const slowTimer = setTimeout(() => {
                 if (!cancelled) {
                     toast.warn("Map rendering is taking a while…");
-                    Sentry.captureMessage("Map render slow (>10 s)", "warning");
+                    Sentry.withScope((scope) => {
+                        scope.setExtra("question_count", mapQuestions.length);
+                        scope.setExtra(
+                            "question_types",
+                            mapQuestions.map((q) => q.id),
+                        );
+                        scope.setExtra(
+                            "questions",
+                            mapQuestions.map((q) => ({
+                                id: q.id,
+                                data: q.data,
+                            })),
+                        );
+                        Sentry.captureMessage("Map render slow (>10 s)", "warning");
+                    });
                 }
             }, 10000);
 

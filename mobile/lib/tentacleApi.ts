@@ -4,6 +4,7 @@ import type { Feature, FeatureCollection, Point } from "geojson";
 
 import { LOCATION_FIRST_TAG, OVERPASS_API } from "../../src/maps/api/constants";
 import type { TraditionalTentacleQuestion } from "../../src/maps/schema";
+import { overpassFetch } from "./overpassFetch";
 import { deleteCached, getCached, setCached } from "./storage";
 
 // ── Tentacles persistent LRU cache ────────────────────────────────────────
@@ -122,7 +123,14 @@ export async function fetchTentacleLocations(
         // may have their centroid outside the radius even though they overlap it.
         const query = `[out:json][timeout:25];nwr["${tag}"="${question.locationType}"](around:${radiusMeters},${question.lat},${question.lng});out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, {
+            query_type: "tentacles",
+            poi_type: question.locationType,
+            lat: question.lat,
+            lng: question.lng,
+            radius: question.radius,
+            unit: question.unit,
+        });
         if (!res.ok)
             throw new Error(
                 `Overpass tentacles ${question.locationType} ${res.status}`,
