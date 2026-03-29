@@ -568,7 +568,7 @@ async function computeMatchingRegions(
                 });
         } catch (e) {
             Sentry.captureException(e, {
-                tags: { question_type: "measuring" },
+                tags: { question_type: "matching" },
             });
         }
     }
@@ -616,7 +616,7 @@ async function computeMeasuringRegions(
                     circles: result.circles,
                 });
         } catch (e) {
-            Sentry.captureException(e, { tags: { question_type: "matching" } });
+            Sentry.captureException(e, { tags: { question_type: "measuring" } });
         }
     }
 

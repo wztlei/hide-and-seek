@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import { useStore } from "@nanostores/react";
 import { useEffect, useState } from "react";
 
@@ -62,6 +63,14 @@ export function useZoneBoundary() {
             .catch((e) => {
                 console.error("fetchAllZoneBoundaries failed:", e);
                 toast.error("Could not load zone boundary");
+                Sentry.captureException(e, {
+                    tags: { location: "useZoneBoundary" },
+                    extra: {
+                        osm_id: $mapGeoLocation.properties.osm_id,
+                        osm_type: $mapGeoLocation.properties.osm_type,
+                        additional_zone_count: $additionalMapGeoLocations.length,
+                    },
+                });
             })
             .finally(() => {
                 if (!cancelled) setIsLoadingZone(false);
