@@ -57,6 +57,14 @@ export const additionalMapGeoLocations = persistentAtom<
     encode: JSON.stringify,
     decode: JSON.parse,
 });
+export const permanentOverlay = persistentAtom<FeatureCollection | null>(
+    "permanentOverlay",
+    null,
+    {
+        encode: JSON.stringify,
+        decode: JSON.parse,
+    },
+);
 
 export const mapGeoJSON = atom<FeatureCollection<
     Polygon | MultiPolygon
@@ -280,6 +288,7 @@ export const hidingZone = computed(
         customStations,
         includeDefaultStations,
         customPresets,
+        permanentOverlay,
     ],
     (
         q,
@@ -294,6 +303,7 @@ export const hidingZone = computed(
         $customStations,
         includeDefault,
         presets,
+        $permanentOverlay,
     ) => {
         if (geo !== null) {
             return {
@@ -307,6 +317,7 @@ export const hidingZone = computed(
                 customStations: $customStations,
                 includeDefaultStations: includeDefault,
                 presets: structuredClone(presets),
+                permanentOverlay: $permanentOverlay,
             };
         } else {
             const $loc = structuredClone(loc);
@@ -323,6 +334,7 @@ export const hidingZone = computed(
                 customStations: $customStations,
                 includeDefaultStations: includeDefault,
                 presets: structuredClone(presets),
+                permanentOverlay: $permanentOverlay,
             };
         }
     },
@@ -375,6 +387,14 @@ export const followMe = persistentAtom<boolean>("followMe", false, {
     encode: JSON.stringify,
     decode: JSON.parse,
 });
+export const defaultCustomQuestions = persistentAtom<boolean>(
+    "defaultCustomQuestions",
+    false,
+    {
+        encode: JSON.stringify,
+        decode: JSON.parse,
+    },
+);
 
 export const pastebinApiKey = persistentAtom<string>("pastebinApiKey", "");
 export const alwaysUsePastebin = persistentAtom<boolean>(
