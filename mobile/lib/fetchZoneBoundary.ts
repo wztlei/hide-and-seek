@@ -12,6 +12,7 @@ import {
     additionalMapGeoLocations,
     polyGeoJSON,
 } from "./context";
+import { overpassFetch } from "./overpassFetch";
 import { getCached, setCached } from "./storage";
 
 const OVERPASS_API = "https://overpass-api.de/api/interpreter";
@@ -70,7 +71,7 @@ async function fetchGeoJSONForZone(
         if (attempt > 0) {
             await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
         }
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "zone_boundary", osm_id: osmId, osm_type: osmType });
         if (res.status === 429 || res.status >= 500) {
             lastError = new Error(
                 `Overpass API error ${res.status} for osm_id ${osmId}`,

@@ -11,6 +11,7 @@ import osmtogeojson from "osmtogeojson";
 import * as Sentry from "@sentry/react-native";
 
 import { LOCATION_FIRST_TAG, OVERPASS_API } from "../../src/maps/api/constants";
+import { overpassFetch } from "./overpassFetch";
 import { deleteCached, getCached, setCached } from "./storage";
 
 // ── In-memory caches keyed on stringified params ───────────────────────────
@@ -96,7 +97,7 @@ export async function fetchAdminBoundary(
     const promise = (async () => {
         const query = `[out:json][timeout:30];is_in(${lat},${lng})->.a;rel(pivot.a)[admin_level="${adminLevel}"][boundary=administrative];out geom qt;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "admin_boundary", lat, lng, admin_level: adminLevel });
         if (!res.ok) throw new Error(`Overpass admin boundary ${res.status}`);
         const data = await res.json();
         const geo = osmtogeojson(data);
@@ -153,7 +154,7 @@ export async function fetchAvailableAdminLevels(
     const promise = (async () => {
         const query = `[out:json][timeout:15];is_in(${anchorLat},${anchorLng})->.a;rel(pivot.a)[boundary=administrative];out tags;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "admin_levels", lat: anchorLat, lng: anchorLng, zone_osm_id: zoneOsmId });
         if (!res.ok) throw new Error(`Overpass admin levels ${res.status}`);
         const data = await res.json();
 
@@ -213,7 +214,7 @@ export async function fetchAirports(): Promise<FeatureCollection<Point>> {
     airportsCache.promise = (async () => {
         const query = `[out:json][timeout:60];nwr["aeroway"="aerodrome"]["iata"];out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "matching_airports_global" });
         if (!res.ok) throw new Error(`Overpass airports ${res.status}`);
         const data = await res.json();
         Sentry.addBreadcrumb({
@@ -258,7 +259,7 @@ export async function fetchMajorCities(): Promise<FeatureCollection<Point>> {
         // Regex: population starts with 1-9 followed by at least 6 digits = ≥1M
         const query = `[out:json][timeout:60];node[place=city]["population"~"^[1-9][0-9]{6,}$"];out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "matching_cities_global" });
         if (!res.ok) throw new Error(`Overpass cities ${res.status}`);
         const data = await res.json();
         Sentry.addBreadcrumb({
@@ -325,7 +326,7 @@ export async function fetchMatchingPOIs(
         const overpassBbox = `(${minLat},${minLng},${maxLat},${maxLng})`;
         const query = `[out:json][timeout:25];nwr["${tag}"="${type}"]${overpassBbox};out center;`;
         const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-        const res = await fetch(url);
+        const res = await overpassFetch(url, { query_type: "matching_poi", poi_type: type, bbox });
         if (!res.ok) throw new Error(`Overpass POI ${type} ${res.status}`);
         const data = await res.json();
 

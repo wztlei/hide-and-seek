@@ -11,6 +11,7 @@ import type {
 import { useEffect, useRef, useState } from "react";
 
 import { OVERPASS_API } from "../../src/maps/api/constants";
+import { overpassFetch } from "../lib/overpassFetch";
 import { toast } from "../lib/notifications";
 import {
     displayHidingZones,
@@ -87,7 +88,7 @@ async function fetchStopsForTag(
     // Overpass format: (south, west, north, east)
     const query = `[out:json][timeout:25];node${tag}(${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)});out body;`;
     const url = `${OVERPASS_API}?data=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
+    const res = await overpassFetch(url, { query_type: "hiding_zones", tag, bbox });
     if (!res.ok) {
         Sentry.captureMessage(
             `Overpass hiding zones ${tag} HTTP ${res.status}`,
