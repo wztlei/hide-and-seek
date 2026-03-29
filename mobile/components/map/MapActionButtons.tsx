@@ -7,6 +7,7 @@ interface Props {
     bottomInset: number;
     isLoadingZone: boolean;
     hasUpdate?: boolean;
+    locateMode: "user" | "zone";
     onQuestionsPress: () => void;
     onZonePress: () => void;
     onLocatePress: () => void;
@@ -27,6 +28,7 @@ export function MapActionButtons({
     bottomInset,
     isLoadingZone,
     hasUpdate,
+    locateMode,
     onQuestionsPress,
     onZonePress,
     onLocatePress,
@@ -83,7 +85,7 @@ export function MapActionButtons({
                 hitSlop={8}
             >
                 <Ionicons
-                    name="locate-outline"
+                    name={locateMode === "user" ? "locate-outline" : "expand-outline"}
                     size={24}
                     color={colors.PRIMARY}
                 />
